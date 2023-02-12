@@ -65,3 +65,6 @@ doc/generated/
 
 # PyBuilder
 target/
+.DS_Store
+tb_logs/*
+

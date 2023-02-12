@@ -17,15 +17,14 @@
 .. |ReadTheDocs| image:: https://readthedocs.org/projects/sklearn-template/badge/?version=latest
 .. _ReadTheDocs: https://sklearn-template.readthedocs.io/en/latest/?badge=latest
 
-project-template - A template for scikit-learn contributions
-============================================================
+causal-graph - A library to infer causal-effect relationships from tabular data
+==================================================================================
 
 .. _scikit-learn: https://scikit-learn.org
 
-**project-template** is a template project for scikit-learn_ compatible
-extensions.
+**causal-graph** is a library that implements methods to extract the causal graph, from continuous tabular data.
 
-It aids development of estimators that can be used in scikit-learn pipelines
+It is build using SKLearn estimators, so that it can be used in scikit-learn pipelines
 and (hyper)parameter search, while facilitating testing (including some API
 compliance), documentation, open source development, packaging, and continuous
 integration.
@@ -34,5 +33,3 @@ integration.
 
 Refer to the documentation_ to modify the template for your own scikit-learn
 contribution.
-
-*Thank you for cleanly contributing to the scikit-learn ecosystem!*

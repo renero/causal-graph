@@ -11,7 +11,7 @@ ver_file = os.path.join('causalgraph', '_version.py')
 with open(ver_file) as f:
     exec(f.read())
 
-DISTNAME = 'causal-graph'
+DISTNAME = 'causalgraph'
 DESCRIPTION = 'A package to extract the causal graph from continuous tabular data.'
 with codecs.open('README.rst', encoding='utf-8-sig') as f:
     LONG_DESCRIPTION = f.read()
