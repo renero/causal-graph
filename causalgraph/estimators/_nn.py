@@ -7,6 +7,9 @@ from sklearn.utils.validation import check_array, check_is_fitted, check_X_y
 from tqdm.auto import tqdm
 
 from causalgraph.dnn.models import DFFModel, MLPModel
+import warnings
+
+warnings.filterwarnings("ignore")
 
 
 class NNRegressor(BaseEstimator):
@@ -27,6 +30,7 @@ class NNRegressor(BaseEstimator):
         patience: int,
         min_delta: float,
         random_state: int = 1234,
+        verbose: bool = False,
         enable_progress_bar: bool = False):
         """
         Train DFF networks for all variables in data. Each network will be trained to
@@ -95,9 +99,9 @@ class NNRegressor(BaseEstimator):
 
         model = DFFModel if self.model_type == "dff" else MLPModel
         self.nets = dict()
-        pbar = tqdm(total=len(self.feature_names), desc="Training NNs", leave=False)
+        pbar_in = tqdm(total=len(self.feature_names), desc="Training NNs", leave=False)
         for target in self.feature_names:
-            pbar.refresh()
+            pbar_in.refresh()
             net = model(
                 target=target,
                 input_size=self.n_features_in_,
@@ -117,8 +121,8 @@ class NNRegressor(BaseEstimator):
                 enable_progress_bar=self.enable_progress_bar)
             net.train()
             self.nets[target] = net
-            pbar.update(1)
-        pbar.close()
+            pbar_in.update(1)
+        pbar_in.close()
 
         self.is_fitted_ = True
         return self

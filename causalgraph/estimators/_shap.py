@@ -11,8 +11,8 @@ from sklearn.utils.validation import check_array, check_is_fitted, check_X_y
 from tqdm.auto import tqdm
 import networkx as nx
 
-from ..common.feature_selection import select_features
-from ..independence.edge_orientation import get_edge_orientation
+from causalgraph.common.feature_selection import select_features
+from causalgraph.independence.edge_orientation import get_edge_orientation
 
 
 class ShapEstimator(BaseEstimator):
@@ -51,7 +51,7 @@ class ShapEstimator(BaseEstimator):
     def fit(self, X, y=None):
         """
         """
-        X, y = check_X_y(X, y, accept_sparse=True)
+        #X, y = check_X_y(X, y, accept_sparse=True)
 
         columns = list(self.models.keys())
         self.shap_values = dict()
@@ -79,16 +79,15 @@ class ShapEstimator(BaseEstimator):
         Builds a causal graph from the shap values using a selection mechanism based
         on the knee or abrupt methods.
         """
-        X = check_array(X, accept_sparse=True)
-        check_is_fitted(self, 'is_fitted_')
-
         self.feature_names_ = list(X.columns)
+        X_array = check_array(X)
+        check_is_fitted(self, 'is_fitted_')
 
         self.parents = dict()
         for target in self.feature_names_:
             candidate_causes = [f for f in self.feature_names_ if f != target]
             self.parents[target] = select_features(
-                values=self.all_shap_values[target],
+                values=self.shap_values[target],
                 feature_names=candidate_causes,
                 method=self.method,
                 tolerance=self.tolerance,

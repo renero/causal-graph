@@ -1,9 +1,16 @@
+from copy import copy
 from pathlib import Path
 from typing import List, Tuple, Union
+
 import numpy as np
+import pandas as pd
+from _nn import NNRegressor
+from _shap import ShapEstimator
 from sklearn.base import BaseEstimator, ClassifierMixin
-from sklearn.utils.validation import check_X_y, check_array, check_is_fitted, check_random_state
 from sklearn.metrics import euclidean_distances
+from sklearn.utils.validation import (check_array, check_is_fitted,
+                                      check_random_state, check_X_y)
+from tqdm.auto import tqdm
 
 
 class Rex(BaseEstimator, ClassifierMixin):
@@ -41,49 +48,48 @@ class Rex(BaseEstimator, ClassifierMixin):
             }
         }
 
-
     def __init__(
-        self,
-        model_type: str = 'mlp',
-        hidden_dim: Union[int, List[int]] = [20, 20, 40],
-        learning_rate: float = 0.0035,
-        dropout: float = 0.065,
-        batch_size: int = 45,
-        num_epochs: int = 250,
-        loss_fn='mse',
-        gpus=0,
-        test_size=0.1,
-        sensitivity=1.0,
-        descending=False,
-        tolerance=None,
-        shap_selection: str = 'abrupt',
-        iters=10,
-        reciprocal=False,
-        min_impact=1e-06,
-        early_stop: bool = True,
-        patience: int = 10,
-        min_delta: float = 0.001,
-        corr_method: str = 'spearman',
-        corr_alpha: float = 0.6,
-        corr_clusters: int = 15,
-        shap_diff_upper_bound: float = 0.1,
-        correction_method: str = 'heuristic',
-        correction_model: Union[str, Path] = None,
-        increase_tolerance: float = 0.0,
-        condlen: int = 1,
-        condsize: int = 0,
-        verbose: bool = False,
-        enable_progress_bar=False,
-        do_plot_correlations: bool = False,
-        do_plot_shap: bool = False,
-        do_plot_discrepancies: bool = False,
-        do_compare_shap: bool = False,
-        do_compare_fci: bool = False,
-        do_compare_final: bool = False,
-        shap_fsize: Tuple[int, int] = (10, 10),
-        dpi: int = 75,
-        pdf_filename: str = None,
-        random_state=1234):
+            self,
+            model_type: str = 'mlp',
+            hidden_dim: Union[int, List[int]] = [20, 20, 40],
+            learning_rate: float = 0.0035,
+            dropout: float = 0.065,
+            batch_size: int = 45,
+            num_epochs: int = 250,
+            loss_fn='mse',
+            gpus=0,
+            test_size=0.1,
+            sensitivity=1.0,
+            descending=False,
+            tolerance=None,
+            shap_selection: str = 'abrupt',
+            iters=10,
+            reciprocal=False,
+            min_impact=1e-06,
+            early_stop: bool = True,
+            patience: int = 10,
+            min_delta: float = 0.001,
+            corr_method: str = 'spearman',
+            corr_alpha: float = 0.6,
+            corr_clusters: int = 15,
+            shap_diff_upper_bound: float = 0.1,
+            correction_method: str = 'heuristic',
+            correction_model: Union[str, Path] = None,
+            increase_tolerance: float = 0.0,
+            condlen: int = 1,
+            condsize: int = 0,
+            verbose: bool = False,
+            enable_progress_bar=True,
+            do_plot_correlations: bool = False,
+            do_plot_shap: bool = False,
+            do_plot_discrepancies: bool = False,
+            do_compare_shap: bool = False,
+            do_compare_fci: bool = False,
+            do_compare_final: bool = False,
+            shap_fsize: Tuple[int, int] = (10, 10),
+            dpi: int = 75,
+            pdf_filename: str = None,
+            random_state=1234):
         """
         Arguments:
         ----------
@@ -168,16 +174,16 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.loss_fn = loss_fn
         self.gpus = gpus
         self.test_size = test_size
+        self.min_impact = min_impact
+        self.early_stop = early_stop
+        self.patience = patience
+        self.min_delta = min_delta
         self.sensitivity = sensitivity
         self.descending = descending
         self.tolerance = tolerance
         self.shap_selection = shap_selection
         self.iters = iters
         self.reciprocal = reciprocal
-        self.min_impact = min_impact
-        self.early_stop = early_stop
-        self.patience = patience
-        self.min_delta = min_delta
         self.corr_method = corr_method
         self.corr_alpha = corr_alpha
         self.corr_clusters = corr_clusters
@@ -201,31 +207,37 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.dpi = dpi
         self.pdf_filename = pdf_filename
 
-    def fit(self, X, y):
-        """A reference implementation of a fitting function.
-
-        Parameters
-        ----------
-        X : {array-like, sparse matrix}, shape (n_samples, n_features)
-            The training input samples.
-        y : array-like, shape (n_samples,) or (n_samples, n_outputs)
-            The target values (class labels in classification, real numbers in
-            regression).
-
-        Returns
-        -------
-        self : object
-            Returns self.
+    def fit(self, X, y=None):
+        """
         """
         self.random_state_ = check_random_state(self.random_state)
-        X, y = check_X_y(X, y, y_numeric=True)
+        # X, y = check_X_y(X, y, y_numeric=True)
         self.n_features_in_ = X.shape[1]
+        self.X = copy(X)
 
-        
+        pbar = tqdm(total=3, desc="Fitting ReX")
+        pbar.refresh()
+        self.nn = NNRegressor(
+            self.model_type, self.hidden_dim, self.learning_rate, self.dropout,
+            self.batch_size, self.num_epochs, self.loss_fn, self.gpus, self.test_size,
+            self.early_stop, self.patience, self.min_delta, self.random_state,
+            enable_progress_bar=False, verbose=self.verbose)
+        self.nn.fit(self.X)
+        pbar.update(1)
+        pbar.refresh()
+        self.shaps = ShapEstimator(
+            self.nn.nets, self.shap_selection, self.sensitivity,
+            self.tolerance, self.descending, self.iters, self.reciprocal, 
+            self.min_impact, self.enable_progress_bar, self.verbose, self.gpus!=0)
+        self.shaps.fit(self.X)
+        pbar.update(1)
+        pbar.refresh()
+        self.G_shap = self.shaps.predict(self.X)
+        pbar.update(1)
+        pbar.refresh()
+        pbar.close()
 
         self.is_fitted_ = True
-
-        # `fit` should always return `self`
         return self
 
     def predict(self, X):
@@ -249,13 +261,8 @@ class Rex(BaseEstimator, ClassifierMixin):
         return np.random.randint(self.n_features_in_**2)
 
 
-
-def main():
-    from sklearn.utils.estimator_checks import check_estimator
-    rex = Rex()
-    #check_estimator(rex)
-
-
 if __name__ == "__main__":
-    main()
-    
+    dataset_name = 'generated_linear_10'
+    data = pd.read_csv("~/phd/data/generated_linear_10.csv")
+
+    rex = Rex().fit(data)

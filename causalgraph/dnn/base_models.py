@@ -13,7 +13,13 @@ from torch.distributions import Categorical
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
-from causalGraph.dnn.loss import MMDLoss
+from loss import MMDLoss
+
+import logging
+logging.getLogger('pytorch_lightning').setLevel(logging.ERROR)
+torch_log = logging.getLogger("pytorch_lightning")
+torch_log.propagate = False
+torch_log.setLevel(logging.ERROR)
 
 
 ONEOVERSQRT2PI = 1.0 / math.sqrt(2 * math.pi)

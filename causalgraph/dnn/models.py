@@ -19,7 +19,9 @@ from dnn.columnar import ColumnsDataset
 
 warnings.filterwarnings("ignore", ".*does not have many workers.*")
 logging.getLogger('pytorch_lightning').setLevel(logging.ERROR)
-
+torch_log = logging.getLogger("pytorch_lightning")
+torch_log.propagate = False
+torch_log.setLevel(logging.ERROR)
 
 class BaseModel(object):
 
