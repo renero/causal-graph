@@ -1,3 +1,4 @@
+import random
 from typing import List
 import numpy as np
 import pandas as pd
@@ -13,13 +14,13 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
 from torch.utils.data import DataLoader
 
-from dnn.base_models import MDN, DFF, MLP
-from dnn.columnar import ColumnsDataset
+from causalgraph.dnn.base_models import MDN, DFF, MLP
+from causalgraph.dnn.columnar import ColumnsDataset
 
 
 warnings.filterwarnings("ignore", ".*does not have many workers.*")
-logging.getLogger('pytorch_lightning').setLevel(logging.ERROR)
-torch_log = logging.getLogger("pytorch_lightning")
+logging.getLogger('pytorch-lightning').setLevel(logging.ERROR)
+torch_log = logging.getLogger("pytorch-lightning")
 torch_log.propagate = False
 torch_log.setLevel(logging.ERROR)
 
@@ -63,9 +64,14 @@ class BaseModel(object):
         self.gpu_available = torch.cuda.is_available()
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-        logging.getLogger('pytorch_lightning').setLevel(logging.ERROR)
+        logging.getLogger("pytorch_lightning").propagate = False
+        logging.getLogger("pytorch_lightning").setLevel(logging.ERROR)
 
-        pl.seed_everything(self.seed)
+        # pl.seed_everything(self.seed)
+        random.seed(self.seed)
+        np.random.seed(self.seed)
+        torch.manual_seed(self.seed)
+
         torch.set_printoptions(precision=3, linewidth=150, sci_mode=False)
         np.set_printoptions(precision=3, linewidth=150)
 
@@ -215,7 +221,6 @@ class MLPModel(BaseModel):
             callbacks=self.callbacks,
             auto_select_gpus=True,
             accelerator="gpu" if self.gpu_available else "cpu",
-            # devices=self.gpus,
             gpus=self.gpus,
             **self.extra_trainer_args)
 

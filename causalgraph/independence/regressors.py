@@ -10,7 +10,7 @@ from pandas import DataFrame
 from pygam import LinearGAM
 from sklearn.gaussian_process import GaussianProcessRegressor as gpr
 
-from causalGraph.independence import HSIC
+from causalgraph.independence.hsic import HSIC
 
 
 def _fit_GPR(x, y, x_test, y_test):

@@ -1,5 +1,10 @@
 {
+    "terminal.integrated.env.osx": {
+        "PYTHONPATH": "./"
+    },
     "python.analysis.extraPaths": [
-        "./causalgraph/dnn"
-    ]
+        "${workspaceFolder}/causalgraph/",
+    ],
+    "python.linting.cwd": "",
+    "python.testing.cwd": ""
 }

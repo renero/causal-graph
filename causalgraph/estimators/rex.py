@@ -4,13 +4,16 @@ from typing import List, Tuple, Union
 
 import numpy as np
 import pandas as pd
-from _nn import NNRegressor
-from _shap import ShapEstimator
+
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.metrics import euclidean_distances
 from sklearn.utils.validation import (check_array, check_is_fitted,
                                       check_random_state, check_X_y)
 from tqdm.auto import tqdm
+
+from causalgraph.dnn._nn import NNRegressor
+from _shap import ShapEstimator
+
 
 
 class Rex(BaseEstimator, ClassifierMixin):

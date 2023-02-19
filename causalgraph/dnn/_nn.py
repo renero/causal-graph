@@ -2,11 +2,15 @@ from typing import List, Union
 
 import numpy as np
 import pandas as pd
-from sklearn.base import BaseEstimator, ClassifierMixin
-from sklearn.utils.validation import check_array, check_is_fitted, check_X_y
+from sklearn.base import BaseEstimator
+from sklearn.utils.validation import check_array, check_is_fitted
 from tqdm.auto import tqdm
 
-from causalgraph.dnn.models import DFFModel, MLPModel
+import sys
+sys.path.append("../dnn")
+
+from causalgraph.dnn.models import DFFModel
+from causalgraph.dnn.models import MLPModel
 import warnings
 
 warnings.filterwarnings("ignore")
