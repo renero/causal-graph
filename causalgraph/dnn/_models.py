@@ -14,8 +14,8 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
 from torch.utils.data import DataLoader
 
-from causalgraph.dnn.base_models import MDN, DFF, MLP
-from causalgraph.dnn.columnar import ColumnsDataset
+from ._base_models import MDN, DFF, MLP
+from ._columnar import ColumnsDataset
 
 
 warnings.filterwarnings("ignore", ".*does not have many workers.*")

@@ -13,7 +13,7 @@ from torch.distributions import Categorical
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
-from .loss import MMDLoss
+from ._loss import MMDLoss
 
 import logging
 logging.getLogger('pytorch_lightning').setLevel(logging.ERROR)

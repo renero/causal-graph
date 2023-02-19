@@ -6,11 +6,11 @@ from sklearn.base import BaseEstimator
 from sklearn.utils.validation import check_array, check_is_fitted
 from tqdm.auto import tqdm
 
-import sys
-sys.path.append("../dnn")
+# import sys
+# sys.path.append("../dnn")
 
-from causalgraph.dnn.models import DFFModel
-from causalgraph.dnn.models import MLPModel
+from ._models import DFFModel, MLPModel
+
 import warnings
 
 warnings.filterwarnings("ignore")
