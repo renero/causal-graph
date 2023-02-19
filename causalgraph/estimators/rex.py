@@ -221,7 +221,6 @@ class Rex(BaseEstimator, ClassifierMixin):
         """
         """
         self.random_state_ = check_random_state(self.random_state)
-        # X, y = check_X_y(X, y, y_numeric=True)
         self.n_features_in_ = X.shape[1]
         self.X = copy(X)
         self.y = copy(y) if y is not None else None
