@@ -20,8 +20,6 @@ class Rex(BaseEstimator, ClassifierMixin):
     uses a regression model to predict the outcome of a treatment and uses
     explainability to identify the causal variables.
 
-
-
     Parameters
     ----------
     demo_param : str, default='demo_param'
