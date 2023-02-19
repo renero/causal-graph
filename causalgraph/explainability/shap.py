@@ -29,9 +29,8 @@ class ShapEstimator(BaseEstimator):
             iters: int = 20,
             reciprocity: False = False,
             min_impact: float = 1e-06,
-            progbar: bool = True,
             verbose: bool = False,
-            prog_bar: bool = True,
+            enable_progress_bar: bool = True,
             on_gpu: bool = False):
         """
         """
@@ -43,22 +42,25 @@ class ShapEstimator(BaseEstimator):
         self.iters = iters
         self.reciprocity = reciprocity
         self.min_impact = min_impact
-        self.progbar = progbar
         self.verbose = verbose
-        self.prog_bar = prog_bar
+        self.prog_bar = enable_progress_bar
         self.on_gpu = on_gpu
+
+        self._fit_desc = "Computing SHAPLEY values"
+        self._pred_desc = "Building graph skeleton"
 
     def fit(self, X, y=None):
         """
         """
-        #X, y = check_X_y(X, y, accept_sparse=True)
+        # X, y = check_X_y(X, y, accept_sparse=True)
 
         columns = list(self.models.keys())
         self.shap_values = dict()
         pbar = tqdm(total=len(columns),
-                    desc="Computing SHAPLEY values", disable=not self.prog_bar, leave=False)
+                    desc=f"{self._fit_desc:<25}", disable=not self.prog_bar,
+                    leave=False)
         for target_name in columns:
-            pbar.update()
+            pbar.update(1)
             model = self.models[target_name]
             features_tensor = model.train_loader.dataset.features
             if self.on_gpu:
@@ -83,6 +85,10 @@ class ShapEstimator(BaseEstimator):
         X_array = check_array(X)
         check_is_fitted(self, 'is_fitted_')
 
+        pbar = tqdm(total=3,
+            desc=f"{self._fit_desc:<25}", disable=not self.prog_bar,
+            leave=False)
+
         self.parents = dict()
         for target in self.feature_names_:
             candidate_causes = [f for f in self.feature_names_ if f != target]
@@ -94,7 +100,7 @@ class ShapEstimator(BaseEstimator):
                 sensitivity=self.sensitivity,
                 descending=self.descending,
                 min_impact=self.min_impact)
-
+        pbar.update(1); pbar.refresh()
         # Add edges ONLY between nodes where SHAP recognizes both directions
         G_shap_unoriented = nx.Graph()
         for target in self.feature_names_:
@@ -104,10 +110,14 @@ class ShapEstimator(BaseEstimator):
                         G_shap_unoriented.add_edge(target, parent)
                 else:
                     G_shap_unoriented.add_edge(target, parent)
+        pbar.update(1); pbar.refresh()
+        pbar.close()
 
         G_shap = nx.DiGraph()
-        pbar = tqdm(total=len(G_shap_unoriented.edges()), disable=not self.progbar,
-                    leave=False, desc="Orienting causal graph")
+        desc = "Orienting causal graph"
+        pbar = tqdm(total=len(G_shap_unoriented.edges()),
+                    disable=not self.prog_bar,
+                    leave=False, desc=f"{desc:<25}")
         for u, v in G_shap_unoriented.edges():
             pbar.update(1)
             orientation = get_edge_orientation(

@@ -12,7 +12,7 @@ from tqdm.auto import tqdm
 
 from causalgraph.dnn.dnn import NNRegressor
 from causalgraph.explainability.shap import ShapEstimator
-
+from causalgraph.explainability.hierarchies import Hierarchies
 
 
 class Rex(BaseEstimator, ClassifierMixin):
@@ -144,7 +144,7 @@ class Rex(BaseEstimator, ClassifierMixin):
                 Default is False.
             verbose (bool): Whether to print the progress of the training. Default
                 is False.
-            random_state (int): The seed for the random number generator. 
+            random_state (int): The seed for the random number generator.
                 Default is 1234.
 
             Additional arguments:
@@ -159,7 +159,7 @@ class Rex(BaseEstimator, ClassifierMixin):
                     causal graph and the after-FCI graph. Default is True.
                 do_compare_final: Whether to plot the dot comparison between the
                     causal graph and the final graph. Default is True.
-                shap_fsize: The size of the figure for the shap values. 
+                shap_fsize: The size of the figure for the shap values.
                     Default is (5, 3).
                 dpi: The dpi for the figures. Default is 75.
                 pdf_filename: The filename for the pdf file where final comparison will
@@ -173,6 +173,7 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.num_epochs = num_epochs
         self.loss_fn = loss_fn
         self.gpus = gpus
+        self.have_gpu = self.gpus != 0
         self.test_size = test_size
         self.min_impact = min_impact
         self.early_stop = early_stop
@@ -207,6 +208,14 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.dpi = dpi
         self.pdf_filename = pdf_filename
 
+        self._fit_desc = "Fitting ReX method"
+
+    def step(self, class_name, list_of_params):
+        obj = class_name(*list_of_params)
+        obj.fit(self.X, self.y)
+        self._pbar_update(1)
+        return obj
+
     def fit(self, X, y=None):
         """
         """
@@ -214,31 +223,34 @@ class Rex(BaseEstimator, ClassifierMixin):
         # X, y = check_X_y(X, y, y_numeric=True)
         self.n_features_in_ = X.shape[1]
         self.X = copy(X)
+        self.y = copy(y) if y is not None else None
 
-        pbar = tqdm(total=3, desc="Fitting ReX")
-        pbar.refresh()
-        self.nn = NNRegressor(
+        self.pbar = tqdm(total=4, desc=f"{self._fit_desc:<25}", leave=False)
+        self._pbar_update(0)
+        
+        self.nn = self.step(NNRegressor, [
             self.model_type, self.hidden_dim, self.learning_rate, self.dropout,
             self.batch_size, self.num_epochs, self.loss_fn, self.gpus, self.test_size,
             self.early_stop, self.patience, self.min_delta, self.random_state,
-            enable_progress_bar=False, verbose=self.verbose)
-        self.nn.fit(self.X)
-        pbar.update(1)
-        pbar.refresh()
-        self.shaps = ShapEstimator(
+            self.verbose, False])
+        
+        self.shaps = self.step(ShapEstimator, [
             self.nn.nets, self.shap_selection, self.sensitivity,
-            self.tolerance, self.descending, self.iters, self.reciprocal, 
-            self.min_impact, self.enable_progress_bar, self.verbose, self.gpus!=0)
-        self.shaps.fit(self.X)
-        pbar.update(1)
-        pbar.refresh()
+            self.tolerance, self.descending, self.iters, self.reciprocal,
+            self.min_impact, self.verbose, self.enable_progress_bar, self.have_gpu])
         self.G_shap = self.shaps.predict(self.X)
-        pbar.update(1)
-        pbar.refresh()
-        pbar.close()
+        self._pbar_update()
 
-        self.is_fitted_ = True
+        self.data_hierarchy = self.step(Hierarchies, [
+            self.corr_method, self.corr_alpha, self.corr_clusters])
+        self.pbar.close()
+
+        self.is_fitted_=True
         return self
+
+    def _pbar_update(self, step=1):
+        self.pbar.update(step)
+        self.pbar.refresh()
 
     def predict(self, X):
         """A reference implementation of a predicting function.
@@ -254,7 +266,7 @@ class Rex(BaseEstimator, ClassifierMixin):
             Returns an array of ones.
         """
         check_is_fitted(self, "is_fitted_")
-        X = check_array(X)
+        X=check_array(X)
         return np.random.rand(self.n_features_in_, self.n_features_in_).astype(np.float32)
 
     def score(self, X, y):
@@ -262,7 +274,7 @@ class Rex(BaseEstimator, ClassifierMixin):
 
 
 if __name__ == "__main__":
-    dataset_name = 'generated_linear_10'
-    data = pd.read_csv("~/phd/data/generated_linear_10.csv")
+    dataset_name='generated_linear_10'
+    data=pd.read_csv("~/phd/data/generated_linear_10.csv")
 
-    rex = Rex().fit(data)
+    rex=Rex().fit(data)

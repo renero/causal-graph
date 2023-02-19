@@ -81,6 +81,8 @@ class NNRegressor(BaseEstimator):
         self.random_state = random_state
         self.enable_progress_bar = enable_progress_bar
 
+        self._fit_desc = "Training NNs"
+
     def fit(self, X, y=None):
         """A reference implementation of a fitting function.
 
@@ -103,7 +105,8 @@ class NNRegressor(BaseEstimator):
 
         model = DFFModel if self.model_type == "dff" else MLPModel
         self.nets = dict()
-        pbar_in = tqdm(total=len(self.feature_names), desc="Training NNs", leave=False)
+        pbar_in = tqdm(total=len(self.feature_names), 
+            desc=f"{self._fit_desc:<25s}", leave=False)
         for target in self.feature_names:
             pbar_in.refresh()
             net = model(
