@@ -13,6 +13,7 @@ from tqdm.auto import tqdm
 from causalgraph.dnn.dnn import NNRegressor
 from causalgraph.explainability.shap import ShapEstimator
 from causalgraph.explainability.hierarchies import Hierarchies
+from causalgraph.independence.graph_independence import GraphIndependence
 
 
 class Rex(BaseEstimator, ClassifierMixin):
@@ -225,7 +226,7 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.X = copy(X)
         self.y = copy(y) if y is not None else None
 
-        self.pbar = tqdm(total=4, desc=f"{self._fit_desc:<25}", leave=False)
+        self.pbar = tqdm(total=5, desc=f"{self._fit_desc:<25}", leave=False)
         self._pbar_update(0)
         
         self.nn = self.step(NNRegressor, [
@@ -243,8 +244,11 @@ class Rex(BaseEstimator, ClassifierMixin):
 
         self.data_hierarchy = self.step(Hierarchies, [
             self.corr_method, self.corr_alpha, self.corr_clusters])
-        self.pbar.close()
 
+        self.GI = self.step(GraphIndependence, [
+            self.G_shap, self.condlen, self.condsize, self.verbose])
+
+        self.pbar.close()
         self.is_fitted_=True
         return self
 
@@ -275,6 +279,6 @@ class Rex(BaseEstimator, ClassifierMixin):
 
 if __name__ == "__main__":
     dataset_name='generated_linear_10'
-    data=pd.read_csv("~/phd/data/generated_linear_10.csv")
+    data=pd.read_csv("~/phd/data/generated_linear_10_mini.csv")
 
     rex=Rex().fit(data)
