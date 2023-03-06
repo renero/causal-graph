@@ -212,41 +212,6 @@ class Rex(BaseEstimator, ClassifierMixin):
 
         self._fit_desc = "Fitting ReX method"
 
-    # def _get_params(self, param_names):
-    #     params = []
-    #     for arg in param_names:
-    #         params.append(getattr(self, arg))
-    #     return params
-
-    # def step(self, step_name: callable, list_of_params: List[Any] = []) -> str:
-    #     """
-    #     This function is used to fit a model to the data, using
-    #     the class passed as `step_name` and `list_of_params` arguments.
-    #     If the `step_name` is a function, then it will be called with
-    #     the `list_of_params` as arguments.
-
-    #     Parameters
-    #     ----------
-    #         class_name (callable): The class to use for the model, or a function.
-    #         list_of_params (list): The list of parameters to use for the model.
-
-    #     Returns
-    #     -------
-    #         obj: The fitted model.
-    #     """
-    #     return_value = None
-    #     if type(step_name) is types.FunctionType or type(step_name) is types.MethodType:
-    #         return_value = step_name(*list_of_params)
-    #     # check if type of step_name is a class
-    #     elif type(step_name) is type:
-    #         obj = step_name(*list_of_params)
-    #         obj.fit(self.X, self.y)
-    #         return_value = obj
-    #     else:
-    #         raise TypeError("step_name must be a class or a function")
-    #     self._pbar_update(1)
-    #     return return_value
-
     def fit(self, X, y=None):
         """Fit the model according to the given training data.
 
@@ -284,24 +249,6 @@ class Rex(BaseEstimator, ClassifierMixin):
             GraphIndependence: ["G_shap", "condlen", "condsize", "verbose"],
             ('discrepancies', 'self.shaps.compute_shap_discrepancies'): []
         }
-
-        # self.nn = self.step(NNRegressor, [
-        #     self.model_type, self.hidden_dim, self.learning_rate, self.dropout,
-        #     self.batch_size, self.num_epochs, self.loss_fn, self.gpus, self.test_size,
-        #     self.early_stop, self.patience, self.min_delta, self.random_state,
-        #     self.verbose, False])
-        # self.shaps = self.step(ShapEstimator, [
-        #     self.nn, self.shap_selection, self.sensitivity,
-        #     self.tolerance, self.descending, self.iters, self.reciprocal,
-        #     self.min_impact, self.verbose, self.enable_progress_bar, self.have_gpu])
-        # self.G_shap = self.shaps.predict(self.X)
-        # self._pbar_update()
-        # self.data_hierarchy = self.step(Hierarchies, [
-        #     self.corr_method, self.corr_alpha, self.corr_clusters])
-        # self.GI = self.step(GraphIndependence, [
-        #     self.G_shap, self.condlen, self.condsize, self.verbose])
-        # self.step(self.shaps.compute_shap_discrepancies)
-
         pipeline.run(steps, "Training REX")
 
         self.is_fitted_ = True
