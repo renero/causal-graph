@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator
 from sklearn.utils.validation import check_array, check_is_fitted
+import torch
 from tqdm.auto import tqdm
 
 # import sys
@@ -15,7 +16,7 @@ import warnings
 
 warnings.filterwarnings("ignore")
 
-
+# TODO: Make this class to inherit from a generic class for all regressors
 class NNRegressor(BaseEstimator):
     """
     """
@@ -79,8 +80,10 @@ class NNRegressor(BaseEstimator):
         self.patience = patience
         self.min_delta = min_delta
         self.random_state = random_state
+        self.verbose = verbose
         self.enable_progress_bar = enable_progress_bar
 
+        self.regressor = None
         self._fit_desc = "Training NNs"
 
     def fit(self, X, y=None):
@@ -99,17 +102,17 @@ class NNRegressor(BaseEstimator):
         self : object
             Returns self.
         """
-        #X, y = check_X_y(X, y)
+        # X, y = check_X_y(X, y)
         self.n_features_in_ = X.shape[1]
         self.feature_names = list(X.columns)
+        self.regressor = dict()
 
         model = DFFModel if self.model_type == "dff" else MLPModel
-        self.nets = dict()
         pbar_in = tqdm(total=len(self.feature_names), 
             desc=f"{self._fit_desc:<25s}", leave=False)
         for target in self.feature_names:
             pbar_in.refresh()
-            net = model(
+            self.regressor[target] = model(
                 target=target,
                 input_size=self.n_features_in_,
                 hidden_dim=self.hidden_dim,
@@ -126,8 +129,7 @@ class NNRegressor(BaseEstimator):
                 patience=self.patience,
                 min_delta=self.min_delta,
                 enable_progress_bar=self.enable_progress_bar)
-            net.train()
-            self.nets[target] = net
+            self.regressor[target].train()
             pbar_in.update(1)
         pbar_in.close()
 
@@ -150,6 +152,38 @@ class NNRegressor(BaseEstimator):
         X = check_array(X, accept_sparse=True)
         check_is_fitted(self, 'is_fitted_')
         return np.ones(X.shape[0], dtype=np.int64)
+    
+    def get_input_tensors(self, target_name: str):
+        """
+        Returns the data used to train the model for the given target.
+
+        Parameters
+        ----------
+        target_name : str
+            The name of the target.
+
+        Returns
+        -------
+        Tuple[pd.DataFrame, pd.Series]
+            The data used to train the model for the given target.
+
+        Examples
+        --------
+        >>> nn = NNRegressor().fit(data)
+        >>> X, y = nn.get_input_tensors('target1')
+
+        """
+        model = self.regressor[target_name]
+        features_tensor = torch.autograd.Variable(model.train_loader.dataset.features)
+        target_tensor = model.train_loader.dataset.target
+
+        cols = list(self.feature_names)
+        cols.remove(target_name)
+
+        X = pd.DataFrame(features_tensor.detach().numpy(), columns=cols)
+        y = pd.DataFrame(target_tensor.detach().numpy(), columns=[target_name])
+
+        return X, y
 
 
 if __name__ == "__main__":

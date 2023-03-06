@@ -1,6 +1,6 @@
 from copy import copy
 from pathlib import Path
-from typing import List, Tuple, Union
+from typing import Any, List, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -14,6 +14,7 @@ from causalgraph.dnn.dnn import NNRegressor
 from causalgraph.explainability.shap import ShapEstimator
 from causalgraph.explainability.hierarchies import Hierarchies
 from causalgraph.independence.graph_independence import GraphIndependence
+from causalgraph.common.pipeline import Pipeline
 
 
 class Rex(BaseEstimator, ClassifierMixin):
@@ -211,49 +212,100 @@ class Rex(BaseEstimator, ClassifierMixin):
 
         self._fit_desc = "Fitting ReX method"
 
-    def step(self, class_name, list_of_params):
-        obj = class_name(*list_of_params)
-        obj.fit(self.X, self.y)
-        self._pbar_update(1)
-        return obj
+    # def _get_params(self, param_names):
+    #     params = []
+    #     for arg in param_names:
+    #         params.append(getattr(self, arg))
+    #     return params
+
+    # def step(self, step_name: callable, list_of_params: List[Any] = []) -> str:
+    #     """
+    #     This function is used to fit a model to the data, using
+    #     the class passed as `step_name` and `list_of_params` arguments.
+    #     If the `step_name` is a function, then it will be called with
+    #     the `list_of_params` as arguments.
+
+    #     Parameters
+    #     ----------
+    #         class_name (callable): The class to use for the model, or a function.
+    #         list_of_params (list): The list of parameters to use for the model.
+
+    #     Returns
+    #     -------
+    #         obj: The fitted model.
+    #     """
+    #     return_value = None
+    #     if type(step_name) is types.FunctionType or type(step_name) is types.MethodType:
+    #         return_value = step_name(*list_of_params)
+    #     # check if type of step_name is a class
+    #     elif type(step_name) is type:
+    #         obj = step_name(*list_of_params)
+    #         obj.fit(self.X, self.y)
+    #         return_value = obj
+    #     else:
+    #         raise TypeError("step_name must be a class or a function")
+    #     self._pbar_update(1)
+    #     return return_value
 
     def fit(self, X, y=None):
-        """
+        """Fit the model according to the given training data.
+
+        Parameters
+        ----------
+        X : {array-like, sparse matrix}, shape (n_samples, n_features)
+            Training vector, where n_samples is the number of samples and
+            n_features is the number of features.
+
+        y : array-like, shape (n_samples,)
+            Target vector relative to X.
+
+        Returns
+        -------
+        self : object
+            Returns self.
         """
         self.random_state_ = check_random_state(self.random_state)
         self.n_features_in_ = X.shape[1]
         self.X = copy(X)
         self.y = copy(y) if y is not None else None
 
-        self.pbar = tqdm(total=5, desc=f"{self._fit_desc:<25}", leave=False)
-        self._pbar_update(0)
-        
-        self.nn = self.step(NNRegressor, [
-            self.model_type, self.hidden_dim, self.learning_rate, self.dropout,
-            self.batch_size, self.num_epochs, self.loss_fn, self.gpus, self.test_size,
-            self.early_stop, self.patience, self.min_delta, self.random_state,
-            self.verbose, False])
-        
-        self.shaps = self.step(ShapEstimator, [
-            self.nn.nets, self.shap_selection, self.sensitivity,
-            self.tolerance, self.descending, self.iters, self.reciprocal,
-            self.min_impact, self.verbose, self.enable_progress_bar, self.have_gpu])
-        self.G_shap = self.shaps.predict(self.X)
-        self._pbar_update()
+        pipeline = Pipeline(self)
+        steps = {
+            ('nn', NNRegressor): [
+                "model_type", "hidden_dim", "learning_rate", "dropout", "batch_size", 
+                "num_epochs", "loss_fn", "gpus", "test_size", "early_stop", "patience", 
+                "min_delta", "random_state", "verbose", False],
+            ('shaps', ShapEstimator): [
+                "nn", "shap_selection", "sensitivity", "tolerance", "descending", 
+                "iters", "reciprocal", "min_impact", "verbose", "enable_progress_bar",
+                "have_gpu"],
+            ("G_shap", 'self.shaps.predict'): ["X"],
+            Hierarchies: ["corr_method", "corr_alpha", "corr_clusters"],
+            GraphIndependence: ["G_shap", "condlen", "condsize", "verbose"],
+            ('discrepancies', 'self.shaps.compute_shap_discrepancies'): []
+        }
 
-        self.data_hierarchy = self.step(Hierarchies, [
-            self.corr_method, self.corr_alpha, self.corr_clusters])
+        # self.nn = self.step(NNRegressor, [
+        #     self.model_type, self.hidden_dim, self.learning_rate, self.dropout,
+        #     self.batch_size, self.num_epochs, self.loss_fn, self.gpus, self.test_size,
+        #     self.early_stop, self.patience, self.min_delta, self.random_state,
+        #     self.verbose, False])
+        # self.shaps = self.step(ShapEstimator, [
+        #     self.nn, self.shap_selection, self.sensitivity,
+        #     self.tolerance, self.descending, self.iters, self.reciprocal,
+        #     self.min_impact, self.verbose, self.enable_progress_bar, self.have_gpu])
+        # self.G_shap = self.shaps.predict(self.X)
+        # self._pbar_update()
+        # self.data_hierarchy = self.step(Hierarchies, [
+        #     self.corr_method, self.corr_alpha, self.corr_clusters])
+        # self.GI = self.step(GraphIndependence, [
+        #     self.G_shap, self.condlen, self.condsize, self.verbose])
+        # self.step(self.shaps.compute_shap_discrepancies)
 
-        self.GI = self.step(GraphIndependence, [
-            self.G_shap, self.condlen, self.condsize, self.verbose])
+        pipeline.run(steps, "Training REX")
 
-        self.pbar.close()
-        self.is_fitted_=True
+        self.is_fitted_ = True
         return self
-
-    def _pbar_update(self, step=1):
-        self.pbar.update(step)
-        self.pbar.refresh()
 
     def predict(self, X):
         """A reference implementation of a predicting function.
@@ -269,7 +321,7 @@ class Rex(BaseEstimator, ClassifierMixin):
             Returns an array of ones.
         """
         check_is_fitted(self, "is_fitted_")
-        X=check_array(X)
+        X = check_array(X)
         return np.random.rand(self.n_features_in_, self.n_features_in_).astype(np.float32)
 
     def score(self, X, y):
@@ -277,7 +329,7 @@ class Rex(BaseEstimator, ClassifierMixin):
 
 
 if __name__ == "__main__":
-    dataset_name='generated_linear_10'
-    data=pd.read_csv("~/phd/data/generated_linear_10_mini.csv")
+    dataset_name = 'generated_linear_10'
+    data = pd.read_csv("~/phd/data/generated_linear_10_mini.csv")
 
-    rex=Rex().fit(data)
+    rex = Rex().fit(data)
