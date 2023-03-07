@@ -2,8 +2,11 @@
 Pipeline class to define and run several execution steps.
 (C) J. Renero, 2023
 """
+import importlib
+import inspect
 import types
-from typing import List, Any
+from typing import Any, List, Union
+
 from tqdm.auto import tqdm
 
 
@@ -104,6 +107,12 @@ class Pipeline:
         self._prog_bar = prog_bar
         self._objects = [self.host]
 
+        # When passing a class to the pipeline, the pipeline will call the 
+        # default method specified by _default_object_method, and will pass
+        # the parameters specified by _default_method_params.
+        self._default_object_method = None
+        self._default_method_params = None
+
     def _get_params(self, param_names) -> List[Any]:
         """
         Get the parameters from the host object.
@@ -135,7 +144,7 @@ class Pipeline:
             params.append(param)
         return params
 
-    def run_step(self, step_name: str, list_of_params: List[Any] = []) -> Any:
+    def run_step(self, step_name: Union[Any, str], list_of_params: List[Any] = []) -> Any:
         """
         Run a step.
 
@@ -152,6 +161,7 @@ class Pipeline:
             Value returned by the function or the fit method of the class.
         """
         return_value = None
+
         # Check if step_name is a function or a class already in globals
         if step_name in globals():
             step_name = globals()[step_name]
@@ -164,6 +174,19 @@ class Pipeline:
                 obj.fit()
                 self._objects.append(obj)
                 return_value = obj
+            else:
+                raise TypeError("step_name must be a class or a function")
+        # Check if step_name is a function or a class in the calling module
+        elif not isinstance(step_name, str) and hasattr(step_name, '__module__'):
+            # check if type of step_name is a function
+            if type(step_name) is types.FunctionType or type(step_name) is types.MethodType:
+                return_value = step_name(*list_of_params)
+            # check if type of step_name is a class
+            elif type(step_name) is type:
+                obj = step_name(*list_of_params)
+                step_name = getattr(obj, self._default_object_method)
+                return_value = step_name(*self._get_params(self._default_method_params))                
+                self._objects.append(obj)
             else:
                 raise TypeError("step_name must be a class or a function")
         # Check if step_name is a method of the host object
@@ -181,11 +204,13 @@ class Pipeline:
             # check if step name is of the form object.method
             if '.' not in step_name:
                 raise ValueError(
-                    "step_name must be method of an object: object.method")
+                    f"step_name ({step_name}) must be method of an object: object.method")
             method_call = step_name
             root_object = self.host
             while '.' in method_call:
-                obj_name, method_name = step_name.split('.')
+                call_composition = step_name.split('.')
+                obj_name = call_composition[0]
+                method_name = method_name = '.'.join(call_composition[1:])
                 obj = getattr(root_object, obj_name)
                 call_name = getattr(obj, method_name)
                 method_call = '.'.join(method_name.split('.')[1:])
@@ -245,12 +270,34 @@ class Pipeline:
         time.sleep(1)
         self._pbar.refresh()
 
+    def set_default_object_method(self, method_name: str):
+        """
+        Set the default method to be called when the step name is a class.
+
+        Parameters
+        ----------
+        method_name: str
+            Name of the method to be called.
+        """
+        self._default_object_method = method_name
+
+    def set_default_method_params(self, params: list):
+        """
+        Set the default parameters to be passed to the default method.
+
+        Parameters
+        ----------
+        params: list
+            List of parameters to be passed to the default method.
+        """
+        self._default_method_params = params
+
 
 if __name__ == "__main__":
     host = Host('value1', 'value2')
     pipeline = Pipeline(host)
     steps = {
-        ('myobject', 'SampleClass'): ['param1', True],
+        ('myobject', SampleClass): ['param1', True],
         'myobject.method': [],
         'host_method': [],
         'my_method': ['param1', 'param2'],

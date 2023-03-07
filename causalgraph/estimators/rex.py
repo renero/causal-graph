@@ -57,7 +57,7 @@ class Rex(BaseEstimator, ClassifierMixin):
             learning_rate: float = 0.0035,
             dropout: float = 0.065,
             batch_size: int = 45,
-            num_epochs: int = 250,
+            num_epochs: int = 25, #250,
             loss_fn='mse',
             gpus=0,
             test_size=0.1,
@@ -235,6 +235,8 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.y = copy(y) if y is not None else None
 
         pipeline = Pipeline(self)
+        pipeline.set_default_object_method('fit')
+        pipeline.set_default_method_params(['X', 'y'])
         steps = {
             ('nn', NNRegressor): [
                 "model_type", "hidden_dim", "learning_rate", "dropout", "batch_size", 
@@ -244,10 +246,10 @@ class Rex(BaseEstimator, ClassifierMixin):
                 "nn", "shap_selection", "sensitivity", "tolerance", "descending", 
                 "iters", "reciprocal", "min_impact", "verbose", "enable_progress_bar",
                 "have_gpu"],
-            ("G_shap", 'self.shaps.predict'): ["X"],
+            ("G_shap", 'shaps.predict'): ["X"],
             Hierarchies: ["corr_method", "corr_alpha", "corr_clusters"],
             GraphIndependence: ["G_shap", "condlen", "condsize", "verbose"],
-            ('discrepancies', 'self.shaps.compute_shap_discrepancies'): []
+            ('discrepancies', 'shaps.compute_shap_discrepancies'): []
         }
         pipeline.run(steps, "Training REX")
 
