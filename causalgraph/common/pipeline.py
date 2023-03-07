@@ -19,7 +19,7 @@ class SampleClass:
     def fit(self):
         # print(f"  Into the fit of class {self.__class__}")
         # print(f"    I got params: {self.param1}, {self.param2}")
-        return ("MyClass.fit")
+        return self
 
     def method(self):
         # print(f"  Into the method {self.method.__name__}")
@@ -185,7 +185,11 @@ class Pipeline:
             elif type(step_name) is type:
                 obj = step_name(*list_of_params)
                 step_name = getattr(obj, self._default_object_method)
-                return_value = step_name(*self._get_params(self._default_method_params))                
+                if self._default_method_params is not None:
+                    step_params = self._get_params(self._default_method_params)
+                else:
+                    step_params = []
+                return_value = step_name(*step_params)
                 self._objects.append(obj)
             else:
                 raise TypeError("step_name must be a class or a function")
@@ -296,6 +300,7 @@ class Pipeline:
 if __name__ == "__main__":
     host = Host('value1', 'value2')
     pipeline = Pipeline(host)
+    pipeline.set_default_object_method('fit')
     steps = {
         ('myobject', SampleClass): ['param1', True],
         'myobject.method': [],
