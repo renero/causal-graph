@@ -1,10 +1,15 @@
 {
     "terminal.integrated.env.osx": {
-        "PYTHONPATH": "./"
+        "PYTHONPATH": "${workspaceFolder}/causalgraph"
     },
-    "python.analysis.extraPaths": [
-        "${workspaceFolder}/causalgraph/",
-    ],
     "python.linting.cwd": "",
-    "python.testing.cwd": ""
-}
+    "python.linting.enabled": true,
+    "python.linting.pylintEnabled": true,
+    "python.linting.pycodestyleEnabled": false,
+    "python.linting.flake8Enabled": false,
+    "python.linting.pylintPath": "~/.pyenv/shims/pylint",
+    "python.envFile": "${workspaceFolder}/.env",
+    "python.testing.pytestArgs": [
+        "causalgraph/tests"
+    ]}
+

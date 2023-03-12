@@ -1,10 +1,6 @@
 from typing import List
 
 import numpy as np
-# import pandas as pd
-# from causalGraph.deprecated.hsic_lasso import hsic_lasso
-# from pandas import DataFrame
-# from pyHSICLasso import HSICLasso as pyHSICLasso
 import pandas as pd
 from pandas import DataFrame
 from pygam import LinearGAM
