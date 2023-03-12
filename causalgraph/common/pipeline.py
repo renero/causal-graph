@@ -270,8 +270,6 @@ class Pipeline:
 
     def _pbar_update(self, step=1):
         self._pbar.update(step)
-        import time
-        time.sleep(1)
         self._pbar.refresh()
 
     def set_default_object_method(self, method_name: str):

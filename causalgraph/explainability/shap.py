@@ -16,9 +16,10 @@ from sklearn.utils.validation import check_is_fitted
 from tqdm.auto import tqdm
 
 from causalgraph.common import *
-from causalgraph.common.feature_selection import select_features
-from causalgraph.dnn.dnn import NNRegressor
+from causalgraph.independence.feature_selection import select_features
+from causalgraph.models.dnn import NNRegressor
 from causalgraph.independence.edge_orientation import get_edge_orientation
+from causalgraph.common.plots import plot_shap_summary
 
 
 class ShapEstimator(BaseEstimator):
@@ -358,21 +359,21 @@ class ShapEstimator(BaseEstimator):
                 diff = np.abs(forward_sd - reverse_sd)
                 vector = [forward_sd, reverse_sd, diff, 0., 0., 0., 0.]
 
-                # If the forward standard deviation is less than the reverse 
-                # standard deviation and within the tolerance range, attempt 
+                # If the forward standard deviation is less than the reverse
+                # standard deviation and within the tolerance range, attempt
                 # to reverse the edge.
                 if (forward_sd < reverse_sd) and \
                         (forward_sd < (target_mean + tolerance)):
-                    # If the difference between the standard deviations is within 
-                    # the acceptable range, reverse the edge and check for cycles 
+                    # If the difference between the standard deviations is within
+                    # the acceptable range, reverse the edge and check for cycles
                     # in the graph.
                     if diff < sd_upper and diff > 0.002:  # diff > sd_tol and
                         new_graph.remove_edge(feature, target)
                         new_graph.add_edge(target, feature)
                         edges_reversed.append((feature, target))
                         cycles = list(nx.simple_cycles(new_graph))
-                        # If reversing the edge creates a cycle that includes both 
-                        # the target and feature nodes, reverse the edge back to 
+                        # If reversing the edge creates a cycle that includes both
+                        # the target and feature nodes, reverse the edge back to
                         # its original direction and log the decision as discarded.
                         if len(cycles) > 0 and self._nodes_in_cycles(cycles, feature, target):
                             new_graph.remove_edge(target, feature)
@@ -476,3 +477,25 @@ class ShapEstimator(BaseEstimator):
               )
         if len(cycles) > 0 and self._nodes_in_cycles(cycles, feature, target):
             print(f"    ~~ Cycles: {cycles}")
+
+    def summary_plot(
+            self,
+            target_name,
+            ax=None,
+            max_features_to_display=20,
+            **kwargs):
+        """
+        This code has been extracted from the summary_plot in SHAP package
+        If you want to produce the original plot, simply type:
+
+        >>> shap.summary_plot(shap_values, plot_type='bar', 
+                              feature_names=feature_names_no_target)
+
+        """
+        feature_order = np.argsort(
+            np.sum(np.abs(self.shap_values[target_name]), axis=0))
+        feature_inds = feature_order[:max_features_to_display]
+        mean_shap_values = np.abs(self.shap_values[target_name]).mean(0)
+
+        plot_shap_summary(self.all_feature_names_, mean_shap_values, feature_inds, 
+                          selected_features=None, ax=ax, **kwargs)

@@ -68,3 +68,4 @@ target/
 .DS_Store
 tb_logs/*
 
+examples/tb_logs/*

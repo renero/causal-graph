@@ -10,11 +10,12 @@ from sklearn.utils.validation import (check_array, check_is_fitted,
                                       check_random_state)
 from tqdm.auto import tqdm
 
-from causalgraph.dnn.dnn import NNRegressor
+from causalgraph.models.dnn import NNRegressor
 from causalgraph.explainability.shap import ShapEstimator
 from causalgraph.explainability.hierarchies import Hierarchies
 from causalgraph.independence.graph_independence import GraphIndependence
 from causalgraph.common.pipeline import Pipeline
+from causalgraph.common.utils import load_experiment, save_experiment
 
 
 class Rex(BaseEstimator, ClassifierMixin):
@@ -281,4 +282,7 @@ if __name__ == "__main__":
     dataset_name = 'generated_linear_10'
     data = pd.read_csv("~/phd/data/generated_linear_10_mini.csv")
 
-    rex = Rex().fit(data)
+    rex = load_experiment('rex', "/Users/renero/phd/output/REX")
+    # rex = Rex().fit(data)
+    # save_experiment('rex', "/Users/renero/phd/output/REX", rex)
+    rex.shaps.summary_plot(target_name='V0')
