@@ -9,6 +9,11 @@ import os
 import pickle
 from os.path import join
 from pathlib import Path
+from typing import Union
+
+import networkx as nx
+import pydot as pydot
+import pydotplus
 
 
 def save_experiment(obj_name: str, folder: str, results: dict):
@@ -101,3 +106,14 @@ def valid_output_name(filename: str, path: str, extension=None) -> str:
         idx += 1
 
     return output_filepath
+
+
+def graph_from_dot_file(dot_file: Union[str, Path]) -> nx.DiGraph:
+    """ Returns a NetworkX DiGraph from a DOT FILE. """
+    dot_object = pydot.graph_from_dot_file(dot_file)
+    dot_string = dot_object[0].to_string()
+    dot_string = dot_string.replace('\"\\n\"', '')
+    dot_string = dot_string.replace("\n;\n", "\n")
+    dotplus = pydotplus.graph_from_dot_data(dot_string)
+    dotplus.set_strict(True)
+    return nx.nx_pydot.from_pydot(dotplus)

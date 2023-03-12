@@ -7,9 +7,21 @@
 from typing import Any, Callable, Dict, List, Tuple
 
 import matplotlib.pyplot as plt
+import networkx as nx
 import numpy as np
+from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.figure import Figure
 from matplotlib.ticker import FormatStrFormatter, MultipleLocator
+
+# Defaults for the graphs plotted
+formatting_kwargs = {"node_size": 1000,
+                     "node_color": "white",
+                     "edgecolors": "black",
+                     "font_family": "monospace",
+                     "horizontalalignment": "center",
+                     "verticalalignment": "center_baseline",
+                     "with_labels": True
+                     }
 
 
 def setup_plot(tex=True, font="serif", dpi=100):
@@ -85,15 +97,15 @@ def add_grid(ax, lines=True, locations=None):
 
 
 def subplots(
-        num_cols: int, 
-        plot_func: Callable, 
+        num_cols: int,
+        plot_func: Callable,
         *plot_args: Any,
         fig_size: Tuple[int, int] = (10, 6),
         title: str = None,
         **kwargs: Any) -> None:
     """
     Plots a set of subplots.
-    
+
     Arguments:
     ----------
         num_cols: int
@@ -134,7 +146,7 @@ def subplots(
                 plot_func(plot_args[index], ax=ax)
             else:
                 blank(axes[i][j])
-                
+
     if title is not None:
         fig.suptitle(title)
     plt.tight_layout()
@@ -143,9 +155,9 @@ def subplots(
 
 def plot_shap_summary(
         feature_names: List[str],
-        mean_shap_values, 
-        feature_inds, 
-        selected_features, 
+        mean_shap_values,
+        feature_inds,
+        selected_features,
         ax,
         **kwargs):
     """
@@ -184,3 +196,121 @@ def plot_shap_summary(
     #                 (','.join(selected_features) if len(selected_features) != 0 else 'ø'))
     fig = ax.figure if fig is None else fig
     return fig
+
+
+def plot_graph(
+        dag: nx.DiGraph,
+        reference: nx.DiGraph = None,
+        names: List[str] = ["REX Prediction", "Ground truth"],
+        figsize: Tuple[int, int] = (10, 5),
+        dpi: int = 75,
+        save_to_pdf: str = None,
+        **kwargs):
+    """
+    Compare two graphs using dot.
+
+    Parameters:
+    -----------
+    reference: The reference DAG.
+    dag: The DAG to compare.
+    names: The names of the reference graph and the dag.
+    figsize: The size of the figure.
+    **kwargs: Additional arguments to format the graphs:
+        - "node_size": 500
+        - "node_color": 'white'
+        - "edgecolors": "black"
+        - "font_family": "monospace"
+        - "horizontalalignment": "center"
+        - "verticalalignment": "center_baseline"
+        - "with_labels": True
+    """
+    ncols = 1 if reference is None else 2
+
+    # Overwrite formatting_kwargs with kwargs if they are provided
+    formatting_kwargs.update(kwargs)
+
+    G = nx.DiGraph()
+    G.add_edges_from(dag.edges())
+    if reference:
+        Gt = _cleanup_graph(reference.copy())
+        for missing in set(list(Gt.nodes)) - set(list(G.nodes)):
+            G.add_node(missing)
+
+        # Gt = _format_graph(Gt, Gt, inv_color="red", wrong_color="black")
+        # G = _format_graph(G, Gt, inv_color="red", wrong_color="gray")
+        Gt = _format_graph(Gt, G, inv_color="lightgreen", wrong_color="black")
+        G = _format_graph(G, Gt, inv_color="orange", wrong_color="gray")
+    else:
+        G = _format_graph(G)
+
+    ref_layout = None
+    setup_plot(dpi=dpi)
+    f, ax = plt.subplots(ncols=ncols, figsize=figsize)
+    ax_graph = ax[1] if reference else ax
+    if save_to_pdf is not None:
+        with PdfPages(save_to_pdf) as pdf:
+            if reference:
+                ref_layout = nx.drawing.nx_agraph.graphviz_layout(
+                    Gt, prog="dot")
+                _draw_graph_subplot(Gt, layout=ref_layout, title=None, ax=ax[0],
+                                    **formatting_kwargs)
+            _draw_graph_subplot(G, layout=ref_layout, title=None, ax=ax_graph,
+                                **formatting_kwargs)
+            pdf.savefig(f, bbox_inches='tight', pad_inches=0)
+            plt.close()
+    else:
+        if reference:
+            ref_layout = nx.drawing.nx_agraph.graphviz_layout(Gt, prog="dot")
+            _draw_graph_subplot(Gt, layout=ref_layout, title=names[1], ax=ax[0],
+                                **formatting_kwargs)
+        _draw_graph_subplot(G, layout=ref_layout, title=names[0], ax=ax_graph,
+                            **formatting_kwargs)
+        plt.show()
+
+
+def _format_graph(
+        G: nx.DiGraph,
+        Gt: nx.DiGraph = None,
+        ok_color="green",
+        inv_color="lightgreen",
+        wrong_color="black") -> nx.DiGraph:
+    if Gt is None:
+        for u, v in G.edges():
+            G[u][v]['color'] = "black"
+            G[u][v]['width'] = 1.0
+            G[u][v]['style'] = 'solid'
+            G[u][v]['alpha'] = 0.7
+    else:
+        for u, v in G.edges():
+            if Gt.has_edge(u, v):
+                G[u][v]['color'] = ok_color
+                G[u][v]['width'] = 3.0
+                G[u][v]['style'] = 'solid'
+                G[u][v]['alpha'] = 1.0
+            elif Gt.has_edge(v, u):
+                G[u][v]['color'] = inv_color
+                G[u][v]['width'] = 2.0
+                G[u][v]['style'] = 'solid'
+                G[u][v]['alpha'] = 0.8
+            else:
+                G[u][v]['color'] = wrong_color
+                G[u][v]['width'] = 1.0
+                G[u][v]['style'] = '--'
+                G[u][v]['alpha'] = 0.6
+    return G
+
+
+def _draw_graph_subplot(G: nx.DiGraph, layout: dict, title: str, ax: plt.Axes, **formatting_kwargs):
+    colors = list(nx.get_edge_attributes(G, 'color').values())
+    widths = list(nx.get_edge_attributes(G, 'width').values())
+    styles = list(nx.get_edge_attributes(G, 'style').values())
+    nx.draw(G, pos=layout, edge_color=colors, width=widths, style=styles,
+            **formatting_kwargs, ax=ax)
+    if title is not None:
+        ax.set_title(title, y=-0.1)
+
+
+def _cleanup_graph(G: nx.DiGraph) -> nx.DiGraph:
+    if '\\n' in G.nodes:
+        G.remove_node('\\n')
+    return G

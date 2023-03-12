@@ -10,8 +10,8 @@ from sklearn.utils.validation import (check_array, check_is_fitted,
 from tqdm.auto import tqdm
 
 from causalgraph.common.pipeline import Pipeline
-from causalgraph.common.plots import subplots
-from causalgraph.common.utils import load_experiment, save_experiment
+from causalgraph.common.plots import subplots, plot_graph
+from causalgraph.common.utils import graph_from_dot_file, load_experiment, save_experiment
 from causalgraph.explainability.hierarchies import Hierarchies
 from causalgraph.explainability.shap import ShapEstimator
 from causalgraph.independence.feature_selection import select_features
@@ -282,6 +282,7 @@ class Rex(BaseEstimator, ClassifierMixin):
 if __name__ == "__main__":
     dataset_name = 'generated_linear_10'
     data = pd.read_csv("~/phd/data/generated_linear_10_mini.csv")
+    ref_graph = graph_from_dot_file("/Users/renero/phd/data/generated_linear_10_mini.dot")
 
     rex = load_experiment('rex', "/Users/renero/phd/output/REX")
     # rex = Rex().fit(data)
@@ -290,4 +291,6 @@ if __name__ == "__main__":
     # Plot the SHAP values
     # plot_args = [(target_name) for target_name in rex.shaps.all_feature_names_]
     # subplots(4, rex.shaps.summary_plot, *plot_args, dpi=200);
-    
+
+    plot_graph(rex.G_final, ref_graph)
+
