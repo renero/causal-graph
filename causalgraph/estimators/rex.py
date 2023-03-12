@@ -4,18 +4,19 @@ from typing import Any, List, Tuple, Union
 
 import numpy as np
 import pandas as pd
-
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.utils.validation import (check_array, check_is_fitted,
                                       check_random_state)
 from tqdm.auto import tqdm
 
-from causalgraph.models.dnn import NNRegressor
-from causalgraph.explainability.shap import ShapEstimator
-from causalgraph.explainability.hierarchies import Hierarchies
-from causalgraph.independence.graph_independence import GraphIndependence
 from causalgraph.common.pipeline import Pipeline
+from causalgraph.common.plots import subplots
 from causalgraph.common.utils import load_experiment, save_experiment
+from causalgraph.explainability.hierarchies import Hierarchies
+from causalgraph.explainability.shap import ShapEstimator
+from causalgraph.independence.feature_selection import select_features
+from causalgraph.independence.graph_independence import GraphIndependence
+from causalgraph.models.dnn import NNRegressor
 
 
 class Rex(BaseEstimator, ClassifierMixin):
@@ -64,7 +65,7 @@ class Rex(BaseEstimator, ClassifierMixin):
             test_size=0.1,
             sensitivity=1.0,
             descending=False,
-            tolerance=None,
+            tolerance=0.04,
             shap_selection: str = 'abrupt',
             iters=10,
             reciprocal=False,
@@ -250,7 +251,7 @@ class Rex(BaseEstimator, ClassifierMixin):
             ("G_shap", 'shaps.predict'): ["X"],
             Hierarchies: ["corr_method", "corr_alpha", "corr_clusters"],
             GraphIndependence: ["G_shap", "condlen", "condsize", "verbose"],
-            ('discrepancies', 'shaps.compute_shap_discrepancies'): []
+            ('discrepancies', 'shaps.compute_shap_discrepancies'): [],
         }
         pipeline.run(steps, "Training REX")
 
@@ -285,4 +286,24 @@ if __name__ == "__main__":
     rex = load_experiment('rex', "/Users/renero/phd/output/REX")
     # rex = Rex().fit(data)
     # save_experiment('rex', "/Users/renero/phd/output/REX", rex)
-    rex.shaps.summary_plot(target_name='V0')
+
+    # Plot the SHAP values
+    # plot_args = [(target_name) for target_name in rex.shaps.all_feature_names_]
+    # subplots(4, rex.shaps.summary_plot, *plot_args, dpi=200);
+
+    target_name = 'V0'
+    feature_names = rex.shaps.all_feature_names_
+    method='knee'
+    sensitivity=1.0
+    tolerance=0.04
+    descending=False
+    strict=True
+
+    selected_features = select_features(
+        rex.shaps.shap_values[target_name],
+        feature_names,
+        method=method,
+        tolerance=tolerance,
+        sensitivity=sensitivity,
+        descending=descending,
+        strict=strict)

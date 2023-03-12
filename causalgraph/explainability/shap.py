@@ -480,9 +480,9 @@ class ShapEstimator(BaseEstimator):
 
     def summary_plot(
             self,
-            target_name,
+            target_name: str,
             ax=None,
-            max_features_to_display=20,
+            max_features_to_display: int = 20,
             **kwargs):
         """
         This code has been extracted from the summary_plot in SHAP package
@@ -497,5 +497,10 @@ class ShapEstimator(BaseEstimator):
         feature_inds = feature_order[:max_features_to_display]
         mean_shap_values = np.abs(self.shap_values[target_name]).mean(0)
 
-        plot_shap_summary(self.all_feature_names_, mean_shap_values, feature_inds, 
-                          selected_features=None, ax=ax, **kwargs)
+        return plot_shap_summary(
+            [feat for feat in self.all_feature_names_ if feat != target_name],
+            mean_shap_values,
+            feature_inds, 
+            selected_features=None, 
+            ax=ax, 
+            **kwargs)

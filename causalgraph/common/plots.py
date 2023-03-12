@@ -4,14 +4,12 @@
 # (C) J. Renero, 2022, 2023
 #
 
-from typing import Any, Callable, Dict
+from typing import Any, Callable, Dict, List, Tuple
 
 import matplotlib.pyplot as plt
-from matplotlib.ticker import MultipleLocator
-from matplotlib.ticker import FormatStrFormatter
 import numpy as np
-
-from typing import List
+from matplotlib.figure import Figure
+from matplotlib.ticker import FormatStrFormatter, MultipleLocator
 
 
 def setup_plot(tex=True, font="serif", dpi=100):
@@ -86,67 +84,59 @@ def add_grid(ax, lines=True, locations=None):
         ax.yaxis.set_major_locator(MultipleLocator(ymaj))
 
 
-def multiline_plot(values: Dict[str, Any], num_cols: int, func: Callable,
-                   title="Multiplot", extra_args: Dict = {}, **kwargs):
+def subplots(
+        num_cols: int, 
+        plot_func: Callable, 
+        *plot_args: Any,
+        fig_size: Tuple[int, int] = (10, 6),
+        title: str = None,
+        **kwargs: Any) -> None:
     """
-    Plots multiple plots in a multiline fashion. For each plot the method `func` is
-    called to produce each individual plot. The dictionary `values` contains pairs
-    where the key is the title of each plot, and value contains the numeric values to
-    be plotted.
-
-    Args:
-        values: A dictionary where the key is the name of each plot, and the value
-            is whatever your plot `func` will represent on each individual plot.
-        num_cols: The number of columns in the grid
-        func: A function that will accept an `ax`, `values`, `target_name` and
-            `labels` for the X axis, and will plot that information.
-        title: The sup_title of the plot.
-        extra_args: A dictionary with extra arguments to be passed to the
-            function that draws each individual plot
+    Plots a set of subplots.
+    
+    Arguments:
+    ----------
+        num_cols: int
+            The number of columns in the subplot grid.
+        plot_func: function
+            The function to be used to plot each subplot.
+        *plot_args: List
+            The arguments to be passed to the plot function.
+        fig_size: Tuple[int, int]
+            The size of the figure.
+        title: str
+            The title of the figure.
+        **kwargs: Dict
+            Additional arguments to be passed to the plot function.
 
     Returns:
-        None
-
-    Examples:
-        >>> def single_plot(ax, values, target_name, labels):
-        >>>     ax.plot(values, marker='.')
-        >>>     ax.set_xticks(range(len(labels)))
-        >>>     ax.set_xticklabels(labels)
-        >>>     ax.set_title(target_name)
-        >>>
-        >>> my_dict = {k:my_value[k] for k in features}
-        >>> multiplot(my_dict, 5, single_plot, title="SHAP values",\
-                figsize=(12, 5), sharey=True)
-
+    --------
+        fig: Figure
+            The figure containing the subplots.
     """
-    dpi = kwargs.get('dpi', 100)
-    feature_names = list(values.keys())
-    num_plots = len(feature_names)
-    num_rows = int(num_plots / num_cols) + int(num_plots % num_cols != 0)
-
-    setup_plot(dpi=dpi)
-    fig, ax = plt.subplots(num_rows, num_cols, **kwargs)
-    row, col = 0, 0
+    setup_plot(**kwargs)
+    num_rows = len(plot_args) // num_cols
+    if len(plot_args) % num_cols != 0:
+        num_rows += 1
 
     def blank(ax):
         npArray = np.array([[[255, 255, 255, 255]]], dtype="uint8")
         ax.imshow(npArray, interpolation="nearest")
         ax.set_axis_off()
 
-    for i in range(num_rows * num_cols):
-        if (i % num_cols == 0) and (i != 0):
-            row += 1
-            col = 0
-        if i < num_plots:  # empty image https://stackoverflow.com/a/30073252
-            target_name = feature_names[i]
-            labels = [f for f in feature_names if f != target_name]
-            func(ax[row, col], values[target_name],
-                 target_name, labels, **extra_args)
-        else:
-            blank(ax[row, col])
-        col += 1
-
-    plt.suptitle(title)
+    plt.rcParams.update({'font.size': 8})
+    fig, axes = plt.subplots(num_rows, num_cols, figsize=fig_size)
+    for i in range(num_rows):
+        for j in range(num_cols):
+            index = i * num_cols + j
+            if index < len(plot_args):
+                ax = axes[i][j]
+                plot_func(plot_args[index], ax=ax)
+            else:
+                blank(axes[i][j])
+                
+    if title is not None:
+        fig.suptitle(title)
     plt.tight_layout()
     plt.show()
 
@@ -177,7 +167,7 @@ def plot_shap_summary(
             Additional arguments to be passed to the plot.
     """
 
-    figsize_ = kwargs.get('figsize', (10, 5))
+    figsize_ = kwargs.get('figsize', (6, 3))
     fig = None
     if ax is None:
         fig, ax = plt.subplots(1, 1, figsize=figsize_)
@@ -192,5 +182,5 @@ def plot_shap_summary(
     ax.set_xlabel("$\\frac{1}{m}\sum_{j=1}^p| \phi_j |$")
     # ax.set_title(target_name + " $\leftarrow$ " +
     #                 (','.join(selected_features) if len(selected_features) != 0 else 'ø'))
-    if fig is not None:
-        plt.show()
+    fig = ax.figure if fig is None else fig
+    return fig

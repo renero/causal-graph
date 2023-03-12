@@ -4,16 +4,16 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+
         {
+            "python": "/Users/renero/.pyenv/shims/python",
             "name": "Python: Current File",
             "type": "python",
             "request": "launch",
             "program": "${file}",
+            "cwd": "/Users/renero/code/causalgraph/examples/",
             "console": "integratedTerminal",
-            "justMyCode": false,
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}/causalgraph"
-            }
+            "justMyCode": false
         }
     ]
 }
