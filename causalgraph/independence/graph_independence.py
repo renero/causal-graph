@@ -83,7 +83,10 @@ class GraphIndependence(object):
             pbar.update(1)
         pbar.close()
 
-        return self # G_skl, indep.actions
+        return self
+    
+    def predict(self):
+        return self.G_skl
 
     def _gen_cond_sets(self, x, y, size):
         """ A function to build the set of conditioning sets to be for

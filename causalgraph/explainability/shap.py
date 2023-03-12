@@ -1,7 +1,7 @@
 """
 This is a module to be used as a reference for building other modules
 """
-from typing import Dict, List
+from typing import Union
 
 import networkx as nx
 import numpy as np
@@ -20,6 +20,9 @@ from causalgraph.independence.feature_selection import select_features
 from causalgraph.models.dnn import NNRegressor
 from causalgraph.independence.edge_orientation import get_edge_orientation
 from causalgraph.common.plots import plot_shap_summary
+
+
+AnyGraph = Union[nx.DiGraph, nx.Graph]
 
 
 class ShapEstimator(BaseEstimator):
@@ -146,7 +149,18 @@ class ShapEstimator(BaseEstimator):
 
         return G_shap
 
-    def compute_shap_discrepancies(self):
+    def adjust(
+            self,
+            graph: AnyGraph,
+            increase_tolerance: float = 0.0,
+            sd_upper: float = 0.1):
+
+        self._compute_shap_discrepancies()
+        new_graph = self._adjust_edges_from_shap_discrepancies(
+            graph, increase_tolerance, sd_upper)
+        return new_graph
+
+    def _compute_shap_discrepancies(self):
         """
         Compute the discrepancies between the SHAP values and the target values
         for all features and all targets.
@@ -166,7 +180,7 @@ class ShapEstimator(BaseEstimator):
 
             # Loop through all features and compute the discrepancy
             for feature in feature_names:
-                discrepancy = self.compute_shap_alignment(
+                discrepancy = self._compute_shap_alignment(
                     X[feature].values,
                     self.shap_values[target_name],
                     y,
@@ -177,7 +191,7 @@ class ShapEstimator(BaseEstimator):
 
         return self.discrepancies
 
-    def compute_shap_alignment(
+    def _compute_shap_alignment(
             self,
             x,
             shap_values,
@@ -186,44 +200,44 @@ class ShapEstimator(BaseEstimator):
             feature_names,
             ax=None,
             plot: bool = False):
-        """ 
-        Compute the alignment of the shap values for a given feature with the target 
-        variable. This is done by computing the correlation between the shap values and 
+        """
+        Compute the alignment of the shap values for a given feature with the target
+        variable. This is done by computing the correlation between the shap values and
         the target variable.
 
         The discrepancy value is computed as: $1 - \\textrm{corr}(y, shap_values)$
 
-        I'm experimenting with the SHAP dependency plots. Given a target variable, 
-        I plot the values of each feature against its SHAP values, and against the 
-        target variable. In theory, both plots should regress to the same point, and 
-        present the same slope. How similar are these slopes is what I called the 
-        Discrepancy Ratio. For some predictions, it is extremely low, showing that 
-        SHAP tendency actually reflects the actual influence of that feature in the 
-        prediction of the target variable. For other features, though, it is high, 
-        showing that the SHAP values obtained for that specific feature do not 
+        I'm experimenting with the SHAP dependency plots. Given a target variable,
+        I plot the values of each feature against its SHAP values, and against the
+        target variable. In theory, both plots should regress to the same point, and
+        present the same slope. How similar are these slopes is what I called the
+        Discrepancy Ratio. For some predictions, it is extremely low, showing that
+        SHAP tendency actually reflects the actual influence of that feature in the
+        prediction of the target variable. For other features, though, it is high,
+        showing that the SHAP values obtained for that specific feature do not
         correspond to the actual relationship with the target.
 
-        In this way, you can see which features are actually playing a role in the 
-        prediction, and which are not. This can help you better understand the causal 
+        In this way, you can see which features are actually playing a role in the
+        prediction, and which are not. This can help you better understand the causal
         relationships between features and the target variable.
 
         Parameters
         ----------
         x : pd.DataFrame
-            The input data. This is a numpy array with the values of the feature 
-            used to predict the target variable in the main model from which 
+            The input data. This is a numpy array with the values of the feature
+            used to predict the target variable in the main model from which
             the SHAP values were computed.
-        shap_values : pd.DataFrame 
-            The SHAP values for the feature used to predict the target variable in 
+        shap_values : pd.DataFrame
+            The SHAP values for the feature used to predict the target variable in
             the main model from which the SHAP values were computed.
         y : pd.DataFrame
             The target variable. This is a numpy array with the values of the target
             variable in the main model from which the SHAP values were computed.
         feature : str
-            The name of the feature used to predict the target variable in the 
+            The name of the feature used to predict the target variable in the
             main model from which the SHAP values were computed.
         feature_names : list
-            The names of the features used to predict the target variable in the 
+            The names of the features used to predict the target variable in the
             main model from which the SHAP values were computed.
         ax : matplotlib.axes._subplots.AxesSubplot, optional
             The axis to plot the alignment on, by default None
@@ -233,8 +247,8 @@ class ShapEstimator(BaseEstimator):
         Returns
         -------
         dict{float, float, float}
-            A dictionary with the discrepancy, the slope of the SHAP values 
-            regression and the slope of the regression of the target variable 
+            A dictionary with the discrepancy, the slope of the SHAP values
+            regression and the slope of the regression of the target variable
             on the feature.
 
         """
@@ -244,6 +258,7 @@ class ShapEstimator(BaseEstimator):
         b_target, m_target = self._regress(x, y)
         corr = spearmanr(shap_values[:, feature_pos], y)
 
+        # TODO: Move the plot to a separate function
         if plot:
             # Plot the SHAP values and the regression
             ax.scatter(x, shap_values[:, feature_pos],
@@ -289,11 +304,9 @@ class ShapEstimator(BaseEstimator):
         b, m = reg.params[0], reg.params[1]
         return b, m
 
-    def adjust_edges_from_shap_discrepancies(
+    def _adjust_edges_from_shap_discrepancies(
             self,
             graph: nx.DiGraph,
-            feature_names: List[str],
-            discrepancies: pd.DataFrame,
             increase_tolerance: float = 0.0,
             sd_upper: float = 0.1):
         """
@@ -306,20 +319,11 @@ class ShapEstimator(BaseEstimator):
         ----------
         graph : nx.DiGraph
             The graph to adjust the edges of.
-        feature_names : List[str]
-            The names of the features in the graph.
-        discrepancies : pd.DataFrame
-            The discrepancy index for each pair of features.
         increase_tolerance : float, optional
             The tolerance for the increase in the discrepancy index, by default 0.0.
-        sd_tol : float, optional
-            The Shap Discrepancy tolerance, by default 0.02. This is the max difference
-            between the SHAP Discrepancy in both causal directions.
         sd_upper : float, optional
             The upper bound for the Shap Discrepancy, by default 0.1. This is the max
             difference between the SHAP Discrepancy in both causal directions.
-        verbose : bool, optional
-            Whether to print the edges that are removed, by default False
 
         Returns
         -------
@@ -333,13 +337,13 @@ class ShapEstimator(BaseEstimator):
         edges_reversed = []
 
         # Experimental
-        if self._increase_upper_tolerance(discrepancies):
+        if self._increase_upper_tolerance(self.discrepancies):
             increase_upper_tolerance = True
         else:
             increase_upper_tolerance = False
 
-        for target in feature_names:
-            target_mean = np.mean(discrepancies.loc[target].values)
+        for target in self.all_feature_names_:
+            target_mean = np.mean(self.discrepancies.loc[target].values)
             # Experimental
             if increase_upper_tolerance:
                 tolerance = target_mean * increase_tolerance
@@ -347,15 +351,15 @@ class ShapEstimator(BaseEstimator):
                 tolerance = 0.0
 
             # Iterate over the features and check if the edge should be reversed.
-            for feature in feature_names:
+            for feature in self.all_feature_names_:
                 # If the edge is already reversed, skip it.
                 if (target, feature) in edges_reversed or \
                         feature == target or \
                         not new_graph.has_edge(feature, target):
                     continue
 
-                forward_sd = discrepancies.loc[target, feature]
-                reverse_sd = discrepancies.loc[feature, target]
+                forward_sd = self.discrepancies.loc[target, feature]
+                reverse_sd = self.discrepancies.loc[feature, target]
                 diff = np.abs(forward_sd - reverse_sd)
                 vector = [forward_sd, reverse_sd, diff, 0., 0., 0., 0.]
 
@@ -367,7 +371,7 @@ class ShapEstimator(BaseEstimator):
                     # If the difference between the standard deviations is within
                     # the acceptable range, reverse the edge and check for cycles
                     # in the graph.
-                    if diff < sd_upper and diff > 0.002:  # diff > sd_tol and
+                    if diff < sd_upper and diff > 0.002:
                         new_graph.remove_edge(feature, target)
                         new_graph.add_edge(target, feature)
                         edges_reversed.append((feature, target))
@@ -488,7 +492,7 @@ class ShapEstimator(BaseEstimator):
         This code has been extracted from the summary_plot in SHAP package
         If you want to produce the original plot, simply type:
 
-        >>> shap.summary_plot(shap_values, plot_type='bar', 
+        >>> shap.summary_plot(shap_values, plot_type='bar',
                               feature_names=feature_names_no_target)
 
         """
@@ -500,7 +504,7 @@ class ShapEstimator(BaseEstimator):
         return plot_shap_summary(
             [feat for feat in self.all_feature_names_ if feat != target_name],
             mean_shap_values,
-            feature_inds, 
-            selected_features=None, 
-            ax=ax, 
+            feature_inds,
+            selected_features=None,
+            ax=ax,
             **kwargs)

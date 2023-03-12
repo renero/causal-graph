@@ -240,18 +240,18 @@ class Rex(BaseEstimator, ClassifierMixin):
         pipeline.set_default_object_method('fit')
         pipeline.set_default_method_params(['X', 'y'])
         steps = {
-            ('nn', NNRegressor): [
+            ('regressor', NNRegressor): [
                 "model_type", "hidden_dim", "learning_rate", "dropout", "batch_size", 
                 "num_epochs", "loss_fn", "gpus", "test_size", "early_stop", "patience", 
                 "min_delta", "random_state", "verbose", False],
             ('shaps', ShapEstimator): [
-                "nn", "shap_selection", "sensitivity", "tolerance", "descending", 
+                "regressor", "shap_selection", "sensitivity", "tolerance", "descending", 
                 "iters", "reciprocal", "min_impact", "verbose", "enable_progress_bar",
                 "have_gpu"],
-            ("G_shap", 'shaps.predict'): ["X"],
-            Hierarchies: ["corr_method", "corr_alpha", "corr_clusters"],
-            GraphIndependence: ["G_shap", "condlen", "condsize", "verbose"],
-            ('discrepancies', 'shaps.compute_shap_discrepancies'): [],
+            ('G_shap', 'shaps.predict'): ["X"],
+            ('indep', GraphIndependence): ["G_shap", "condlen", "condsize", "verbose"],
+            ('G_indep', 'indep.predict'): [],
+            ('G_final', 'shaps.adjust'): ['G_indep']
         }
         pipeline.run(steps, "Training REX")
 
@@ -290,20 +290,4 @@ if __name__ == "__main__":
     # Plot the SHAP values
     # plot_args = [(target_name) for target_name in rex.shaps.all_feature_names_]
     # subplots(4, rex.shaps.summary_plot, *plot_args, dpi=200);
-
-    target_name = 'V0'
-    feature_names = rex.shaps.all_feature_names_
-    method='knee'
-    sensitivity=1.0
-    tolerance=0.04
-    descending=False
-    strict=True
-
-    selected_features = select_features(
-        rex.shaps.shap_values[target_name],
-        feature_names,
-        method=method,
-        tolerance=tolerance,
-        sensitivity=sensitivity,
-        descending=descending,
-        strict=strict)
+    
