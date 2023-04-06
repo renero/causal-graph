@@ -282,7 +282,7 @@ class Rex(BaseEstimator, ClassifierMixin):
 if __name__ == "__main__":
     dataset_name = 'generated_linear_10'
     data = pd.read_csv("~/phd/data/generated_linear_10_mini.csv")
-    ref_graph = graph_from_dot_file("/Users/renero/phd/data/generated_linear_10_mini.dot")
+    ref_graph = graph_from_dot_file("/Users/renero/phd/data/generated_linear_10.dot")
 
     rex = load_experiment('rex', "/Users/renero/phd/output/REX")
     # rex = Rex().fit(data)
