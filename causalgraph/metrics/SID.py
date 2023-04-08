@@ -19,16 +19,16 @@ def allDagsIntern(gm, a, row_names, tmp=None):
     if tmp is None:
         tmp = []
 
-    if any(((a + a.T) == 1)):
+    if np.any(((a + a.T) == 1)):
         raise ValueError(
             'The matrix is not entirely undirected. This should not happen!')
 
     if a.sum() == 0:
-        tmp2 = np.vstack([tmp, gm.flatten()])
+        tmp2 = gm.flatten() if not tmp else np.vstack([tmp, gm.flatten()])
         if all(np.logical_not(np.array([np.array_equal(x, y) for x in tmp2 for y in tmp2]).reshape(tmp2.shape[0], -1).sum(axis=1) > 1)):
             tmp = tmp2
     else:
-        sinks = np.where(a.sum(axis=0) > 0)[0]
+        sinks = np.where(a.sum(axis=0) > 0)[1]
         for x in sinks:
             gm2 = gm.copy()
             a2 = None
@@ -36,17 +36,17 @@ def allDagsIntern(gm, a, row_names, tmp=None):
 
             Adj = (a == 1)
             Adjx = Adj[x, :]
-            if any(Adjx):
-                un = np.where(Adjx)[0]
+            if np.any(Adjx):
+                un = np.where(Adjx)[1]
                 pp = len(un)
                 Adj2 = np.matrix(Adj[un, :][:, un])
                 np.fill_diagonal(Adj2, True)
             else:
                 Adj2 = True
 
-            if all(Adj2):
-                if any(Adjx):
-                    un = row_names[np.where(Adjx)[0]]
+            if np.all(Adj2):
+                if np.any(Adjx):
+                    un = row_names[np.where(Adjx)[1]]
                     pp = len(un)
                     gm2[un, row_names[x]] = np.ones(pp)
                     gm2[row_names[x], un] = np.zeros(pp)
@@ -64,7 +64,7 @@ def allDagsJonas(adj: np.matrix, row_names: List[str]) -> List[List[str]]:
     # !!!! the function can probably be faster if we use partial orderings
 
     a = adj[row_names, :][:, row_names]
-    if (a + a.T).any() == 1:
+    if np.any(((a + a.T) == 1)):
         # if any((a + a.T) == 1):
         # warning("The matrix is not entirely undirected.")
         return -1
@@ -569,6 +569,12 @@ if __name__ == "__main__":
                    [0, 0, 0, 0, 0],
                    [0, 0, 0, 0, 0]])
 
+    H1c = np.array([[0, 1, 1, 1, 1],
+                    [1, 0, 1, 1, 1],
+                    [1, 1, 0, 1, 0],
+                    [1, 1, 1, 0, 0],
+                    [1, 1, 0, 0, 0]])
+
     # print("true DAG G:")
     # print(G)
     # print("==============")
@@ -580,25 +586,20 @@ if __name__ == "__main__":
     # print(f"SID between G and H1: {sid['sid']}")
     # print("===========================\n\n")
 
-    print("estimated DAG H2:")
-    print(H2)
-    sid = SID(G, H2)
-    shd = hammingDist(G, H2)
-    print(f"SHD between G and H2: {shd}")
-    print(f"SID between G and H2: {sid['sid']}")
-    print("The matrix of incorrect interventional distributions is:")
-    print(sid['incorrectMat'])
+    # print("estimated DAG H2:")
+    # print(H2)
+    # sid = SID(G, H2)
+    # shd = hammingDist(G, H2)
+    # print(f"SHD between G and H2: {shd}")
+    # print(f"SID between G and H2: {sid['sid']}")
+    # print("The matrix of incorrect interventional distributions is:")
+    # print(sid['incorrectMat'])
 
     # input("The SID can also be applied to CPDAGs. Please press enter...")
-    # print("==============")
-    # print("estimated CPDAG H1c:")
-    # H1c = np.array([[0, 1, 1, 1, 1],
-    #                 [1, 0, 1, 1, 1],
-    #                 [1, 1, 0, 1, 0],
-    #                 [1, 1, 1, 0, 0],
-    #                 [1, 1, 0, 0, 0]])
-    # print(H1c)
-    # sid = SID(G, H1c)
-    # print(f"SID between G and H1:")
-    # print(
-    #     f"lower bound: {sid['sidLowerBound']} upper bound: {sid['sidUpperBound']}")
+    print("==============")
+    print("estimated CPDAG H1c:")
+    print(H1c)
+    sid = SID(G, H1c)
+    print(f"SID between G and H1:")
+    print(
+        f"lower bound: {sid['sidLowerBound']} upper bound: {sid['sidUpperBound']}")
