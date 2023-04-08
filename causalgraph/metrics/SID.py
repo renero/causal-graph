@@ -432,7 +432,7 @@ def SID(trueGraph: np.ndarray, estGraph: np.ndarray, output: bool = False, spars
                     paGp = certainpaGp
                 else:
                     Gpnew = np.matrix(
-                        mmm[uniqueRows[count-1], :]).reshape(p, p).T
+                        mmm[uniqueRows[count-1], :]).reshape(p, p)
                     paGp = np.where(Gpnew[:, i] == 1)[0]
                     if output:
                         print(
@@ -444,6 +444,7 @@ def SID(trueGraph: np.ndarray, estGraph: np.ndarray, output: bool = False, spars
 
                 checkAlldSep = dSepAdji(
                     trueGraph.copy(), i, paGp, PathMatrix, PathMatrix2, spars=spars)
+                
                 numChecks += 1
                 reachableWOutCausalPath = checkAlldSep["reachableOnNonCausalPath"]
 
