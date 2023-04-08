@@ -292,7 +292,7 @@ def dSepAdji(AdjMat, i, condSet, PathMatrix=None, PathMatrix2=None, spars=None):
 
 
     if reachableOnNonCausalPathLater.shape[0] > 2:
-        for kk in range(3, reachableOnNonCausalPathLater.shape[0]):
+        for kk in range(2, reachableOnNonCausalPathLater.shape[0]):
             ReachableThrough = reachableOnNonCausalPathLater[kk, 0]
             newReachable = reachableOnNonCausalPathLater[kk, 1]
             reachableOnNonCausalPath[newReachable + p] = 1
