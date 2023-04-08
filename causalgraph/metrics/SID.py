@@ -24,7 +24,7 @@ def allDagsIntern(gm, a, row_names, tmp=None):
             'The matrix is not entirely undirected. This should not happen!')
 
     if a.sum() == 0:
-        tmp2 = gm.flatten() if not tmp else np.vstack([tmp, gm.flatten()])
+        tmp2 = gm.flatten('F') if not len(tmp) else np.vstack([tmp, gm.flatten('F')])
         if all(np.logical_not(np.array([np.array_equal(x, y) for x in tmp2 for y in tmp2]).reshape(tmp2.shape[0], -1).sum(axis=1) > 1)):
             tmp = tmp2
     else:
@@ -53,6 +53,15 @@ def allDagsIntern(gm, a, row_names, tmp=None):
 
                 a2 = np.delete(np.delete(a, x, axis=0), x, axis=1)
                 row_names2 = np.delete(row_names, x)
+
+                # print("~"*100)
+                # print("gm2")
+                # for ridx in range(gm2.shape[0]):
+                #     print(str(gm2[ridx, :])[2:-2])
+                # print("a2")
+                # for ridx in range(a2.shape[0]):
+                #     print(str(a2[ridx, :])[2:-2])
+                
                 tmp = allDagsIntern(gm2, a2, row_names2, tmp)
 
     return tmp
@@ -314,6 +323,19 @@ def dSepAdji(AdjMat, i, condSet, PathMatrix=None, PathMatrix2=None, spars=None):
     return result
 
 
+def unique_rows(m):
+    mm = np.ascontiguousarray(m)
+    result = []
+    uniques = set()
+    for row_index in range(0, mm.shape[0]):
+        row = mm[row_index, :]
+        tup = tuple(row)
+        if tup not in uniques:
+            uniques.add(tup)
+            result.append(row_index)
+    return result
+
+
 def SID(trueGraph: np.ndarray, estGraph: np.ndarray, output: bool = False, spars: bool = False) -> float:
     estGraph = np.array(estGraph)
     trueGraph = np.array(trueGraph)
@@ -378,6 +400,7 @@ def SID(trueGraph: np.ndarray, estGraph: np.ndarray, output: bool = False, spars
                 GpIsEssentialGraph = False
             else:
                 incorrectSum = np.zeros(mmm.shape[0])
+        
         for i in conn_comp[ll]:
             paG = np.where(trueGraph[:, i] == 1)[0]
             print(">>> set paG to:", paG)
@@ -396,9 +419,8 @@ def SID(trueGraph: np.ndarray, estGraph: np.ndarray, output: bool = False, spars
                 incorrectSum = np.zeros(maxcount)
             else:
                 if mmm.shape[0] > 1:
-                    allParentsOfI = np.arange(i, (p-1)*p+i, p)
-                    uniqueRows = np.where(~np.array([row.tolist() for row in np.unique(
-                        mmm[:, allParentsOfI], axis=0)])).any(axis=1)[0]
+                    allParentsOfI = np.arange(i, ((p-1)*p+i)+1, p)
+                    uniqueRows = unique_rows(mmm[:, allParentsOfI])
                     maxcount = len(uniqueRows)
                 else:
                     maxcount = 1
