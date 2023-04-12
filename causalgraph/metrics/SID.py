@@ -24,7 +24,8 @@ def allDagsIntern(gm, a, row_names, tmp=None):
             'The matrix is not entirely undirected. This should not happen!')
 
     if a.sum() == 0:
-        tmp2 = gm.flatten('F') if not len(tmp) else np.vstack([tmp, gm.flatten('F')])
+        tmp2 = gm.flatten('F') if not len(
+            tmp) else np.vstack([tmp, gm.flatten('F')])
         if all(np.logical_not(np.array([np.array_equal(x, y) for x in tmp2 for y in tmp2]).reshape(tmp2.shape[0], -1).sum(axis=1) > 1)):
             tmp = tmp2
     else:
@@ -61,7 +62,7 @@ def allDagsIntern(gm, a, row_names, tmp=None):
                 # print("a2")
                 # for ridx in range(a2.shape[0]):
                 #     print(str(a2[ridx, :])[2:-2])
-                
+
                 tmp = allDagsIntern(gm2, a2, row_names2, tmp)
 
     return tmp
@@ -211,10 +212,11 @@ def dSepAdji(AdjMat, i, condSet, PathMatrix=None, PathMatrix2=None, spars=None):
     while k < len(toCheck)-1:
         k += 1
         a1 = toCheck[k]
-        print("[ k:",k,"; a1:",a1,"; toCheck:",toCheck, "]")
+        print("[ k:", k, "; a1:", a1, "; toCheck:", toCheck, "]")
         # Pretty print the reachability matrix
         print("Reachability Matrix:")
         for ii in range(2 * p):
+            print(f"{ii:<2d}", end=" ")
             for jj in range(2 * p):
                 print(reachabilityMatrix[ii, jj], " ", end='')
             print()
@@ -229,21 +231,23 @@ def dSepAdji(AdjMat, i, condSet, PathMatrix=None, PathMatrix2=None, spars=None):
             reachabilityMatrix[Pa1, currentNode] = [1] * len(Pa1)
             reachabilityMatrix[Pa1 + p, currentNode] = [1] * len(Pa1)
             if len(Pa1):
-                print("L0 -> CurNode:",currentNode, "; Pa1:",Pa1,"; len(Pa1):",len(Pa1))
+                print("L0 -> CurNode:", currentNode,
+                      "; Pa1:", Pa1, "; len(Pa1):", len(Pa1))
 
             if np.sum(np.isin(AncOfCondSet, currentNode)) > 0:
                 reachabilityMatrix[currentNode, Pa + p] = 1
                 if PathMatrix2[i, currentNode] > 0:
                     reachableOnNonCausalPathLater = np.vstack(
                         (reachableOnNonCausalPathLater, np.column_stack(
-                        (np.repeat(currentNode, len(Pa)), Pa))))
+                            (np.repeat(currentNode, len(Pa)), Pa))))
                 newtoCheck = Pa[np.where(alreadyChecked[Pa] == 0)[0]]
                 toCheck.extend(newtoCheck)
 
             if np.sum(np.isin(condSet, currentNode)) == 0:
                 reachabilityMatrix[currentNode + p, Pa + p] = [1] * len(Pa)
                 if len(Pa):
-                    print("L1 -> CurNode:",currentNode, "; Pa:",Pa,"; len(Pa):",len(Pa))
+                    print("L1 -> CurNode:", currentNode,
+                          "; Pa:", Pa, "; len(Pa):", len(Pa))
                 newtoCheck = Pa[np.where(alreadyChecked[Pa] == 0)[0]]
                 toCheck.extend(newtoCheck)
 
@@ -251,23 +255,26 @@ def dSepAdji(AdjMat, i, condSet, PathMatrix=None, PathMatrix2=None, spars=None):
             Ch1 = np.setdiff1d(Ch, condSet)
             if len(Ch1):
                 reachabilityMatrix[Ch1 + p, currentNode + p] = [1] * len(Ch1)
-                print("L2 -> CurNode:",currentNode, "; Ch1:", Ch1, "; len(Ch1):",len(Ch1))
+                print("L2 -> CurNode:", currentNode,
+                      "; Ch1:", Ch1, "; len(Ch1):", len(Ch1))
 
             Ch2 = np.intersect1d(Ch, AncOfCondSet)
             if len(Ch2):
                 reachabilityMatrix[Ch2, currentNode + p] = [1] * len(Ch2)
-                print("L3 -> CurNode:",currentNode, "; Ch2:", Ch2, "; len(Ch2):",len(Ch2))
+                print("L3 -> CurNode:", currentNode,
+                      "; Ch2:", Ch2, "; len(Ch2):", len(Ch2))
             Ch2b = np.intersect1d(Ch2, np.where(PathMatrix2[i, :] > 0)[1])
             if len(Ch2b):
                 reachableOnNonCausalPathLater = np.vstack(
                     (reachableOnNonCausalPathLater, np.column_stack(
-                    (Ch2b, np.repeat(currentNode, len(Ch2b))))))
+                        (Ch2b, np.repeat(currentNode, len(Ch2b))))))
 
             if np.sum(np.isin(condSet, currentNode)) == 0:
                 reachabilityMatrix[currentNode, Ch] = [1] * len(Ch)
                 reachabilityMatrix[currentNode + p, Ch] = [1] * len(Ch)
                 if len(Ch):
-                    print("L4 -> CurNode:",currentNode, "; Ch:",Ch,"; len(Ch):",len(Ch))
+                    print("L4 -> CurNode:", currentNode,
+                          "; Ch:", Ch, "; len(Ch):", len(Ch))
                 newtoCheck = Ch[np.where(alreadyChecked[Ch] == 0)[0]]
                 toCheck.extend(newtoCheck)
         print("-"*60)
@@ -290,13 +297,13 @@ def dSepAdji(AdjMat, i, condSet, PathMatrix=None, PathMatrix2=None, spars=None):
     reachableOnNonCausalPath[tt] = 1
     print("    >>> P1: reachableOnNonCausalPath:", reachableOnNonCausalPath)
 
-
     if reachableOnNonCausalPathLater.shape[0] > 2:
         for kk in range(2, reachableOnNonCausalPathLater.shape[0]):
             ReachableThrough = reachableOnNonCausalPathLater[kk, 0]
             newReachable = reachableOnNonCausalPathLater[kk, 1]
             reachableOnNonCausalPath[newReachable + p] = 1
-            print("    >>> P2: reachableOnNonCausalPath:", reachableOnNonCausalPath)
+            print("    >>> P2: reachableOnNonCausalPath:",
+                  reachableOnNonCausalPath)
 
             reachabilityMatrix[newReachable, ReachableThrough] = 0
             reachabilityMatrix[newReachable, ReachableThrough + p] = 0
@@ -305,7 +312,7 @@ def dSepAdji(AdjMat, i, condSet, PathMatrix=None, PathMatrix2=None, spars=None):
 
         ttt = np.where(reachableOnNonCausalPath == 1)[0]
         if len(ttt) == 1:
-            tt = np.where(reachabilityMatrix[ttt, :] > 0)[0]
+            tt = np.where(reachabilityMatrix[ttt, :] > 0)[1]
         else:
             tt = np.where(np.sum(reachabilityMatrix[ttt, :], axis=0) > 0)[0]
         reachableOnNonCausalPath[tt] = 1
@@ -376,9 +383,9 @@ def SID(trueGraph: np.ndarray, estGraph: np.ndarray, output: bool = False, spars
                 GpIsEssentialGraph = False
 
     for ll in range(numConnComp):
-        # if len(conn_comp[ll]) > 0:
         if len(conn_comp[ll]) <= 0:
             continue
+
         if GpIsEssentialGraph:
             if len(conn_comp[ll]) > 1:
                 mmm = allDagsJonas(estGraph, conn_comp[ll])
@@ -391,7 +398,7 @@ def SID(trueGraph: np.ndarray, estGraph: np.ndarray, output: bool = False, spars
                 mmm = estGraph.flatten(order='F')
             newInd = np.arange(
                 1, p**3, p) - np.repeat(np.arange(0, (p-1)*((p**2)-1)+1, (p**2)-1), p)
-            # Fix that Python starts counting from 0 instead 1, in R.
+            #  Fix that Python starts counting from 0 instead 1, in R.
             newInd = newInd - 1
             dimM = mmm.shape
             mmm = np.matrix(mmm[:, newInd]).reshape(dimM)
@@ -400,8 +407,14 @@ def SID(trueGraph: np.ndarray, estGraph: np.ndarray, output: bool = False, spars
                 GpIsEssentialGraph = False
             else:
                 incorrectSum = np.zeros(mmm.shape[0])
-        
+
         for i in conn_comp[ll]:
+            print("\n", "#"*120, sep="")
+            print("#", " "*116, "#")
+            print("#  i: ", i, "/", conn_comp[ll], " conn_comp[",ll,"]", sep="")
+            print("#", " "*116, "#")
+            print("#"*120, "\n")
+
             paG = np.where(trueGraph[:, i] == 1)[0]
             print(">>> set paG to:", paG)
             certainpaGp = np.where(
@@ -444,7 +457,7 @@ def SID(trueGraph: np.ndarray, estGraph: np.ndarray, output: bool = False, spars
 
                 checkAlldSep = dSepAdji(
                     trueGraph.copy(), i, paGp, PathMatrix, PathMatrix2, spars=spars)
-                
+
                 numChecks += 1
                 reachableWOutCausalPath = checkAlldSep["reachableOnNonCausalPath"]
 
@@ -465,24 +478,30 @@ def SID(trueGraph: np.ndarray, estGraph: np.ndarray, output: bool = False, spars
                         finished = True
                         correctInt[i, j] = 1
 
-                    print(f">>> i={i}, j={j}, ijGNull={ijGNull}, ijGpNull={ijGpNull}, finished={finished}")
+                    print(
+                        f">>> i={i}, j={j}, ijGNull={ijGNull}, ijGpNull={ijGpNull}, finished={finished}")
 
                     if ijGpNull and not ijGNull:
                         incorrectInt[i, j] = 1
                         incorrectSum[uniqueRows[count-1]] += 1
-                        allOthers = np.setdiff1d(np.arange(0, mmm.shape[0]), uniqueRows)
+                        print("   T0--> incorrectSum:", incorrectSum)
+                        allOthers = np.setdiff1d(
+                            np.arange(0, mmm.shape[0]), uniqueRows)
                         if len(allOthers) > 1:
-                            indInAllOthers = np.where(np.sum(~np.logical_xor(
-                                mmm[uniqueRows[count-1], allParentsOfI], mmm[allOthers-1, allParentsOfI]), axis=1) == p)[0]
+                            # indInAllOthers = np.where(np.sum(~np.logical_xor(
+                            #     mmm[uniqueRows[count-1], allParentsOfI], mmm[allOthers-1, allParentsOfI]), axis=1) == p)[0]
+                            indInAllOthers = get_indInAllOthers(
+                                        p, mmm, uniqueRows, allParentsOfI, count, allOthers)
                             if len(indInAllOthers) > 0:
-                                incorrectSum[allOthers[indInAllOthers] -
-                                                1] += np.ones(len(indInAllOthers))
+                                incorrectSum[allOthers[indInAllOthers]] += np.ones(len(indInAllOthers))
+                                print("   T1--> incorrectSum:", incorrectSum)
                         if len(allOthers) == 1:
-                            indInAllOthers = np.where(np.sum(~np.logical_xor(
-                                mmm[uniqueRows[count-1], allParentsOfI], mmm[allOthers-1, allParentsOfI])) == p)[0]
+                            indInAllOthers = get_indInAllOthers(
+                                        p, mmm, uniqueRows, allParentsOfI, count, allOthers)
                             if len(indInAllOthers) > 0:
                                 incorrectSum[allOthers[indInAllOthers] -
-                                                1] += np.ones(len(indInAllOthers))
+                                             1] += np.ones(len(indInAllOthers))
+                                print("   T2--> incorrectSum:", incorrectSum)
                         finished = True
 
                     if not finished and set(paG) == set(paGp):
@@ -493,43 +512,45 @@ def SID(trueGraph: np.ndarray, estGraph: np.ndarray, output: bool = False, spars
                         if PathMatrix[i, j] > 0:
                             chiCausPath = np.where(
                                 trueGraph[i, :] & PathMatrix[:, j].T)[1]
-                            if np.sum(PathMatrix[chiCausPath, paGp]) > 0:
+                            if np.sum(PathMatrix[chiCausPath, :][:, paGp]) > 0:
                                 incorrectInt[i, j] = 1
                                 incorrectSum[uniqueRows[count-1]] += 1
+                                print("   T3--> incorrectSum:", incorrectSum)
                                 allOthers = np.setdiff1d(
                                     np.arange(0, mmm.shape[0]), uniqueRows)
                                 if len(allOthers) > 1:
-                                    indInAllOthers = np.where(np.sum(~np.logical_xor(
-                                        mmm[uniqueRows[count-1], allParentsOfI], mmm[allOthers-1, allParentsOfI]), axis=1) == p)[0]
+                                    indInAllOthers = get_indInAllOthers(
+                                        p, mmm, uniqueRows, allParentsOfI, count, allOthers)
                                     if len(indInAllOthers) > 0:
-                                        incorrectSum[allOthers[indInAllOthers] -
-                                                        1] += np.ones(len(indInAllOthers))
+                                        incorrectSum[allOthers[indInAllOthers]] += np.ones(len(indInAllOthers))
+                                        print("   T4--> incorrectSum:", incorrectSum)
                                 if len(allOthers) == 1:
-                                    indInAllOthers = np.where(np.sum(~np.logical_xor(
-                                        mmm[uniqueRows[count-1], allParentsOfI], mmm[allOthers-1, allParentsOfI])) == p)[0]
+                                    indInAllOthers = get_indInAllOthers(
+                                        p, mmm, uniqueRows, allParentsOfI, count, allOthers)
                                     if len(indInAllOthers) > 0:
-                                        incorrectSum[allOthers[indInAllOthers] -
-                                                        1] += np.ones(len(indInAllOthers))
+                                        incorrectSum[allOthers[indInAllOthers]] += np.ones(len(indInAllOthers))
+                                        print("   T5--> incorrectSum:", incorrectSum)
                                 finished = True
 
                         if not finished:
                             if reachableWOutCausalPath[j] == 1:
                                 incorrectInt[i, j] = 1
                                 incorrectSum[uniqueRows[count-1]] += 1
+                                print("   T6--> incorrectSum:", incorrectSum)
                                 allOthers = np.setdiff1d(
                                     np.arange(0, mmm.shape[0]), uniqueRows)
                                 if len(allOthers) > 1:
-                                    indInAllOthers = np.where(np.sum(~np.logical_xor(
-                                        mmm[uniqueRows[count-1], allParentsOfI], mmm[allOthers-1, allParentsOfI]), axis=1) == p)[0]
+                                    indInAllOthers = get_indInAllOthers(
+                                        p, mmm, uniqueRows, allParentsOfI, count, allOthers)
                                     if len(indInAllOthers) > 0:
-                                        incorrectSum[allOthers[indInAllOthers] -
-                                                        1] += np.ones(len(indInAllOthers))
+                                        incorrectSum[allOthers[indInAllOthers]] += np.ones(len(indInAllOthers))
+                                        print("   T7--> incorrectSum:", incorrectSum)
                                 if len(allOthers) == 1:
-                                    indInAllOthers = np.where(np.sum(~np.logical_xor(
-                                        mmm[uniqueRows[count-1], allParentsOfI], mmm[allOthers-1, allParentsOfI])) == p)[0]
+                                    indInAllOthers = get_indInAllOthers(
+                                        p, mmm, uniqueRows, allParentsOfI, count, allOthers)
                                     if len(indInAllOthers) > 0:
-                                        incorrectSum[allOthers[indInAllOthers] -
-                                                        1] += np.ones(len(indInAllOthers))
+                                        incorrectSum[allOthers[indInAllOthers]] += np.ones(len(indInAllOthers))
+                                        print("   T8--> incorrectSum:", incorrectSum)
                             else:
                                 correctInt[i, j] = 1
                 count += 1
@@ -548,6 +569,20 @@ def SID(trueGraph: np.ndarray, estGraph: np.ndarray, output: bool = False, spars
     ress["incorrectMat"] = incorrectInt
 
     return ress
+
+
+def get_indInAllOthers(p, mmm, uniqueRows, allParentsOfI, count, allOthers):
+    # This chunk is used several times, and needed correction from its original form.
+    return np.where(
+        np.sum(
+            ~np.logical_xor(
+                mmm[uniqueRows[count-1],
+                    allParentsOfI],
+                mmm[allOthers.flatten(), :][:,
+                                            allParentsOfI.flatten()]
+            ), axis=1
+        ) == p
+    )[0]
 
 
 def hammingDist(G1, G2, allMistakesOne=True):
@@ -574,6 +609,7 @@ def hammingDist(G1, G2, allMistakesOne=True):
 
 
 if __name__ == "__main__":
+    np.set_printoptions(linewidth=120)
     G = np.array([[0, 1, 1, 1, 1],
                   [0, 0, 1, 1, 1],
                   [0, 0, 0, 0, 0],
