@@ -585,10 +585,10 @@ def SID(
                             else:
                                 correctInt[i, j] = 1
                 count += 1
-        if not GpIsEssentialGraph:
-            minimumTotal += np.min(incorrectSum)
-            maximumTotal += np.max(incorrectSum)
-            incorrectSum = 0
+            if not GpIsEssentialGraph:
+                minimumTotal += np.min(incorrectSum)
+                maximumTotal += np.max(incorrectSum)
+                incorrectSum = 0
         minimumTotal += np.min(incorrectSum)
         maximumTotal += np.max(incorrectSum)
         incorrectSum = 0
