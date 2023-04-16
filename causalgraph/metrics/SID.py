@@ -15,6 +15,17 @@ from causallearn.utils.DAG2CPDAG import dag2cpdag
 from scipy.sparse import csr_matrix, diags, eye
 
 
+def pm(m):
+    # This function prints a matrix in a nice way.
+    # It is used for debugging.
+    for i in range(m.shape[0]):
+        print(f"{i:02d} ", end="")
+        for j in range(m.shape[1]):
+            print(f"{int(m[i, j]):d} ", end="", sep="")
+        print("")
+
+
+
 def allDagsIntern(gm, a, row_names, tmp=None):
     if tmp is None:
         tmp = []
@@ -26,7 +37,9 @@ def allDagsIntern(gm, a, row_names, tmp=None):
     if a.sum() == 0:
         tmp2 = gm.flatten('F') if not len(
             tmp) else np.vstack([tmp, gm.flatten('F')])
-        if all(np.logical_not(np.array([np.array_equal(x, y) for x in tmp2 for y in tmp2]).reshape(tmp2.shape[0], -1).sum(axis=1) > 1)):
+        if all(np.logical_not(
+            np.array([np.array_equal(x, y)
+                      for x in tmp2 for y in tmp2]).reshape(tmp2.shape[0], -1).sum(axis=1) > 1)):
             tmp = tmp2
     else:
         sinks = np.where(a.sum(axis=0) > 0)[1]
@@ -88,7 +101,8 @@ def computePathMatrix(G, spars=False):
     p = G.shape[1]
 
     if (p > 3000) and (not spars):
-        print("Warning: Maybe you should use the sparse version by using spars=True to increase speed")
+        print("Warning: Maybe you should use the sparse version by using spars=True \
+              to increase speed")
 
     if spars:
         G = csr_matrix(G)
@@ -343,7 +357,12 @@ def unique_rows(m):
     return result
 
 
-def SID(trueGraph: np.ndarray, estGraph: np.ndarray, output: bool = False, spars: bool = False) -> float:
+def SID(
+        trueGraph: np.ndarray,
+        estGraph: np.ndarray,
+        output: bool = False,
+        spars: bool = False) -> float:
+
     estGraph = np.array(estGraph)
     trueGraph = np.array(trueGraph)
     p = trueGraph.shape[1]
@@ -411,7 +430,8 @@ def SID(trueGraph: np.ndarray, estGraph: np.ndarray, output: bool = False, spars
         for i in conn_comp[ll]:
             print("\n", "#"*120, sep="")
             print("#", " "*116, "#")
-            print("#  i: ", i, "/", conn_comp[ll], " conn_comp[",ll,"]", sep="")
+            print("#  i: ", i, "/", conn_comp[ll],
+                  " conn_comp[", ll, "]", sep="")
             print("#", " "*116, "#")
             print("#"*120, "\n")
 
@@ -425,10 +445,14 @@ def SID(trueGraph: np.ndarray, estGraph: np.ndarray, output: bool = False, spars
             print(">>> set possiblepaGp to:", possiblepaGp)
             if not GpIsEssentialGraph:
                 maxcount = 2**len(possiblepaGp)
-                uniqueRows = np.arange(1, maxcount+1)
-                mmm = np.tile(estGraph.T.flatten(), (maxcount, 1))
-                mmm[:, i + (possiblepaGp - 1) * p] = np.array(
-                    list(product([0, 1], repeat=len(possiblepaGp))))
+                # uniqueRows = np.arange(1, maxcount+1)
+                uniqueRows = np.arange(0, maxcount)
+                mmm = np.tile(estGraph.flatten(), (maxcount, 1))
+                # R inverts the order of the product, so we have to do it here too.
+                neworder = np.array(list(product([0, 1], repeat=len(possiblepaGp))))
+                # invert each row
+                neworder = neworder[:, ::-1]
+                mmm[:, i + (possiblepaGp) * p] = neworder
                 incorrectSum = np.zeros(maxcount)
             else:
                 if mmm.shape[0] > 1:
@@ -488,16 +512,15 @@ def SID(trueGraph: np.ndarray, estGraph: np.ndarray, output: bool = False, spars
                         allOthers = np.setdiff1d(
                             np.arange(0, mmm.shape[0]), uniqueRows)
                         if len(allOthers) > 1:
-                            # indInAllOthers = np.where(np.sum(~np.logical_xor(
-                            #     mmm[uniqueRows[count-1], allParentsOfI], mmm[allOthers-1, allParentsOfI]), axis=1) == p)[0]
                             indInAllOthers = get_indInAllOthers(
-                                        p, mmm, uniqueRows, allParentsOfI, count, allOthers)
+                                p, mmm, uniqueRows, allParentsOfI, count, allOthers)
                             if len(indInAllOthers) > 0:
-                                incorrectSum[allOthers[indInAllOthers]] += np.ones(len(indInAllOthers))
+                                incorrectSum[allOthers[indInAllOthers]
+                                             ] += np.ones(len(indInAllOthers))
                                 print("   T1--> incorrectSum:", incorrectSum)
                         if len(allOthers) == 1:
                             indInAllOthers = get_indInAllOthers(
-                                        p, mmm, uniqueRows, allParentsOfI, count, allOthers)
+                                p, mmm, uniqueRows, allParentsOfI, count, allOthers)
                             if len(indInAllOthers) > 0:
                                 incorrectSum[allOthers[indInAllOthers] -
                                              1] += np.ones(len(indInAllOthers))
@@ -522,14 +545,18 @@ def SID(trueGraph: np.ndarray, estGraph: np.ndarray, output: bool = False, spars
                                     indInAllOthers = get_indInAllOthers(
                                         p, mmm, uniqueRows, allParentsOfI, count, allOthers)
                                     if len(indInAllOthers) > 0:
-                                        incorrectSum[allOthers[indInAllOthers]] += np.ones(len(indInAllOthers))
-                                        print("   T4--> incorrectSum:", incorrectSum)
+                                        incorrectSum[allOthers[indInAllOthers]
+                                                     ] += np.ones(len(indInAllOthers))
+                                        print("   T4--> incorrectSum:",
+                                              incorrectSum)
                                 if len(allOthers) == 1:
                                     indInAllOthers = get_indInAllOthers(
                                         p, mmm, uniqueRows, allParentsOfI, count, allOthers)
                                     if len(indInAllOthers) > 0:
-                                        incorrectSum[allOthers[indInAllOthers]] += np.ones(len(indInAllOthers))
-                                        print("   T5--> incorrectSum:", incorrectSum)
+                                        incorrectSum[allOthers[indInAllOthers]
+                                                     ] += np.ones(len(indInAllOthers))
+                                        print("   T5--> incorrectSum:",
+                                              incorrectSum)
                                 finished = True
 
                         if not finished:
@@ -543,14 +570,18 @@ def SID(trueGraph: np.ndarray, estGraph: np.ndarray, output: bool = False, spars
                                     indInAllOthers = get_indInAllOthers(
                                         p, mmm, uniqueRows, allParentsOfI, count, allOthers)
                                     if len(indInAllOthers) > 0:
-                                        incorrectSum[allOthers[indInAllOthers]] += np.ones(len(indInAllOthers))
-                                        print("   T7--> incorrectSum:", incorrectSum)
+                                        incorrectSum[allOthers[indInAllOthers]
+                                                     ] += np.ones(len(indInAllOthers))
+                                        print("   T7--> incorrectSum:",
+                                              incorrectSum)
                                 if len(allOthers) == 1:
                                     indInAllOthers = get_indInAllOthers(
                                         p, mmm, uniqueRows, allParentsOfI, count, allOthers)
                                     if len(indInAllOthers) > 0:
-                                        incorrectSum[allOthers[indInAllOthers]] += np.ones(len(indInAllOthers))
-                                        print("   T8--> incorrectSum:", incorrectSum)
+                                        incorrectSum[allOthers[indInAllOthers]
+                                                     ] += np.ones(len(indInAllOthers))
+                                        print("   T8--> incorrectSum:",
+                                              incorrectSum)
                             else:
                                 correctInt[i, j] = 1
                 count += 1
@@ -578,8 +609,7 @@ def get_indInAllOthers(p, mmm, uniqueRows, allParentsOfI, count, allOthers):
             ~np.logical_xor(
                 mmm[uniqueRows[count-1],
                     allParentsOfI],
-                mmm[allOthers.flatten(), :][:,
-                                            allParentsOfI.flatten()]
+                mmm[allOthers.flatten(), :][:, allParentsOfI.flatten()]
             ), axis=1
         ) == p
     )[0]
@@ -588,9 +618,11 @@ def get_indInAllOthers(p, mmm, uniqueRows, allParentsOfI, count, allOthers):
 def hammingDist(G1, G2, allMistakesOne=True):
     # hammingDist(G1,G2)
     #
-    # Computes Hamming Distance between DAGs G1 and G2 with SHD(->,<-) = 1 if allMistakesOne == TRUE
+    # Computes Hamming Distance between DAGs G1 and G2 with SHD(->,<-) = 1
+    # if allMistakesOne == TRUE
     #
-    # INPUT:  G1, G2     adjacency graph containing only zeros and ones: (i,j)=1 means edge from X_i to X_j.
+    # INPUT:  G1, G2     adjacency graph containing only zeros and ones:
+    #                    (i,j)=1 means edge from X_i to X_j.
     #
     # OUTPUT: hammingDis Hamming Distance between G1 and G2
     if allMistakesOne:
@@ -639,26 +671,73 @@ if __name__ == "__main__":
     # print("==============")
     # print("estimated DAG H1:")
     # print(H1)
-    # sid = SID(G, H1)
-    # shd = hammingDist(G, H1)
-    # print(f"\n\nSHD between G and H1: {shd}")
-    # print(f"SID between G and H1: {sid['sid']}")
+    # sid1 = SID(G, H1)
+    # shd1 = hammingDist(G, H1)
+    # print(f"\n\nSHD between G and H1: {shd1}")
+    # print(f"SID between G and H1: {sid1['sid']}")
     # print("===========================\n\n")
 
     # print("estimated DAG H2:")
     # print(H2)
-    # sid = SID(G, H2)
-    # shd = hammingDist(G, H2)
-    # print(f"SHD between G and H2: {shd}")
-    # print(f"SID between G and H2: {sid['sid']}")
+    # sid2 = SID(G, H2)
+    # shd2 = hammingDist(G, H2)
+    # print(f"SHD between G and H2: {shd2}")
+    # print(f"SID between G and H2: {sid2['sid']}")
     # print("The matrix of incorrect interventional distributions is:")
-    # print(sid['incorrectMat'])
+    # print(sid2['incorrectMat'])
 
-    # input("The SID can also be applied to CPDAGs. Please press enter...")
-    print("==============")
-    print("estimated CPDAG H1c:")
-    print(H1c)
-    sid = SID(G, H1c)
-    print(f"SID between G and H1:")
+    # # input("The SID can also be applied to CPDAGs. Please press enter...")
+    # print("==============")
+    # print("estimated CPDAG H1c:")
+    # print(H1c)
+    # sid3 = SID(G, H1c)
+    # print(f"SID between G and CPDAG H1c:")
+    # print(
+    #     f"> lower bound: {sid3['sidLowerBound']} upper bound: {sid3['sidUpperBound']}")
+
+    ###################################################################################
+    # These matrices are mine
+
+    cpH4 = np.array([[0., 0., 1., 1., 1.],
+                     [0., 0., 0., 1., 0.],
+                     [1., 1., 0., 1., 0.],
+                     [0., 1., 0., 0., 1.],
+                     [1., 0., 1., 0., 0.]])
+    sid4 = SID(G, cpH4)
+
+    # H5 = array([[0., 0., 1., 1., 0.],
+    #             [0., 0., 0., 0., 1.],
+    #             [0., 0., 0., 1., 0.],
+    #             [0., 0., 0., 0., 0.],
+    #             [0., 0., 0., 0., 0.]])
+    # sid5 = SID(G, H5)
+
+    # ###################################################################################
+
+    # print("\n\n")
+    # print("#"*120)
+    # print("S U M M A R Y")
+    # print("#"*120)
+    # print(f"SHD between G and H1: {shd1}")
+    # print(f"SID between G and H1: {sid1['sid']}")
+    # print("#"*120)
+    # print(f"SHD between G and H2: {shd2}")
+    # print(f"SID between G and H2: {sid2['sid']}")
+    # print("The matrix of incorrect interventional distributions is:")
+    # print(sid2['incorrectMat'])
+    # print("#"*120)
+    # print(f"SID between G and CPDAG H1c:")
+    # print(
+    #     f"> lower bound: {sid3['sidLowerBound']} upper bound: {sid3['sidUpperBound']}")
+    # print("#"*120)
+
+    #########################################
+    # more tests
+    #########################################
+    print(f"SID between G and CPDAG H4:")
     print(
-        f"lower bound: {sid['sidLowerBound']} upper bound: {sid['sidUpperBound']}")
+        f"> lower bound: {sid4['sidLowerBound']} upper bound: {sid4['sidUpperBound']}")
+    # print("#"*120)
+    # print(f"SHD between G and H5: {shd5}")
+    # print(f"SID between G and H5: {sid5['sid']}")
+    # print("#"*120)
