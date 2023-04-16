@@ -25,7 +25,6 @@ def pm(m):
         print("")
 
 
-
 def allDagsIntern(gm, a, row_names, tmp=None):
     if tmp is None:
         tmp = []
@@ -449,7 +448,8 @@ def SID(
                 uniqueRows = np.arange(0, maxcount)
                 mmm = np.tile(estGraph.flatten(), (maxcount, 1))
                 # R inverts the order of the product, so we have to do it here too.
-                neworder = np.array(list(product([0, 1], repeat=len(possiblepaGp))))
+                neworder = np.array(
+                    list(product([0, 1], repeat=len(possiblepaGp))))
                 # invert each row
                 neworder = neworder[:, ::-1]
                 mmm[:, i + (possiblepaGp) * p] = neworder
@@ -698,19 +698,20 @@ if __name__ == "__main__":
     ###################################################################################
     # These matrices are mine
 
-    cpH4 = np.array([[0., 0., 1., 1., 1.],
-                     [0., 0., 0., 1., 0.],
-                     [1., 1., 0., 1., 0.],
-                     [0., 1., 0., 0., 1.],
-                     [1., 0., 1., 0., 0.]])
-    sid4 = SID(G, cpH4)
+    # cpH4 = np.array([[0., 0., 1., 1., 1.],
+    #                  [0., 0., 0., 1., 0.],
+    #                  [1., 1., 0., 1., 0.],
+    #                  [0., 1., 0., 0., 1.],
+    #                  [1., 0., 1., 0., 0.]])
+    # sid4 = SID(G, cpH4)
 
-    # H5 = array([[0., 0., 1., 1., 0.],
-    #             [0., 0., 0., 0., 1.],
-    #             [0., 0., 0., 1., 0.],
-    #             [0., 0., 0., 0., 0.],
-    #             [0., 0., 0., 0., 0.]])
-    # sid5 = SID(G, H5)
+    H5 = np.array([[0., 0., 1., 1., 0.],
+                   [0., 0., 0., 0., 1.],
+                   [0., 0., 0., 1., 0.],
+                   [0., 0., 0., 0., 0.],
+                   [0., 0., 0., 0., 0.]])
+    sid5 = SID(G, H5)
+    shd5 = hammingDist(G, H5)
 
     # ###################################################################################
 
@@ -734,10 +735,10 @@ if __name__ == "__main__":
     #########################################
     # more tests
     #########################################
-    print(f"SID between G and CPDAG H4:")
-    print(
-        f"> lower bound: {sid4['sidLowerBound']} upper bound: {sid4['sidUpperBound']}")
-    # print("#"*120)
-    # print(f"SHD between G and H5: {shd5}")
-    # print(f"SID between G and H5: {sid5['sid']}")
-    # print("#"*120)
+    # print(f"SID between G and CPDAG H4:")
+    # print(
+    #     f"> lower bound: {sid4['sidLowerBound']} upper bound: {sid4['sidUpperBound']}")
+    print("#"*120)
+    print(f"SHD between G and H5: {shd5}")
+    print(f"SID between G and H5: {sid5['sid']}")
+    print("#"*120)
