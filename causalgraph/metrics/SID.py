@@ -666,44 +666,44 @@ if __name__ == "__main__":
                     [1, 1, 1, 0, 0],
                     [1, 1, 0, 0, 0]])
 
-    # print("true DAG G:")
-    # print(G)
-    # print("==============")
-    # print("estimated DAG H1:")
-    # print(H1)
-    # sid1 = SID(G, H1)
-    # shd1 = hammingDist(G, H1)
-    # print(f"\n\nSHD between G and H1: {shd1}")
-    # print(f"SID between G and H1: {sid1['sid']}")
-    # print("===========================\n\n")
+    print("true DAG G:")
+    print(G)
+    print("==============")
+    print("estimated DAG H1:")
+    print(H1)
+    sid1 = SID(G, H1)
+    shd1 = hammingDist(G, H1)
+    print(f"\n\nSHD between G and H1: {shd1}")
+    print(f"SID between G and H1: {sid1['sid']}")
+    print("===========================\n\n")
 
-    # print("estimated DAG H2:")
-    # print(H2)
-    # sid2 = SID(G, H2)
-    # shd2 = hammingDist(G, H2)
-    # print(f"SHD between G and H2: {shd2}")
-    # print(f"SID between G and H2: {sid2['sid']}")
-    # print("The matrix of incorrect interventional distributions is:")
-    # print(sid2['incorrectMat'])
+    print("estimated DAG H2:")
+    print(H2)
+    sid2 = SID(G, H2)
+    shd2 = hammingDist(G, H2)
+    print(f"SHD between G and H2: {shd2}")
+    print(f"SID between G and H2: {sid2['sid']}")
+    print("The matrix of incorrect interventional distributions is:")
+    print(sid2['incorrectMat'])
 
-    # # input("The SID can also be applied to CPDAGs. Please press enter...")
-    # print("==============")
-    # print("estimated CPDAG H1c:")
-    # print(H1c)
-    # sid3 = SID(G, H1c)
-    # print(f"SID between G and CPDAG H1c:")
-    # print(
-    #     f"> lower bound: {sid3['sidLowerBound']} upper bound: {sid3['sidUpperBound']}")
+    # input("The SID can also be applied to CPDAGs. Please press enter...")
+    print("==============")
+    print("estimated CPDAG H1c:")
+    print(H1c)
+    sid3 = SID(G, H1c)
+    print(f"SID between G and CPDAG H1c:")
+    print(
+        f"> lower bound: {sid3['sidLowerBound']} upper bound: {sid3['sidUpperBound']}")
 
-    ###################################################################################
+    ##################################################################################
     # These matrices are mine
 
-    # cpH4 = np.array([[0., 0., 1., 1., 1.],
-    #                  [0., 0., 0., 1., 0.],
-    #                  [1., 1., 0., 1., 0.],
-    #                  [0., 1., 0., 0., 1.],
-    #                  [1., 0., 1., 0., 0.]])
-    # sid4 = SID(G, cpH4)
+    cpH4 = np.array([[0., 0., 1., 1., 1.],
+                     [0., 0., 0., 1., 0.],
+                     [1., 1., 0., 1., 0.],
+                     [0., 1., 0., 0., 1.],
+                     [1., 0., 1., 0., 0.]])
+    sid4 = SID(G, cpH4)
 
     H5 = np.array([[0., 0., 1., 1., 0.],
                    [0., 0., 0., 0., 1.],
@@ -713,32 +713,33 @@ if __name__ == "__main__":
     sid5 = SID(G, H5)
     shd5 = hammingDist(G, H5)
 
-    # ###################################################################################
+    ###################################################################################
 
-    # print("\n\n")
-    # print("#"*120)
-    # print("S U M M A R Y")
-    # print("#"*120)
-    # print(f"SHD between G and H1: {shd1}")
-    # print(f"SID between G and H1: {sid1['sid']}")
-    # print("#"*120)
-    # print(f"SHD between G and H2: {shd2}")
-    # print(f"SID between G and H2: {sid2['sid']}")
-    # print("The matrix of incorrect interventional distributions is:")
-    # print(sid2['incorrectMat'])
-    # print("#"*120)
-    # print(f"SID between G and CPDAG H1c:")
-    # print(
-    #     f"> lower bound: {sid3['sidLowerBound']} upper bound: {sid3['sidUpperBound']}")
-    # print("#"*120)
+    print("\n\n")
+    print("#"*120)
+    print("S U M M A R Y")
+    print("#"*120)
+    print(f"SHD between G and H1: {shd1}")
+    print(f"SID between G and H1: {sid1['sid']}")
+    print("#"*120)
+    print(f"SHD between G and H2: {shd2}")
+    print(f"SID between G and H2: {sid2['sid']}")
+    print("The matrix of incorrect interventional distributions is:")
+    print(sid2['incorrectMat'])
+    print("#"*120)
+    print(f"SID between G and CPDAG H1c:")
+    print(
+        f"> lower bound: {sid3['sidLowerBound']} upper bound: {sid3['sidUpperBound']}")
+    print("#"*120)
 
     #########################################
     # more tests
     #########################################
-    # print(f"SID between G and CPDAG H4:")
-    # print(
-    #     f"> lower bound: {sid4['sidLowerBound']} upper bound: {sid4['sidUpperBound']}")
+    print(f"SID between G and CPDAG H4:")
+    print(
+        f"> lower bound: {sid4['sidLowerBound']} upper bound: {sid4['sidUpperBound']}")
     print("#"*120)
     print(f"SHD between G and H5: {shd5}")
     print(f"SID between G and H5: {sid5['sid']}")
+    print(sid5['incorrectMat'])
     print("#"*120)
