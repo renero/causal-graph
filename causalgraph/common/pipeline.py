@@ -241,7 +241,8 @@ class Pipeline:
             function or class. Each parameter must be a string corresponding to
             an attribute of the host object or a value.
         """
-        self._pbar = tqdm(total=len(steps.keys()), **tqdm_params(desc, self._prog_bar))
+        self._pbar = tqdm(total=len(steps.keys()), 
+                          **tqdm_params(desc, self._prog_bar, leave=True, position=0))
         self._pbar.update(0)
         print("-"*80) if self._verbose else None
 

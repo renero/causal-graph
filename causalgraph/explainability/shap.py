@@ -68,8 +68,6 @@ class ShapEstimator(BaseEstimator):
 
         pbar = tqdm(total=len(self.all_feature_names_), 
                     **tqdm_params(self._fit_desc, self.prog_bar))
-                    # desc=f"{self._fit_desc:<25}", disable=not self.prog_bar,
-                    # position=1, leave=False)
 
         for target_name in self.all_feature_names_:
             pbar.update(1)
@@ -96,10 +94,8 @@ class ShapEstimator(BaseEstimator):
         # X_array = check_array(X)
         check_is_fitted(self, 'is_fitted_')
 
-        pbar = tqdm(total=3, **tqdm_params(self._fit_desc, self.prog_bar))
-                    # desc=f"{self._fit_desc:<25}", disable=not self.prog_bar,
-                    # leave=False)
-
+        pbar = tqdm(total=2, 
+                    **tqdm_params("Building graph from SHAPs", self.prog_bar))
         self.parents = dict()
         for target in self.all_feature_names_:
             candidate_causes = [
@@ -549,8 +545,8 @@ class ShapEstimator(BaseEstimator):
         ax.barh(y_pos, mean_shap_values[feature_inds],
                 0.7, align='center', color="#0e73fa", alpha=0.8)
         ax.xaxis.set_major_formatter(FormatStrFormatter('%.3g'))
-        ax.set_yticks(y_pos, fontsize=13)
-        ax.set_yticklabels([feature_names[i] for i in feature_inds])
+        ax.set_yticks(y_pos, [feature_names[i] for i in feature_inds], fontsize=13)
+        # ax.set_yticklabels([feature_names[i] for i in feature_inds])
         # ax.set_xlabel("$\\frac{1}{m}\sum_{j=1}^p| \phi_j |$")
         ax.set_xlabel("Avg. SHAP value")
         ax.set_title(

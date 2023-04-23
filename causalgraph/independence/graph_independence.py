@@ -78,8 +78,6 @@ class GraphIndependence(object):
 
         pbar = tqdm(total=len(self.feature_names), 
                     **tqdm_params(self._fit_desc, self.prog_bar))
-                    # desc=f"{self._fit_desc:<25}",
-                    # disable=not self.prog_bar, position=1, leave=False)
         for feature_name in self.feature_names:
             pbar.refresh()
             self._remove_independent_edges(feature_name, self.condlen, self.condsize)
