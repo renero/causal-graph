@@ -243,7 +243,7 @@ class Rex(BaseEstimator, ClassifierMixin):
             ('regressor', NNRegressor): [
                 "model_type", "hidden_dim", "learning_rate", "dropout", "batch_size", 
                 "num_epochs", "loss_fn", "gpus", "test_size", "early_stop", "patience", 
-                "min_delta", "random_state", "verbose", False],
+                "min_delta", "random_state", "verbose", "prog_bar"],
             ('shaps', ShapEstimator): [
                 "regressor", "shap_selection", "sensitivity", "tolerance", "descending", 
                 "iters", "reciprocal", "min_impact", "verbose", "prog_bar",

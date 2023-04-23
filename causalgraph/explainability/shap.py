@@ -68,7 +68,7 @@ class ShapEstimator(BaseEstimator):
 
         pbar = tqdm(total=len(self.all_feature_names_),
                     desc=f"{self._fit_desc:<25}", disable=not self.prog_bar,
-                    leave=False)
+                    position=1, leave=False)
 
         for target_name in self.all_feature_names_:
             pbar.update(1)

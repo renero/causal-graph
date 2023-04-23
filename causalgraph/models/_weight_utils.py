@@ -351,9 +351,9 @@ def infer_causal_relationships(
 ):
     shap_values = dict()
     pbar = tqdm(total=len(feature_names), desc="Computing SHAPLEY values",
-                disable=not prog_bar, leave=False)
+                disable=not prog_bar, position=1, leave=False)
     for target_name in feature_names:
-        pbar.update()
+        pbar.update(1)
         model = trained_models[target_name]
         shap_values[target_name] = _get_shap_values(model)
         pbar.refresh()

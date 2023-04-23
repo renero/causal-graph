@@ -109,7 +109,8 @@ class NNRegressor(BaseEstimator):
 
         model = DFFModel if self.model_type == "dff" else MLPModel
         pbar_in = tqdm(total=len(self.feature_names), 
-            desc=f"{self._fit_desc:<25s}", leave=False)
+            desc=f"{self._fit_desc:<25s}", position=1, leave=False, 
+            disable=not self.prog_bar)
         for target in self.feature_names:
             pbar_in.refresh()
             self.regressor[target] = model(
