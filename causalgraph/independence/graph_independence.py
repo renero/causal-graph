@@ -15,6 +15,7 @@ from pandas import DataFrame
 from hyppo.independence import Hsic
 from tqdm.auto import tqdm
 
+from causalgraph.common import tqdm_params
 
 # TODO: Change the way this objects are called. Use a fit method instead of
 # passing the data to the constructor.
@@ -75,8 +76,10 @@ class GraphIndependence(object):
             if col not in self.G_skl.nodes():
                 self.G_skl.add_node(col)
 
-        pbar = tqdm(total=len(self.feature_names), desc=f"{self._fit_desc:<25}",
-                    disable=not self.prog_bar, position=1, leave=False)
+        pbar = tqdm(total=len(self.feature_names), 
+                    **tqdm_params(self._fit_desc, self.prog_bar))
+                    # desc=f"{self._fit_desc:<25}",
+                    # disable=not self.prog_bar, position=1, leave=False)
         for feature_name in self.feature_names:
             pbar.refresh()
             self._remove_independent_edges(feature_name, self.condlen, self.condsize)

@@ -1,5 +1,6 @@
 import random
-from typing import List
+from types import UnionType
+from typing import List, Union
 import numpy as np
 import pandas as pd
 import pytorch_lightning as pl
@@ -14,7 +15,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
 from torch.utils.data import DataLoader
 
-from ._base_models import MDN, DFF, MLP
+from ._base_models import MLP
 from ._columnar import ColumnsDataset
 
 
@@ -156,7 +157,7 @@ class BaseModel(object):
         self.extra_trainer_args = dict(
             {
                 "enable_model_summary": False,
-                "auto_lr_find": True,
+                # "auto_lr_find": True,
                 "log_every_n_steps": log_every_steps,
                 "fast_dev_run": False,
                 "enable_progress_bar": False,
@@ -179,7 +180,7 @@ class MLPModel(BaseModel):
         num_epochs: int,
         dataframe: pd.DataFrame,
         test_size: float,
-        gpus: int,
+        devices: Union[int, str],
         seed: int,
         early_stop: bool = True,
         patience: int = 10,
@@ -204,7 +205,7 @@ class MLPModel(BaseModel):
         self.loss_fn = loss_fn
         self.dropout = dropout
         self.num_epochs = num_epochs
-        self.gpus = gpus
+        self.devices = devices
         self.override_extras(**kwargs)
 
         self.model = MLP(
@@ -219,9 +220,10 @@ class MLPModel(BaseModel):
             max_epochs=self.num_epochs,
             logger=self.logger,
             callbacks=self.callbacks,
-            auto_select_gpus=True,
-            accelerator="gpu" if self.gpu_available else "cpu",
-            gpus=self.gpus,
+            # auto_select_gpus=True,
+            devices=self.devices,
+            # accelerator="gpu" if self.gpu_available else "cpu",
+            accelerator="auto",
             **self.extra_trainer_args)
 
     def train(self):
@@ -230,130 +232,6 @@ class MLPModel(BaseModel):
             train_dataloaders=self.train_loader,
             val_dataloaders=self.val_loader
         )
-
-
-class DFFModel(BaseModel):
-    def __init__(
-        self,
-        target: str,
-        input_size: int,
-        hidden_dim: int,
-        learning_rate: float,
-        batch_size: int,
-        loss_fn: str,
-        dropout: float,
-        num_epochs: int,
-        dataframe: pd.DataFrame,
-        test_size: float,
-        gpus: int,
-        seed: int,
-        early_stop: bool = True,
-        patience: int = 10,
-        min_delta: float = 0.001,
-        **kwargs,
-    ):
-        super(DFFModel, self).__init__(
-            target=target,
-            dataframe=dataframe,
-            test_size=test_size,
-            batch_size=batch_size,
-            tb_suffix="DFF",
-            seed=seed,
-            early_stop=early_stop,
-            patience=patience,
-            min_delta=min_delta)
-
-        self.input_size = input_size
-        self.hidden_dim = hidden_dim
-        self.learning_rate = learning_rate
-        self.num_epochs = num_epochs
-        self.loss_fn = loss_fn
-        self.gpus = gpus
-        self.override_extras(**kwargs)
-
-        self.model = DFF(
-            self.input_size,
-            self.hidden_dim,
-            self.batch_size,
-            self.learning_rate,
-            self.loss_fn)
-
-        self.trainer = Trainer(
-            max_epochs=self.num_epochs,
-            logger=self.logger,
-            callbacks=self.callbacks,
-            auto_select_gpus=True,
-            accelerator="gpu" if self.gpu_available else "cpu",
-            # devices=self.gpus,
-            gpus=self.gpus,
-            **self.extra_trainer_args)
-
-    def train(self):
-        self.trainer.fit(
-            self.model,
-            train_dataloaders=self.train_loader,
-            val_dataloaders=self.val_loader
-        )
-
-
-class MDNModel(BaseModel):
-    def __init__(
-        self,
-        target: str,
-        input_size: int,
-        hidden_size: int,
-        num_gaussians: int,
-        learning_rate: float,
-        batch_size: int,
-        loss_fn: str,
-        num_epochs: int,
-        dataframe: pd.DataFrame,
-        test_size: float,
-        gpus: int,
-        seed: int,
-        **kwargs,
-    ):
-        super(MDNModel, self).__init__(
-            target=target,
-            dataframe=dataframe,
-            test_size=test_size,
-            batch_size=batch_size,
-            tb_suffix="MDN",
-            seed=seed)
-
-        self.input_size = input_size
-        self.hidden_size = hidden_size
-        self.num_gaussians = num_gaussians
-        self.learning_rate = learning_rate
-        self.num_epochs = num_epochs
-        self.loss_fn = loss_fn
-        self.gpus = gpus
-        self.override_extras(**kwargs)
-
-        self.model = MDN(
-            self.input_size,
-            self.hidden_size,
-            self.num_gaussians,
-            self.learning_rate,
-            self.batch_size,
-            self.loss_fn,
-        )
-
-        self.trainer = Trainer(
-            max_epochs=self.num_epochs,
-            logger=self.logger,
-            callbacks=self.callbacks,
-            auto_select_gpus=True,
-            accelerator="gpu" if self.gpu_available else "cpu",
-            # devices=self.gpus,
-            gpus=self.gpus,
-            **self.extra_trainer_args)
-
-    def train(self):
-        self.trainer.fit(
-            self.model,
-            train_dataloaders=self.train_loader,
-            val_dataloaders=self.val_loader)
 
 
 if __name__ == "__main__":
@@ -369,7 +247,7 @@ if __name__ == "__main__":
         num_epochs=200, 
         dataframe=data, 
         test_size=0.1, 
-        gpus=0, 
+        devices="auto", 
         seed=1234,
         early_stop=False)
     mlp.train()

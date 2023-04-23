@@ -1,42 +1,48 @@
+import warnings
 from typing import List, Union
 
 import numpy as np
 import pandas as pd
+import torch
 from sklearn.base import BaseEstimator
 from sklearn.utils.validation import check_array, check_is_fitted
-import torch
 from tqdm.auto import tqdm
+
+from causalgraph.common import tqdm_params
+
+from ._models import MLPModel
 
 # import sys
 # sys.path.append("../dnn")
 
-from ._models import DFFModel, MLPModel
 
-import warnings
 
 warnings.filterwarnings("ignore")
 
 # TODO: Make this class to inherit from a generic class for all regressors
+
+
 class NNRegressor(BaseEstimator):
     """
     """
+
     def __init__(
-        self,
-        model_type: str,
-        hidden_dim: Union[int, List[int]],
-        learning_rate: float,
-        dropout: float,
-        batch_size: int,
-        num_epochs: int,
-        loss_fn: str,
-        gpus: int,
-        test_size: float,
-        early_stop: bool,
-        patience: int,
-        min_delta: float,
-        random_state: int = 1234,
-        verbose: bool = False,
-        prog_bar: bool = False):
+            self,
+            model_type: str,
+            hidden_dim: Union[int, List[int]],
+            learning_rate: float,
+            dropout: float,
+            batch_size: int,
+            num_epochs: int,
+            loss_fn: str,
+            devices: Union[int, str],
+            test_size: float,
+            early_stop: bool,
+            patience: int,
+            min_delta: float,
+            random_state: int = 1234,
+            verbose: bool = False,
+            prog_bar: bool = False):
         """
         Train DFF networks for all variables in data. Each network will be trained to
         predict one of the variables in the data, using the rest as predictors plus one
@@ -74,7 +80,7 @@ class NNRegressor(BaseEstimator):
         self.batch_size = batch_size
         self.num_epochs = num_epochs
         self.loss_fn = loss_fn
-        self.gpus = gpus
+        self.devices = devices
         self.test_size = test_size
         self.early_stop = early_stop
         self.patience = patience
@@ -108,9 +114,10 @@ class NNRegressor(BaseEstimator):
         self.regressor = dict()
 
         model = DFFModel if self.model_type == "dff" else MLPModel
-        pbar_in = tqdm(total=len(self.feature_names), 
-            desc=f"{self._fit_desc:<25s}", position=1, leave=False, 
-            disable=not self.prog_bar)
+        pbar_in = tqdm(total=len(self.feature_names),
+                       **tqdm_params(self._fit_desc, self.prog_bar))
+                    # desc=f"{self._fit_desc:<25s}", position=1, leave=False,
+                    # disable=not self.prog_bar)
         for target in self.feature_names:
             pbar_in.refresh()
             self.regressor[target] = model(
@@ -124,7 +131,7 @@ class NNRegressor(BaseEstimator):
                 num_epochs=self.num_epochs,
                 dataframe=X,
                 test_size=self.test_size,
-                gpus=self.gpus,
+                devices=self.devices,
                 seed=self.random_state,
                 early_stop=self.early_stop,
                 patience=self.patience,
@@ -153,7 +160,7 @@ class NNRegressor(BaseEstimator):
         X = check_array(X, accept_sparse=True)
         check_is_fitted(self, 'is_fitted_')
         return np.ones(X.shape[0], dtype=np.int64)
-    
+
     def get_input_tensors(self, target_name: str):
         """
         Returns the data used to train the model for the given target.
@@ -175,7 +182,8 @@ class NNRegressor(BaseEstimator):
 
         """
         model = self.regressor[target_name]
-        features_tensor = torch.autograd.Variable(model.train_loader.dataset.features)
+        features_tensor = torch.autograd.Variable(
+            model.train_loader.dataset.features)
         target_tensor = model.train_loader.dataset.target
 
         cols = list(self.feature_names)
@@ -203,7 +211,7 @@ if __name__ == "__main__":
         batch_size=16,
         num_epochs=50,
         loss_fn="mse",
-        gpus=0,
+        devices="auto",
         test_size=0.1,
         early_stop=False,
         patience=10,

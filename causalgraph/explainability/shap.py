@@ -55,7 +55,7 @@ class ShapEstimator(BaseEstimator):
         self.prog_bar = prog_bar
         self.on_gpu = on_gpu
 
-        self._fit_desc = "Computing SHAPLEY values"
+        self._fit_desc = "Running SHAP explainer"
         self._pred_desc = "Building graph skeleton"
 
     def fit(self, X, y=None):
@@ -66,9 +66,10 @@ class ShapEstimator(BaseEstimator):
         self.all_feature_names_ = list(self.models.regressor.keys())
         self.shap_values = dict()
 
-        pbar = tqdm(total=len(self.all_feature_names_),
-                    desc=f"{self._fit_desc:<25}", disable=not self.prog_bar,
-                    position=1, leave=False)
+        pbar = tqdm(total=len(self.all_feature_names_), 
+                    **tqdm_params(self._fit_desc, self.prog_bar))
+                    # desc=f"{self._fit_desc:<25}", disable=not self.prog_bar,
+                    # position=1, leave=False)
 
         for target_name in self.all_feature_names_:
             pbar.update(1)
@@ -95,9 +96,9 @@ class ShapEstimator(BaseEstimator):
         # X_array = check_array(X)
         check_is_fitted(self, 'is_fitted_')
 
-        pbar = tqdm(total=3,
-                    desc=f"{self._fit_desc:<25}", disable=not self.prog_bar,
-                    leave=False)
+        pbar = tqdm(total=3, **tqdm_params(self._fit_desc, self.prog_bar))
+                    # desc=f"{self._fit_desc:<25}", disable=not self.prog_bar,
+                    # leave=False)
 
         self.parents = dict()
         for target in self.all_feature_names_:
@@ -129,8 +130,9 @@ class ShapEstimator(BaseEstimator):
         G_shap = nx.DiGraph()
         desc = "Orienting causal graph"
         pbar = tqdm(total=len(G_shap_unoriented.edges()),
-                    disable=not self.prog_bar,
-                    leave=False, desc=f"{desc:<25}")
+                    **tqdm_params(desc, self.prog_bar))
+                    # disable=not self.prog_bar,
+                    # leave=False, desc=f"{desc:<25}")
         for u, v in G_shap_unoriented.edges():
             pbar.update(1)
             orientation = get_edge_orientation(

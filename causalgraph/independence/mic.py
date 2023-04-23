@@ -1,4 +1,5 @@
 from deprecated import deprecated
+from causalgraph.common import tqdm_params
 import numpy as np
 import pandas as pd
 
@@ -46,8 +47,9 @@ def pairwise_mic(
     mic_p, tic_p = pstats(data.values.T, alpha=alpha, c=c, est=est)
     m = len(data.columns)
     mic, tic = np.ones((m, m)), np.ones((m, m))
-    pbar = tqdm(total=m*(m-1)/2, desc="Computing MIC", disable=not progbar, 
-                position=1, leave=False)
+    pbar = tqdm(total=m*(m-1)/2, **tqdm_params("Computing MIC", progbar))
+                # desc="Computing MIC", disable=not progbar, 
+                # position=1, leave=False)
     for i in range(m):
         for j in range(i+1, m):
             pbar.refresh()
@@ -81,8 +83,8 @@ def pairwise_MIC(data: pd.DataFrame, c=15, alpha=0.6, progbar=True):
     list_pairs = list(combinations(list_nodes, 2))
     mine = MINE(alpha=alpha, c=c)
     score_df = pd.DataFrame(0, index=data.columns, columns=data.columns)
-    pbar = tqdm(total=len(list_pairs),
-                disable=not progbar, desc="Computing MIC", position=1, leave=False)
+    pbar = tqdm(total=len(list_pairs), **tqdm_params("Computing MIC", progbar))
+                # disable=not progbar, desc="Computing MIC", position=1, leave=False)
     for feat1, feat2 in list_pairs:
         pbar.update(1)
         x, y = data[feat1], data[feat2]

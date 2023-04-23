@@ -1,4 +1,5 @@
 from collections import Counter
+from typing import Dict, List, Tuple, Union
 
 import kneed
 import matplotlib.pyplot as plt
@@ -8,13 +9,12 @@ import pandas as pd
 import seaborn as sns
 import shap
 from pynewood.graph_utils import graph_from_dictionary
-
-from tqdm.auto import tqdm
-from typing import List, Union, Dict, Tuple
 from sklearn.cluster import DBSCAN
 from sklearn.preprocessing import MinMaxScaler
+from tqdm.auto import tqdm
 
-from causalGraph.dnn.models import MDNModel, DFFModel, MLPModel
+from causalgraph.common import tqdm_params
+from causalGraph.dnn.models import DFFModel, MDNModel, MLPModel
 
 
 def extract_weights(model, verbose=False):
@@ -350,8 +350,10 @@ def infer_causal_relationships(
         prog_bar=True
 ):
     shap_values = dict()
-    pbar = tqdm(total=len(feature_names), desc="Computing SHAPLEY values",
-                disable=not prog_bar, position=1, leave=False)
+    pbar = tqdm(total=len(feature_names), 
+                **tqdm_params("Computing SHAPLEY values", prog_bar))
+                # desc="Computing SHAPLEY values",
+                # disable=not prog_bar, position=1, leave=False)
     for target_name in feature_names:
         pbar.update(1)
         model = trained_models[target_name]

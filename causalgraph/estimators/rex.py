@@ -61,7 +61,7 @@ class Rex(BaseEstimator, ClassifierMixin):
             batch_size: int = 45,
             num_epochs: int = 25, #250,
             loss_fn='mse',
-            gpus=0,
+            devices="auto",
             test_size=0.1,
             sensitivity=1.0,
             descending=False,
@@ -176,8 +176,8 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.batch_size = batch_size
         self.num_epochs = num_epochs
         self.loss_fn = loss_fn
-        self.gpus = gpus
-        self.have_gpu = self.gpus != 0
+        self.devices = devices
+        self.have_gpu = (isinstance(self.devices, int) and self.devices != 0)
         self.test_size = test_size
         self.min_impact = min_impact
         self.early_stop = early_stop
@@ -242,7 +242,7 @@ class Rex(BaseEstimator, ClassifierMixin):
         steps = {
             ('regressor', NNRegressor): [
                 "model_type", "hidden_dim", "learning_rate", "dropout", "batch_size", 
-                "num_epochs", "loss_fn", "gpus", "test_size", "early_stop", "patience", 
+                "num_epochs", "loss_fn", "devices", "test_size", "early_stop", "patience", 
                 "min_delta", "random_state", "verbose", "prog_bar"],
             ('shaps', ShapEstimator): [
                 "regressor", "shap_selection", "sensitivity", "tolerance", "descending", 

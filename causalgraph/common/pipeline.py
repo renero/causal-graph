@@ -2,13 +2,12 @@
 Pipeline class to define and run several execution steps.
 (C) J. Renero, 2023
 """
-import importlib
-import inspect
 import types
 from typing import Any, List, Union
 
 from tqdm.auto import tqdm
 
+from causalgraph.common import tqdm_params
 
 class SampleClass:
     def __init__(self, param1=None, param2=False):
@@ -242,10 +241,7 @@ class Pipeline:
             function or class. Each parameter must be a string corresponding to
             an attribute of the host object or a value.
         """
-        self._pbar = tqdm(total=len(steps.keys()),
-                          desc=f"{desc:<25}",
-                          leave=False,
-                          disable=not self._prog_bar)
+        self._pbar = tqdm(total=len(steps.keys()), **tqdm_params(desc, self._prog_bar))
         self._pbar.update(0)
         print("-"*80) if self._verbose else None
 
