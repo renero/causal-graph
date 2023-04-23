@@ -159,7 +159,7 @@ class BaseModel(object):
                 "auto_lr_find": True,
                 "log_every_n_steps": log_every_steps,
                 "fast_dev_run": False,
-                "enable_progress_bar": True,
+                "enable_progress_bar": False,
             }
         )
         for k, default_value in self.extra_trainer_args.items():

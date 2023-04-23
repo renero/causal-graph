@@ -83,7 +83,7 @@ class Rex(BaseEstimator, ClassifierMixin):
             condlen: int = 1,
             condsize: int = 0,
             verbose: bool = False,
-            enable_progress_bar=True,
+            prog_bar=True,
             do_plot_correlations: bool = False,
             do_plot_shap: bool = False,
             do_plot_discrepancies: bool = False,
@@ -144,7 +144,7 @@ class Rex(BaseEstimator, ClassifierMixin):
                 SHAP discrepancies matrix properties have been met.
             condlen (int): The depth of the conditioning sequence. Default is 1.
             condsize (int): The size of the conditioning sequence. Default is 0.
-            enable_progress_bar (bool): Whether to display a progress bar.
+            prog_bar (bool): Whether to display a progress bar.
                 Default is False.
             verbose (bool): Whether to print the progress of the training. Default
                 is False.
@@ -198,7 +198,7 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.increase_tolerance = increase_tolerance
         self.condlen = condlen
         self.condsize = condsize
-        self.enable_progress_bar = enable_progress_bar
+        self.prog_bar = prog_bar
         self.verbose = verbose
         self.random_state = random_state
 
@@ -246,7 +246,7 @@ class Rex(BaseEstimator, ClassifierMixin):
                 "min_delta", "random_state", "verbose", False],
             ('shaps', ShapEstimator): [
                 "regressor", "shap_selection", "sensitivity", "tolerance", "descending", 
-                "iters", "reciprocal", "min_impact", "verbose", "enable_progress_bar",
+                "iters", "reciprocal", "min_impact", "verbose", "prog_bar",
                 "have_gpu"],
             ('G_shap', 'shaps.predict'): ["X"],
             ('indep', GraphIndependence): ["G_shap", "condlen", "condsize", "verbose"],
@@ -273,7 +273,8 @@ class Rex(BaseEstimator, ClassifierMixin):
         """
         check_is_fitted(self, "is_fitted_")
         X = check_array(X)
-        return np.random.rand(self.n_features_in_, self.n_features_in_).astype(np.float32)
+        # return np.random.rand(self.n_features_in_, self.n_features_in_).astype(np.float32)
+        return self.G_final
 
     def score(self, X, y):
         return np.random.randint(self.n_features_in_**2)

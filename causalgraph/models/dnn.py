@@ -36,7 +36,7 @@ class NNRegressor(BaseEstimator):
         min_delta: float,
         random_state: int = 1234,
         verbose: bool = False,
-        enable_progress_bar: bool = False):
+        prog_bar: bool = False):
         """
         Train DFF networks for all variables in data. Each network will be trained to
         predict one of the variables in the data, using the rest as predictors plus one
@@ -60,7 +60,7 @@ class NNRegressor(BaseEstimator):
             early_stop (bool): Whether to use early stopping. Default is True.
             patience (int): The patience for early stopping. Default is 10.
             min_delta (float): The minimum delta for early stopping. Default is 0.001.
-            enable_progress_bar (bool): Whether to enable the progress bar. Default
+            prog_bar (bool): Whether to enable the progress bar. Default
                 is False.
 
         Returns:
@@ -81,7 +81,7 @@ class NNRegressor(BaseEstimator):
         self.min_delta = min_delta
         self.random_state = random_state
         self.verbose = verbose
-        self.enable_progress_bar = enable_progress_bar
+        self.prog_bar = prog_bar
 
         self.regressor = None
         self._fit_desc = "Training NNs"
@@ -128,7 +128,7 @@ class NNRegressor(BaseEstimator):
                 early_stop=self.early_stop,
                 patience=self.patience,
                 min_delta=self.min_delta,
-                enable_progress_bar=self.enable_progress_bar)
+                prog_bar=self.prog_bar)
             self.regressor[target].train()
             pbar_in.update(1)
         pbar_in.close()
@@ -208,5 +208,5 @@ if __name__ == "__main__":
         patience=10,
         min_delta=0.001,
         random_state=1234,
-        enable_progress_bar=False)
+        prog_bar=False)
     nn.fit(data)

@@ -153,51 +153,6 @@ def subplots(
     plt.show()
 
 
-def plot_shap_summary(
-        feature_names: List[str],
-        mean_shap_values,
-        feature_inds,
-        selected_features,
-        ax,
-        **kwargs):
-    """
-    Plots the summary of the SHAP values for a given target.
-
-    Arguments:
-    ----------
-        feature_names: List[str]
-            The names of the features.
-        mean_shap_values: np.array
-            The mean SHAP values for each feature.
-        feature_inds: np.array
-            The indices of the features to be plotted.
-        selected_features: List[str]
-            The names of the selected features.
-        ax: Axis
-            The axis in which to plot the summary. If None, a new figure is created.
-        **kwargs: Dict
-            Additional arguments to be passed to the plot.
-    """
-
-    figsize_ = kwargs.get('figsize', (6, 3))
-    fig = None
-    if ax is None:
-        fig, ax = plt.subplots(1, 1, figsize=figsize_)
-
-    y_pos = np.arange(len(feature_inds))
-    ax.grid(True, axis='x')
-    ax.barh(y_pos, mean_shap_values[feature_inds],
-            0.7, align='center', color="#0e73fa", alpha=0.8)
-    ax.xaxis.set_major_formatter(FormatStrFormatter('%.3g'))
-    ax.set_yticks(y_pos, fontsize=13)
-    ax.set_yticklabels([feature_names[i] for i in feature_inds])
-    ax.set_xlabel("$\\frac{1}{m}\sum_{j=1}^p| \phi_j |$")
-    # ax.set_title(target_name + " $\leftarrow$ " +
-    #                 (','.join(selected_features) if len(selected_features) != 0 else 'ø'))
-    fig = ax.figure if fig is None else fig
-    return fig
-
-
 def plot_graph(
         dag: nx.DiGraph,
         reference: nx.DiGraph = None,

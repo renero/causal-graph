@@ -1,7 +1,8 @@
 """
 This is a module to be used as a reference for building other modules
 """
-from typing import Union
+from typing import List, Union
+from matplotlib import pyplot as plt
 
 import networkx as nx
 import numpy as np
@@ -9,18 +10,16 @@ import pandas as pd
 import shap
 import statsmodels.api as sm
 import torch
-
+from matplotlib.ticker import FormatStrFormatter
 from scipy.stats import spearmanr
 from sklearn.base import BaseEstimator
 from sklearn.utils.validation import check_is_fitted
 from tqdm.auto import tqdm
 
 from causalgraph.common import *
+from causalgraph.independence.edge_orientation import get_edge_orientation
 from causalgraph.independence.feature_selection import select_features
 from causalgraph.models.dnn import NNRegressor
-from causalgraph.independence.edge_orientation import get_edge_orientation
-from causalgraph.common.plots import plot_shap_summary
-
 
 AnyGraph = Union[nx.DiGraph, nx.Graph]
 
@@ -40,7 +39,7 @@ class ShapEstimator(BaseEstimator):
             reciprocity: False = False,
             min_impact: float = 1e-06,
             verbose: bool = False,
-            enable_progress_bar: bool = True,
+            prog_bar: bool = True,
             on_gpu: bool = False):
         """
         """
@@ -53,7 +52,7 @@ class ShapEstimator(BaseEstimator):
         self.reciprocity = reciprocity
         self.min_impact = min_impact
         self.verbose = verbose
-        self.prog_bar = enable_progress_bar
+        self.prog_bar = prog_bar
         self.on_gpu = on_gpu
 
         self._fit_desc = "Computing SHAPLEY values"
@@ -501,10 +500,59 @@ class ShapEstimator(BaseEstimator):
         feature_inds = feature_order[:max_features_to_display]
         mean_shap_values = np.abs(self.shap_values[target_name]).mean(0)
 
-        return plot_shap_summary(
+        return self.plot_shap_summary(
             [feat for feat in self.all_feature_names_ if feat != target_name],
+            target_name,
             mean_shap_values,
             feature_inds,
             selected_features=None,
             ax=ax,
             **kwargs)
+
+    def plot_shap_summary(
+            self,
+            feature_names: List[str],
+            target_name: str,
+            mean_shap_values,
+            feature_inds,
+            selected_features,
+            ax,
+            **kwargs):
+        """
+        Plots the summary of the SHAP values for a given target.
+
+        Arguments:
+        ----------
+            feature_names: List[str]
+                The names of the features.
+            mean_shap_values: np.array
+                The mean SHAP values for each feature.
+            feature_inds: np.array
+                The indices of the features to be plotted.
+            selected_features: List[str]
+                The names of the selected features.
+            ax: Axis
+                The axis in which to plot the summary. If None, a new figure is created.
+            **kwargs: Dict
+                Additional arguments to be passed to the plot.
+        """
+
+        figsize_ = kwargs.get('figsize', (6, 3))
+        fig = None
+        if ax is None:
+            fig, ax = plt.subplots(1, 1, figsize=figsize_)
+
+        y_pos = np.arange(len(feature_inds))
+        ax.grid(True, axis='x')
+        ax.barh(y_pos, mean_shap_values[feature_inds],
+                0.7, align='center', color="#0e73fa", alpha=0.8)
+        ax.xaxis.set_major_formatter(FormatStrFormatter('%.3g'))
+        ax.set_yticks(y_pos, fontsize=13)
+        ax.set_yticklabels([feature_names[i] for i in feature_inds])
+        # ax.set_xlabel("$\\frac{1}{m}\sum_{j=1}^p| \phi_j |$")
+        ax.set_xlabel("Avg. SHAP value")
+        ax.set_title(
+            target_name + " $\leftarrow$ " +
+            (','.join(selected_features) if selected_features else 'ø'))
+        fig = ax.figure if fig is None else fig
+        return fig

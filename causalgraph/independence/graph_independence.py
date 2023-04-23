@@ -22,12 +22,12 @@ class GraphIndependence(object):
 
     def __init__(self, base_graph, condlen: int = 1,
                  condsize: int = 0, verbose: bool = False, 
-                 enable_progress_bar: bool = True):
+                 prog_bar: bool = True):
         self.base_graph = base_graph
         self.condlen = condlen
         self.condsize = condsize
         self.verbose = verbose
-        self.prog_bar = enable_progress_bar
+        self.prog_bar = prog_bar
 
         self._fit_desc = "Removing independent edges"
 
