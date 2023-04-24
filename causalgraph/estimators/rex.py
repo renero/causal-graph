@@ -9,6 +9,7 @@ from sklearn.utils.validation import (check_array, check_is_fitted,
                                       check_random_state)
 from tqdm.auto import tqdm
 
+from causalgraph.common import RESET, GREEN, GRAY
 from causalgraph.common.pipeline import Pipeline
 from causalgraph.common.plots import subplots, plot_graph
 from causalgraph.common.utils import graph_from_dot_file, load_experiment, save_experiment
@@ -247,11 +248,11 @@ class Rex(BaseEstimator, ClassifierMixin):
             ('shaps', ShapEstimator): [
                 "regressor", "shap_selection", "sensitivity", "tolerance", "descending", 
                 "iters", "reciprocal", "min_impact", "verbose", "prog_bar",
-                "have_gpu"],
-            ('G_shap', 'shaps.predict'): ["X"],
-            ('indep', GraphIndependence): ["G_shap", "condlen", "condsize", "verbose"],
-            ('G_indep', 'indep.predict'): [],
-            ('G_final', 'shaps.adjust'): ['G_indep']
+                "have_gpu"]#,
+            # ('G_shap', 'shaps.predict'): ["X"],
+            # ('indep', GraphIndependence): ["G_shap", "condlen", "condsize", "verbose"],
+            # ('G_indep', 'indep.predict'): [],
+            # ('G_final', 'shaps.adjust'): ['G_indep']
         }
         pipeline.run(steps, "Training REX")
 
@@ -273,11 +274,33 @@ class Rex(BaseEstimator, ClassifierMixin):
         """
         check_is_fitted(self, "is_fitted_")
         X = check_array(X)
-        # return np.random.rand(self.n_features_in_, self.n_features_in_).astype(np.float32)
+
+        prediction = Pipeline(self)
+        prediction.set_default_object_method('fit')
+        prediction.set_default_method_params(['X', 'y'])
+        steps = {
+            ('G_shap', 'shaps.predict'): ["X"],
+            ('indep', GraphIndependence): ["G_shap", "condlen", "condsize", "verbose"],
+            ('G_indep', 'indep.predict'): [],
+            ('G_final', 'shaps.adjust'): ['G_indep']
+        }
+        prediction.run(steps, "Predicting graph")
+
         return self.G_final
 
     def score(self, X, y):
         return np.random.randint(self.n_features_in_**2)
+
+    def __repr__(self):
+        # print rex object attributes names
+        print(f"{GREEN}REX object attributes{RESET}")
+        print(f"{GRAY}{'-'*80}{RESET}")
+        for attr in dir(rex):
+            if attr.startswith('_'):
+                continue
+            if attr == "X" or attr == "y":
+                print(f"{attr:30} {getattr(rex, attr).shape}")
+            print(f"{attr:30} {getattr(rex, attr)}")
 
 
 if __name__ == "__main__":
@@ -294,4 +317,3 @@ if __name__ == "__main__":
     # subplots(4, rex.shaps.summary_plot, *plot_args, dpi=200);
 
     plot_graph(rex.G_final, ref_graph)
-
