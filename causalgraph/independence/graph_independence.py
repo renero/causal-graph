@@ -22,13 +22,12 @@ from causalgraph.common import tqdm_params
 class GraphIndependence(object):
 
     def __init__(self, base_graph, condlen: int = 1,
-                 condsize: int = 0, verbose: bool = False, 
-                 prog_bar: bool = True):
+                 condsize: int = 0, prog_bar: bool = True, verbose: bool = False):
         self.base_graph = base_graph
         self.condlen = condlen
         self.condsize = condsize
-        self.verbose = verbose
         self.prog_bar = prog_bar
+        self.verbose = verbose
 
         self._fit_desc = "Removing independent edges"
 
@@ -46,6 +45,7 @@ class GraphIndependence(object):
         - condsize (int): The size of the conditioning sets to use in the 
             independence test. Default is 0, which means that conditioning 
             sets will be based on direct connections
+        - prog_bar (bool): Whether to show a progress bar
         - verbose (bool): Whether to print debug messages
 
         Returns:
@@ -165,7 +165,7 @@ class GraphIndependence(object):
     def _update_graph(self, x, y, cs):
         print(
             f"    ! {x}⫫{y}|({','.join(cs)}) ❌ Independent!") if self.verbose else None
-        self.base_graph.remove_edge(x, y)
+        self.G_skl.remove_edge(x, y)
         self.sepset[(x, y)] = cs
         self.sepset[(y, x)] = cs
 

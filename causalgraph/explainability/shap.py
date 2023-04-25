@@ -127,8 +127,6 @@ class ShapEstimator(BaseEstimator):
         desc = "Orienting causal graph"
         pbar = tqdm(total=len(G_shap_unoriented.edges()),
                     **tqdm_params(desc, self.prog_bar))
-                    # disable=not self.prog_bar,
-                    # leave=False, desc=f"{desc:<25}")
         for u, v in G_shap_unoriented.edges():
             pbar.update(1)
             orientation = get_edge_orientation(
@@ -168,7 +166,8 @@ class ShapEstimator(BaseEstimator):
             A dataframe containing the discrepancies for all features and all targets.
         """
         self.discrepancies = pd.DataFrame(columns=self.all_feature_names_)
-        for target_name in tqdm(self.all_feature_names_, leave=False):
+        for target_name in tqdm(self.all_feature_names_, 
+                                **tqdm_params("Computing Shap discrepancies", self.prog_bar)):
             X, y = self.models.get_input_tensors(target_name)
             feature_names = list(X.columns)
 
@@ -545,7 +544,7 @@ class ShapEstimator(BaseEstimator):
         ax.barh(y_pos, mean_shap_values[feature_inds],
                 0.7, align='center', color="#0e73fa", alpha=0.8)
         ax.xaxis.set_major_formatter(FormatStrFormatter('%.3g'))
-        ax.set_yticks(y_pos, [feature_names[i] for i in feature_inds], fontsize=13)
+        ax.set_yticks(y_pos, [feature_names[i] for i in feature_inds], fontsize=11)
         # ax.set_yticklabels([feature_names[i] for i in feature_inds])
         # ax.set_xlabel("$\\frac{1}{m}\sum_{j=1}^p| \phi_j |$")
         ax.set_xlabel("Avg. SHAP value")

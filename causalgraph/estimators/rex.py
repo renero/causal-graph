@@ -4,10 +4,10 @@ from typing import Any, List, Tuple, Union
 
 import numpy as np
 import pandas as pd
+import networkx as nx
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.utils.validation import (check_array, check_is_fitted,
                                       check_random_state)
-from tqdm.auto import tqdm
 
 from causalgraph.common import RESET, GREEN, GRAY
 from causalgraph.common.pipeline import Pipeline
@@ -237,7 +237,7 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.X = copy(X)
         self.y = copy(y) if y is not None else None
 
-        pipeline = Pipeline(self)
+        pipeline = Pipeline(self, prog_bar=self.prog_bar, verbose=self.verbose)
         pipeline.set_default_object_method('fit')
         pipeline.set_default_method_params(['X', 'y'])
         steps = {
@@ -247,12 +247,7 @@ class Rex(BaseEstimator, ClassifierMixin):
                 "min_delta", "random_state", "verbose", "prog_bar"],
             ('shaps', ShapEstimator): [
                 "regressor", "shap_selection", "sensitivity", "tolerance", "descending", 
-                "iters", "reciprocal", "min_impact", "verbose", "prog_bar",
-                "have_gpu"]#,
-            # ('G_shap', 'shaps.predict'): ["X"],
-            # ('indep', GraphIndependence): ["G_shap", "condlen", "condsize", "verbose"],
-            # ('G_indep', 'indep.predict'): [],
-            # ('G_final', 'shaps.adjust'): ['G_indep']
+                "iters", "reciprocal", "min_impact", "have_gpu", "verbose", "prog_bar"]
         }
         pipeline.run(steps, "Training REX")
 
@@ -275,12 +270,20 @@ class Rex(BaseEstimator, ClassifierMixin):
         check_is_fitted(self, "is_fitted_")
         X = check_array(X)
 
-        prediction = Pipeline(self)
+        # Create a new pipeline for the prediction stages.
+        prediction = Pipeline(self, prog_bar=self.prog_bar, verbose=self.verbose)
         prediction.set_default_object_method('fit')
         prediction.set_default_method_params(['X', 'y'])
+        
+        # Overwrite values for prog_bar and verbosity with current pipeline
+        # values, in case predict is called from a loaded experiment
+        self.shaps.prog_bar = self.prog_bar
+        self.shaps.verbose = self.verbose
+
         steps = {
             ('G_shap', 'shaps.predict'): ["X"],
-            ('indep', GraphIndependence): ["G_shap", "condlen", "condsize", "verbose"],
+            ('indep', GraphIndependence): ["G_shap", "condlen", "condsize", 
+                                           "prog_bar", "verbose"],
             ('G_indep', 'indep.predict'): [],
             ('G_final', 'shaps.adjust'): ['G_indep']
         }
@@ -292,15 +295,25 @@ class Rex(BaseEstimator, ClassifierMixin):
         return np.random.randint(self.n_features_in_**2)
 
     def __repr__(self):
-        # print rex object attributes names
-        print(f"{GREEN}REX object attributes{RESET}")
-        print(f"{GRAY}{'-'*80}{RESET}")
-        for attr in dir(rex):
-            if attr.startswith('_'):
+        forbidden_attrs = ['fit', 'predict', 'score', 'get_params', 'set_params']
+        ret = f"{GREEN}REX object attributes{RESET}\n"
+        ret += f"{GRAY}{'-'*80}{RESET}\n"
+        for attr in dir(self):
+            if attr.startswith('_') or attr in forbidden_attrs:
                 continue
-            if attr == "X" or attr == "y":
-                print(f"{attr:30} {getattr(rex, attr).shape}")
-            print(f"{attr:30} {getattr(rex, attr)}")
+            elif attr == "X" or attr == "y":
+                if isinstance(attr, pd.DataFrame):
+                    ret += f"{attr:25} {getattr(self, attr).shape}\n"
+                    continue
+                elif isinstance(attr, nx.DiGraph):
+                    n_nodes = getattr(self, attr).number_of_nodes()
+                    n_edges = getattr(self, attr).number_of_edges()
+                    ret += f"{attr:25} {n_nodes} nodes, {n_edges} edges\n"
+                    continue
+            else:
+                ret += f"{attr:25} {getattr(self, attr)}\n"
+
+        return ret
 
 
 if __name__ == "__main__":
