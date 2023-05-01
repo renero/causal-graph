@@ -4,6 +4,9 @@ import numpy as np
 import pandas as pd
 import sklearn
 import kneed
+from sklearn import metrics
+from sklearn.cluster import DBSCAN
+from sklearn.metrics import euclidean_distances
 
 from sklearn.model_selection import cross_validate
 from typing import List
@@ -100,6 +103,8 @@ def select_features(values,
     elif method == 'abrupt':
         limit_idx = abrupt_change(
             sorted_impact_values, tolerance=tolerance, verbose=verbose)
+    elif method == "cluster":
+        limit_idx = cluster_change(sorted_impact_values, verbose=verbose)
     else:
         raise ValueError(
             f"Unknown method ({method}). Only 'knee' or 'abrupt' accepted")
@@ -150,3 +155,53 @@ def abrupt_change(X: np.array, tolerance: float = 0.1, verbose=False) -> int:
         prev = x
 
     return cutoff
+
+
+def cluster_change(X: List, verbose: bool = False):
+    """
+    Given an array of values in increasing or decreasing order, detect what are the
+    elements that belong to the same cluster. The clustering is done using DBSCAN
+    with a distance computed as the max. difference between consecutive elements.
+
+    Arguments:
+        - X (np.array): the series of values to detect the abrupt change.
+        - verbose (bool): Verbose output.
+
+    Returns:
+        The position in the array where an abrupt change is produced. If there's
+            no change in consecutive values greater than the tolerance passed then
+            the last element of the array is returned.
+    """
+    X = np.array(X).reshape(-1, 1)
+    pairwise_distances = euclidean_distances(X)[0,]
+    pairwise_distances = np.diff(pairwise_distances)
+    n_clusters_ = 0
+    while n_clusters_ <= 1 and len(pairwise_distances) > 0:
+        min_distance = pairwise_distances.max()
+        if verbose:
+            print(f"pairwise_distances: {pairwise_distances}")
+            print(f"min_distance: {min_distance}")
+
+        db = DBSCAN(eps=min_distance, min_samples=1).fit(X)
+        labels = db.labels_
+        # Number of clusters in labels, ignoring noise if present.
+        n_clusters_ = len(set(labels)) - (1 if -1 in labels else 0)
+        n_noise_ = list(labels).count(-1)
+        if n_clusters_ <= 1:
+            if verbose:
+                print("** Only 1 cluster generated. Increasing min_distance **")
+            pairwise_distances = pairwise_distances[1:]
+
+    if pairwise_distances.size == 0:
+        print("No clusters generated") if verbose else None
+        return None
+    
+    if verbose:
+        print("Estimated number of clusters: %d" % n_clusters_)
+        print("Estimated number of noise points: %d" % n_noise_)
+        print(f"Silhouette Coefficient: {metrics.silhouette_score(X, labels):.3f}")
+
+    print(f"Labels: {labels}") if verbose else None
+    winner_label = 0
+    samples_in_winner_cluster = np.argwhere(X[labels == winner_label])
+    return samples_in_winner_cluster[:, 0][-1]+1

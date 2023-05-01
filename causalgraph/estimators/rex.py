@@ -331,13 +331,15 @@ if __name__ == "__main__":
     if load:
         rex = load_experiment('rex', "/Users/renero/phd/output/REX")
     else:
-        rex = Rex(descending=True).fit(data, ref_graph)
+        rex = Rex(tolerance=0.1, descending=True).fit(data, ref_graph)
     if save:
         save_experiment('rex', "/Users/renero/phd/output/REX", rex)
 
     rex.prog_bar = False
     rex.verbose = True
+    rex.shaps.method = 'cluster'
     rex.shaps.descending = True
+    rex.shaps.tolerance = 0.1
     pred_graph = rex.predict(data)
 
     # Plot the SHAP values for each regression
