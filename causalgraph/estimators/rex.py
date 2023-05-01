@@ -1,6 +1,7 @@
 from copy import copy
 from pathlib import Path
 from typing import Any, List, Tuple, Union
+import warnings
 
 import numpy as np
 import pandas as pd
@@ -317,16 +318,31 @@ class Rex(BaseEstimator, ClassifierMixin):
 
 
 if __name__ == "__main__":
+    np.set_printoptions(precision=4, linewidth=150)
+    warnings.filterwarnings('ignore')
+
+    load = True
+    save = False
     dataset_name = 'generated_linear_10'
-    data = pd.read_csv("~/phd/data/generated_linear_10_mini.csv")
+
+    data = pd.read_csv("~/phd/data/generated_linear_10.csv")
     ref_graph = graph_from_dot_file("/Users/renero/phd/data/generated_linear_10.dot")
 
-    rex = load_experiment('rex', "/Users/renero/phd/output/REX")
-    # rex = Rex().fit(data)
-    # save_experiment('rex', "/Users/renero/phd/output/REX", rex)
+    if load:
+        rex = load_experiment('rex', "/Users/renero/phd/output/REX")
+    else:
+        rex = Rex(descending=True).fit(data, ref_graph)
+    if save:
+        save_experiment('rex', "/Users/renero/phd/output/REX", rex)
 
-    # Plot the SHAP values
-    # plot_args = [(target_name) for target_name in rex.shaps.all_feature_names_]
-    # subplots(4, rex.shaps.summary_plot, *plot_args, dpi=200);
+    rex.prog_bar = False
+    rex.verbose = True
+    rex.shaps.descending = True
+    pred_graph = rex.predict(data)
 
-    plot_graph(rex.G_final, ref_graph)
+    # Plot the SHAP values for each regression
+    plot_args = [(target_name) for target_name in rex.shaps.all_feature_names_]
+    subplots(4, rex.shaps.summary_plot, *plot_args, dpi=100);
+
+    # Plot the predicted graph
+    plot_graph(pred_graph, ref_graph)

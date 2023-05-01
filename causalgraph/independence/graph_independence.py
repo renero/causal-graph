@@ -116,7 +116,7 @@ class GraphIndependence(object):
         return combos
 
     @staticmethod
-    def residuals(x, y, Z):
+    def _residuals(x, y, Z):
         """
         Train a GAM with cond_set to predict "i", and then "j". For both cases
         get the residuals.
@@ -137,7 +137,7 @@ class GraphIndependence(object):
         residuals_y = g.deviance_residuals(Z, y)
         return residuals_x, residuals_y
 
-    def cond_indep_test(self, x: np.array, y: np.array, Z: np.array = None):
+    def _cond_indep_test(self, x: np.array, y: np.array, Z: np.array = None):
         """
         Perform the conditional independence test configured in the
         main class attribute
@@ -157,7 +157,7 @@ class GraphIndependence(object):
         if Z is None:
             stat, pval = Hsic().test(x, y)
         else:
-            r_x, r_y = self.residuals(x, y, Z)
+            r_x, r_y = self._residuals(x, y, Z)
             stat, pval = Hsic().test(r_x, r_y)
         indep = pval > 0.05
         return indep, stat, pval
@@ -197,7 +197,7 @@ class GraphIndependence(object):
         for idx, cond_set in enumerate(cond_sets):
             Z = self.data.loc[:, cond_set].values if not self._empty(
                 cond_set) else None
-            independent, _, _ = self.cond_indep_test(x, y, Z)
+            independent, _, _ = self._cond_indep_test(x, y, Z)
             if independent:
                 self._update_graph(x_name, y_name, cond_set)
                 return x_name, y_name, cond_set
@@ -214,7 +214,7 @@ class GraphIndependence(object):
         if self.actions is None:
             self.actions = defaultdict(list)
 
-        neighbors = list(self.base_graph.neighbors(x))
+        neighbors = list(self.G_skl.neighbors(x))
         neighbors_str = ",".join([i for i in neighbors])
         print(
             f"> Iterating over neighbors: {neighbors_str}") if self.verbose else None

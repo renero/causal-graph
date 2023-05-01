@@ -76,13 +76,14 @@ def select_features(values,
     if descending:
         sorted_impact_values = sorted_impact_values[::-1]
     if verbose:
-        print("Sorted shaps......:", end="")
+        print("Selecting features", )
+        print("  SHAP values........:", end="")
         print(','.join([f"({f}:{s:.03f})" for f, s in zip(
             feature_names, np.sum(np.abs(values), axis=0))]))
         print(
-            f"feature_order.....: {','.join([f'{feature_names[i]}' for i in feature_order])}")
+            f"  Feature_order......: {','.join([f'{feature_names[i]}' for i in feature_order])}")
         print(
-            f"sorted_mean_values: {','.join([f'{x:.6f}' for x in sorted_impact_values])}")
+            f"  sorted_mean_values.: {','.join([f'{x:.6f}' for x in sorted_impact_values])}")
 
     if method == 'knee':
         cutoff = kneed.KneeLocator(x=range(len(sorted_impact_values)),
@@ -111,8 +112,8 @@ def select_features(values,
             [feature_names[i] for i in feature_order[limit_idx:]]))
 
     if verbose:
-        print(f"limit_idx..........: {limit_idx}")
-        print(f"selected_features..: {selected_features}")
+        print(f"  Limit_idx(cut-off)..: {limit_idx}")
+        print(f"  Selected_features...: {selected_features}")
     if return_shaps:
         return selected_features, list(reversed(sorted(mean_shap_values)[limit_idx:]))
 
@@ -139,11 +140,11 @@ def abrupt_change(X: np.array, tolerance: float = 0.1, verbose=False) -> int:
     prev = X[0]
     interval = max(X) - min(X)
     if verbose:
-        print(f"Tolerance: {tolerance*100}%")
+        print(f"    Tolerance: {tolerance*100}%")
     for cutoff, x in enumerate(X):
         delta = np.abs((prev - x) / interval)
         if verbose:
-            print(f"- pos.{cutoff:02d} ({x:.4f}), ∂={delta * 100.0:+.2f}")
+            print(f"    - pos.{cutoff:02d} ({x:.4f}), ∂={delta * 100.0:+.2f}")
         if delta > tolerance:
             break
         prev = x

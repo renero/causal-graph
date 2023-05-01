@@ -38,9 +38,9 @@ class ShapEstimator(BaseEstimator):
             iters: int = 20,
             reciprocity: False = False,
             min_impact: float = 1e-06,
+            on_gpu: bool = False,
             verbose: bool = False,
-            prog_bar: bool = True,
-            on_gpu: bool = False):
+            prog_bar: bool = True):
         """
         """
         self.models = models
@@ -107,13 +107,13 @@ class ShapEstimator(BaseEstimator):
                 tolerance=self.tolerance,
                 sensitivity=self.sensitivity,
                 descending=self.descending,
-                min_impact=self.min_impact)
+                min_impact=self.min_impact, verbose=self.verbose)
         pbar.update(1)
         pbar.refresh()
-        # Add edges ONLY between nodes where SHAP recognizes both directions
         G_shap_unoriented = nx.Graph()
         for target in self.all_feature_names_:
             for parent in self.parents[target]:
+                # Add edges ONLY between nodes where SHAP recognizes both directions
                 if self.reciprocity:
                     if target in self.parents[parent]:
                         G_shap_unoriented.add_edge(target, parent)
@@ -502,7 +502,7 @@ class ShapEstimator(BaseEstimator):
             target_name,
             mean_shap_values,
             feature_inds,
-            selected_features=None,
+            selected_features=[parent for parent in self.parents[target_name]],
             ax=ax,
             **kwargs)
 
