@@ -7,7 +7,7 @@
 
 import time
 from itertools import product
-from typing import List
+from typing import Dict, List
 
 import igraph
 import networkx as nx
@@ -362,10 +362,10 @@ def SID(
         trueGraph: np.ndarray,
         estGraph: np.ndarray,
         output: bool = False,
-        spars: bool = False) -> float:
+        spars: bool = False) -> Dict[str, float]:
 
-    estGraph = np.array(estGraph)
-    trueGraph = np.array(trueGraph)
+    estGraph = np.stack(estGraph).astype(int)
+    trueGraph = np.stack(trueGraph).astype(int)
     p = trueGraph.shape[1]
     estGraph = np.matrix(estGraph)
     trueGraph = np.matrix(trueGraph)

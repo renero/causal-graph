@@ -16,9 +16,9 @@ from causalgraph.common.plots import subplots, plot_graph
 from causalgraph.common.utils import graph_from_dot_file, load_experiment, save_experiment
 from causalgraph.explainability.hierarchies import Hierarchies
 from causalgraph.explainability.shap import ShapEstimator
-from causalgraph.independence.feature_selection import select_features
 from causalgraph.independence.graph_independence import GraphIndependence
 from causalgraph.models.dnn import NNRegressor
+from causalgraph.metrics.compare_graphs import evaluate_graph
 
 
 class Rex(BaseEstimator, ClassifierMixin):
@@ -289,6 +289,8 @@ class Rex(BaseEstimator, ClassifierMixin):
             ('G_final', 'shaps.adjust'): ['G_indep']
         }
         prediction.run(steps, "Predicting graph")
+        if '\\n' in self.G_final.nodes:
+            self.G_final.remove_node('\\n')
 
         return self.G_final
 
@@ -343,8 +345,11 @@ if __name__ == "__main__":
     pred_graph = rex.predict(data)
 
     # Plot the SHAP values for each regression
-    plot_args = [(target_name) for target_name in rex.shaps.all_feature_names_]
-    subplots(4, rex.shaps.summary_plot, *plot_args, dpi=100);
+    # plot_args = [(target_name) for target_name in rex.shaps.all_feature_names_]
+    # subplots(4, rex.shaps.summary_plot, *plot_args, dpi=100);
 
     # Plot the predicted graph
-    plot_graph(pred_graph, ref_graph)
+    # plot_graph(pred_graph, ref_graph)
+
+    metric = evaluate_graph(ref_graph, pred_graph, rex.shaps.all_feature_names_)
+    print(metric)

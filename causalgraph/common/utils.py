@@ -116,4 +116,8 @@ def graph_from_dot_file(dot_file: Union[str, Path]) -> nx.DiGraph:
     dot_string = dot_string.replace("\n;\n", "\n")
     dotplus = pydotplus.graph_from_dot_data(dot_string)
     dotplus.set_strict(True)
-    return nx.nx_pydot.from_pydot(dotplus)
+    final_graph = nx.nx_pydot.from_pydot(dotplus)
+    if '\\n' in final_graph.nodes:
+        final_graph.remove_node('\\n')
+
+    return final_graph

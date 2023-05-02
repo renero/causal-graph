@@ -105,6 +105,8 @@ def select_features(values,
             sorted_impact_values, tolerance=tolerance, verbose=verbose)
     elif method == "cluster":
         limit_idx = cluster_change(sorted_impact_values, verbose=verbose)
+        if limit_idx is None:
+            limit_idx = len(feature_order) - 1
     else:
         raise ValueError(
             f"Unknown method ({method}). Only 'knee' or 'abrupt' accepted")

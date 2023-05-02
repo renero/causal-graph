@@ -38,7 +38,9 @@ import numpy as np
 from dataclasses import dataclass
 from networkx.linalg import adjacency_matrix
 from sklearn.metrics import precision_recall_curve, auc
-from typing import Union, List
+from typing import Dict, Union, List
+
+from metrics.SID import SID
 
 # Code for metrics...
 AnyGraph = Union[nx.Graph, nx.DiGraph]
@@ -59,8 +61,7 @@ class Metrics:
     aupr: float = 0.0
     f1: float = 0.0
     shd: float = 0.0
-    umi: float = 0.0
-    omi: float = 0.0
+    sid: float = 0.0
 
     def __init__(
             self,
@@ -73,8 +74,7 @@ class Metrics:
             aupr: float,
             f1: float,
             shd: int,
-            umi: float,
-            omi: float,
+            sid: Dict[str, float]
     ):
         self.Tp = Tp
         self.Tn = Tn
@@ -89,8 +89,9 @@ class Metrics:
             self.ishd = 0.0
         else:
             self.ishd = 1 - (self.shd / (self.Fn + self.Fp))
-        self.umi = umi
-        self.omi = omi
+        self.sid = sid['sid']
+        self.sid_lower = sid['sidLowerBound']
+        self.sid_upper = sid['sidUpperBound']
 
     def __str__(self):
         s = ""
@@ -99,6 +100,7 @@ class Metrics:
         s += f"  1       |{self.Tp:^5d} {self.Fn:^5d}|   F1.......: {self.recall:.3g}\n"
         s += f"  0       |{self.Fp:^5d} {self.Tn:^5d}|   AuPR.....: {self.aupr:.3g}\n"
         s += f"           -----------    SHD......: {self.shd:.3g}\n"
+        s += f"                          SID......: {self.sid:.3g}\n"
         return s
 
 
@@ -203,12 +205,12 @@ def evaluate_graph(
     metrics["f1"] = _f1(metrics)
     metrics["aupr"] = _aupr(metrics)
     metrics["SHD"] = _SHD(metrics)
-    metrics["UMI"] = _UMI(metrics)
-    metrics["OMI"] = _OMI(truth, predicted)
+    metrics["SID"] = SID(trueGraph=nx.to_numpy_array(ground_truth), 
+                         estGraph=nx.to_numpy_array(predicted_graph))
 
     return Metrics(metrics["Tp"], metrics["Tn"], metrics["Fn"], metrics["Fp"],
                    metrics["precision"], metrics["recall"], metrics["aupr"],
-                   metrics["f1"], metrics["SHD"], metrics["UMI"], metrics["OMI"])
+                   metrics["f1"], metrics["SHD"], metrics["SID"])
 
 
 def _is_weighted(G: AnyGraph) -> bool:
@@ -285,7 +287,7 @@ def _adjacency(G: AnyGraph, order: List = None, threshold=0.0, absolute=False):
         if nodeset - set(G):
             # delete from order any nodes not in G
             order = [n for n in order if n in G.nodes()]
-        adj_matrix = nx.to_numpy_matrix(G, nodelist=order)
+        adj_matrix = nx.to_numpy_array(G, nodelist=order)
         adj_matrix[np.isnan(adj_matrix)] = 0
         result = adj_matrix
 
@@ -355,6 +357,7 @@ def _conf_mat(truth, est, feature_names):
         return _conf_mat_directed(truth, est, feature_names)
     else:
         return _conf_mat_undirected(truth, est, feature_names)
+
 
 def _conf_mat_directed(truth, est, feature_names):
 
@@ -499,69 +502,3 @@ def _SHD(metrics):
         _shd = np.sum(diff) / 2
 
     return int(_shd)
-
-
-def _attenuation(x, k):
-    """
-    Attenuation function. The higher the 'k' the larger the attenuation
-
-    Arguments:
-        k: slope control for the parameter gamma (1, 10).
-            The higher the value of k the lower the penalty due to mismatching
-            the number of edges infered for the causal graph "g". Default is 3.
-    """
-    return (1.0 - np.exp(-k * x)) + (x * np.exp(-k))
-
-
-def _UMI(metrics):
-    """
-    Computes match between two directed graphs as the number of
-    correct edges in B with respect to A, attenuated by the ratio of edges in
-    A with respect to the total number of edges in both graphs.
-
-    Returns:
-        (float) A value between 0 (not similar) and 1 (exactly the same).
-    """
-
-    A = metrics["_Gm"].sum()
-    B = metrics["_gm"].sum()
-    AnB = _intersect_matrices(metrics["_Gm"], metrics["_gm"]).sum()
-    AplusB = metrics["_Gm"] + metrics["_gm"]
-    AplusB = np.where(AplusB > 1, 1, AplusB)
-    AplusB = AplusB.sum()
-    BminusA = B - A
-    in_common = AnB / A
-    gamma = 1 - (abs(BminusA) / AplusB)
-    return in_common * _attenuation(gamma, k=3)
-
-
-def _get_oriented_edges(graph: nx.DiGraph) -> List:
-    """Returns the list of oriented edges in the graph"""
-    oriented_edges = []
-    for source, target in graph.edges():
-        if (target, source) not in graph.edges():
-            oriented_edges.append((source, target))
-    return oriented_edges
-
-
-def _OMI(G, g):
-    """
-    Computes how well oriented is 'g' with respect to the ground thruth graph 'G'
-
-    Returns:
-        (float) A value between 0 (not similar) and 1 (exactly the same).
-    """
-    G_oriented_edges = _get_oriented_edges(G)
-    g_oriented_edges = _get_oriented_edges(g)
-    G_len = len(G_oriented_edges)
-    g_len = len(g_oriented_edges)
-    if G_len == 0 or g_len == 0:
-        return 0.0
-    matches = 0
-    for source, target in g_oriented_edges:
-        if (source, target) in G.edges():
-            matches += 1
-
-    gamma = 1 - (abs(g_len - G_len) / (G_len + g_len))
-
-    return (matches / G_len) * _attenuation(gamma, k=3)
