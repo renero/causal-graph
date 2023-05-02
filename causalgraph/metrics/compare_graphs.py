@@ -100,7 +100,10 @@ class Metrics:
         s += f"  1       |{self.Tp:^5d} {self.Fn:^5d}|   F1.......: {self.recall:.3g}\n"
         s += f"  0       |{self.Fp:^5d} {self.Tn:^5d}|   AuPR.....: {self.aupr:.3g}\n"
         s += f"           -----------    SHD......: {self.shd:.3g}\n"
-        s += f"                          SID......: {self.sid:.3g}\n"
+        if self.sid_upper == self.sid_lower:
+            s += f"                          SID......: {self.sid:.3g}\n"
+        else:
+            s += f"                          SID......: {self.sid:.3g} [{self.sid_lower}..{self.sid_upper}]\n"
         return s
 
 
