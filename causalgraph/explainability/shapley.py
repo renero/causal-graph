@@ -2,6 +2,7 @@
 This is a module to be used as a reference for building other modules
 """
 from typing import List, Union
+import warnings
 from matplotlib import pyplot as plt
 
 import networkx as nx
@@ -20,6 +21,7 @@ from causalgraph.common import *
 from causalgraph.independence.edge_orientation import get_edge_orientation
 from causalgraph.independence.feature_selection import select_features
 from causalgraph.models.dnn import NNRegressor
+from causalgraph.common.utils import graph_from_dot_file, load_experiment
 
 AnyGraph = Union[nx.DiGraph, nx.Graph]
 
@@ -31,7 +33,7 @@ class ShapEstimator(BaseEstimator):
     def __init__(
             self,
             models: NNRegressor = None,
-            method: str = 'knee',
+            method: str = 'cluster',
             sensitivity: float = 1.0,
             tolerance: float = None,
             descending: bool = False,
@@ -79,6 +81,7 @@ class ShapEstimator(BaseEstimator):
             else:
                 tensorData = torch.autograd.Variable(features_tensor)
                 explainer = shap.DeepExplainer(model.model, tensorData)
+                # explainer = shap.GradientExplainer(model.model, tensorData)
             self.shap_values[target_name] = explainer.shap_values(tensorData)
             pbar.refresh()
         pbar.close()
@@ -553,3 +556,16 @@ class ShapEstimator(BaseEstimator):
             (','.join(selected_features) if selected_features else 'ø'))
         fig = ax.figure if fig is None else fig
         return fig
+
+
+if __name__ == "__main__":
+    np.set_printoptions(precision=4, linewidth=150)
+    warnings.filterwarnings('ignore')
+
+    dataset_name = 'generated_linear_10'
+    data = pd.read_csv("~/phd/data/generated_linear_10.csv")
+    ref_graph = graph_from_dot_file("/Users/renero/phd/data/generated_linear_10_mini.dot")
+    rex = load_experiment('rex', "/Users/renero/phd/output/REX")
+    rex.prog_bar = False
+    rex.verbose = True
+    rex.shaps = ShapEstimator(rex.regressor).fit(data)

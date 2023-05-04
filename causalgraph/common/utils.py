@@ -65,7 +65,8 @@ def load_experiment(obj_name: str, folder: str):
 
     experiment = f"{str(Path(folder, obj_name))}{ext}"
     with open(experiment, 'rb') as h:
-        return pickle.load(h)
+        obj = pickle.load(h)
+    return obj
 
 
 def valid_output_name(filename: str, path: str, extension=None) -> str:

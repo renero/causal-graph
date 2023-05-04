@@ -15,7 +15,7 @@ from causalgraph.common.pipeline import Pipeline
 from causalgraph.common.plots import subplots, plot_graph
 from causalgraph.common.utils import graph_from_dot_file, load_experiment, save_experiment
 from causalgraph.explainability.hierarchies import Hierarchies
-from causalgraph.explainability.shap import ShapEstimator
+from causalgraph.explainability.shapley import ShapEstimator
 from causalgraph.independence.graph_independence import GraphIndependence
 from causalgraph.models.dnn import NNRegressor
 from causalgraph.metrics.compare_graphs import evaluate_graph
@@ -323,19 +323,17 @@ if __name__ == "__main__":
     np.set_printoptions(precision=4, linewidth=150)
     warnings.filterwarnings('ignore')
 
-    load = True
-    save = False
+    load = False
+    save = True
     dataset_name = 'generated_linear_10'
 
     data = pd.read_csv("~/phd/data/generated_linear_10.csv")
-    ref_graph = graph_from_dot_file("/Users/renero/phd/data/generated_linear_10.dot")
+    ref_graph = graph_from_dot_file("/Users/renero/phd/data/generated_linear_10_mini.dot")
 
     if load:
         rex = load_experiment('rex', "/Users/renero/phd/output/REX")
     else:
         rex = Rex(tolerance=0.1, descending=True).fit(data, ref_graph)
-    if save:
-        save_experiment('rex', "/Users/renero/phd/output/REX", rex)
 
     rex.prog_bar = False
     rex.verbose = True
@@ -345,11 +343,14 @@ if __name__ == "__main__":
     pred_graph = rex.predict(data)
 
     # Plot the SHAP values for each regression
-    # plot_args = [(target_name) for target_name in rex.shaps.all_feature_names_]
-    # subplots(4, rex.shaps.summary_plot, *plot_args, dpi=100);
+    plot_args = [(target_name) for target_name in rex.shaps.all_feature_names_]
+    subplots(4, rex.shaps.summary_plot, *plot_args, dpi=100);
 
     # Plot the predicted graph
     # plot_graph(pred_graph, ref_graph)
 
     metric = evaluate_graph(ref_graph, pred_graph, rex.shaps.all_feature_names_)
     print(metric)
+
+    if save:
+        save_experiment('rex', "/Users/renero/phd/output/REX", rex)
