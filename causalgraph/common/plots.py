@@ -97,21 +97,18 @@ def add_grid(ax, lines=True, locations=None):
 
 
 def subplots(
-        num_cols: int,
         plot_func: Callable,
         *plot_args: Any,
-        fig_size: Tuple[int, int] = (10, 6),
-        title: str = None,
         **kwargs: Any) -> None:
     """
     Plots a set of subplots.
 
     Arguments:
     ----------
-        num_cols: int
-            The number of columns in the subplot grid.
         plot_func: function
             The function to be used to plot each subplot.
+        num_cols: int
+            The number of columns in the subplot grid.
         *plot_args: List
             The arguments to be passed to the plot function.
         fig_size: Tuple[int, int]
@@ -126,6 +123,9 @@ def subplots(
         fig: Figure
             The figure containing the subplots.
     """
+    fig_size = kwargs.pop("fig_size", (8, 6))
+    title = kwargs.pop("title", None)
+    num_cols = kwargs.pop("num_cols", 4)
     setup_plot(**kwargs)
     num_rows = len(plot_args) // num_cols
     if len(plot_args) % num_cols != 0:
@@ -153,7 +153,7 @@ def subplots(
     plt.show()
 
 
-def plot_graph(
+def plot_dags(
         dag: nx.DiGraph,
         reference: nx.DiGraph = None,
         names: List[str] = ["REX Prediction", "Ground truth"],

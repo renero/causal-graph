@@ -268,7 +268,7 @@ class ShapEstimator(BaseEstimator):
             y = np.array(y)
 
         feature_pos = feature_names.index(feature)
-        
+
         # Normalize the data
         x_norm = StandardScaler().fit_transform(x.reshape(-1, 1))
         y_norm = StandardScaler().fit_transform(y.reshape(-1, 1))
@@ -296,19 +296,20 @@ class ShapEstimator(BaseEstimator):
 
             # Plot the target and the regression
             ax.scatter(x_norm, y_norm, alpha=0.3, marker='+', label="target")
-            ax.plot(x_norm, m_target*x_norm+b_target, color='orange', linewidth=.5)
+            ax.plot(x_norm, m_target*x_norm+b_target, color='red', linewidth=.5)
             # ax.scatter(x, y, alpha=0.3, marker='+', label="target")
             # ax.plot(x, m_target*x+b_target, color='orange', linewidth=.5)
 
             ax.set_title(
-                f"corr:{corr.correlation:.2f}, $m_S:${m_shap:.2f}, $m_y:${m_target:.2f}")
+                f"corr:{corr.correlation:.2f}, $m_S:${m_shap:.2f}, $m_y:${m_target:.2f}",
+                fontsize=8)
 
             ax.set_yticks([])
             ax.set_xticks([])
             ax.spines['right'].set_visible(False)
             ax.spines['top'].set_visible(False)
             ax.set_xlabel(feature)
-            ax.legend()
+            ax.legend(loc='best', fontsize=8)
 
         return {'discrepancy': 1. - np.abs(corr.correlation),
                 'm_shap': m_shap,
@@ -326,10 +327,10 @@ class ShapEstimator(BaseEstimator):
 
         Returns
         -------
-        slope : float
-            The slope of the fitted line.
         intercept : float
             The y-intercept of the fitted line.
+        slope : float
+            The slope of the fitted line.
         """
         # reg = sm.OLS(y, sm.add_constant(x)).fit()
         # b, m = reg.params[0], reg.params[1]

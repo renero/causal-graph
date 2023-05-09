@@ -12,7 +12,7 @@ from sklearn.utils.validation import (check_array, check_is_fitted,
 
 from causalgraph.common import RESET, GREEN, GRAY
 from causalgraph.common.pipeline import Pipeline
-from causalgraph.common.plots import subplots, plot_graph
+from causalgraph.common.plots import subplots, plot_dags
 from causalgraph.common.utils import graph_from_dot_file, load_experiment, save_experiment
 from causalgraph.explainability.hierarchies import Hierarchies
 from causalgraph.explainability.shapley import ShapEstimator
@@ -41,18 +41,6 @@ class Rex(BaseEstimator, ClassifierMixin):
     >>> estimator.fit(X, y)
     TemplateEstimator()
     """
-
-    def _more_tags(self):
-        return {
-            'multioutput_only': True,
-            "non_deterministic": True,
-            "no_validation": True,
-            "poor_score": True,
-            "_xfail_checks": {
-                "check_methods_sample_order_invariance": "This test shouldn't be running at all!",
-                "check_methods_subset_invariance": "This test shouldn't be running at all!",
-            }
-        }
 
     def __init__(
             self,
@@ -216,6 +204,18 @@ class Rex(BaseEstimator, ClassifierMixin):
 
         self._fit_desc = "Fitting ReX method"
 
+    def _more_tags(self):
+        return {
+            'multioutput_only': True,
+            "non_deterministic": True,
+            "no_validation": True,
+            "poor_score": True,
+            "_xfail_checks": {
+                "check_methods_sample_order_invariance": "This test shouldn't be running at all!",
+                "check_methods_subset_invariance": "This test shouldn't be running at all!",
+            }
+        }
+
     def fit(self, X, y=None):
         """Fit the model according to the given training data.
 
@@ -318,36 +318,45 @@ class Rex(BaseEstimator, ClassifierMixin):
 
         return ret
 
+    def plot_shap_discrepancies(self, target_name:str, **kwargs):
+        assert self.is_fitted_, "Model not fitted yet"
+        return self.shaps.plot_discrepancies_for_target(target_name, **kwargs)
+
+    def plot_shap_values(self, **kwargs):
+        assert self.is_fitted_, "Model not fitted yet"
+        plot_args = [(target_name) for target_name in self.shaps.all_feature_names_]
+        return subplots(self.shaps.summary_plot, *plot_args, **kwargs);
+
 
 if __name__ == "__main__":
     np.set_printoptions(precision=4, linewidth=150)
     warnings.filterwarnings('ignore')
 
-    load = False
-    save = True
+    load = True
+    save = False
     dataset_name = 'generated_linear_10'
 
     data = pd.read_csv("~/phd/data/generated_linear_10.csv")
-    ref_graph = graph_from_dot_file("/Users/renero/phd/data/generated_linear_10_mini.dot")
+    ref_graph = graph_from_dot_file("/Users/renero/phd/data/generated_linear_10.dot")
 
     if load:
         rex = load_experiment('rex', "/Users/renero/phd/output/REX")
     else:
         rex = Rex(tolerance=0.1, descending=True).fit(data, ref_graph)
 
-    rex.prog_bar = False
-    rex.verbose = True
-    rex.shaps.method = 'cluster'
-    rex.shaps.descending = True
-    rex.shaps.tolerance = 0.1
+    # rex.prog_bar = False
+    # rex.verbose = True
+    # rex.shaps.method = 'cluster'
+    # rex.shaps.descending = True
+    # rex.shaps.tolerance = 0.1
     pred_graph = rex.predict(data)
 
     # Plot the SHAP values for each regression
     plot_args = [(target_name) for target_name in rex.shaps.all_feature_names_]
-    subplots(4, rex.shaps.summary_plot, *plot_args, dpi=100);
+    subplots(rex.shaps.summary_plot, *plot_args, dpi=100);
 
     # Plot the predicted graph
-    # plot_graph(pred_graph, ref_graph)
+    # plot_dags(pred_graph, ref_graph)
 
     metric = evaluate_graph(ref_graph, pred_graph, rex.shaps.all_feature_names_)
     print(metric)
