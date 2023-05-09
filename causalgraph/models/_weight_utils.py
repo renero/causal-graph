@@ -8,13 +8,13 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import shap
-from pynewood.graph_utils import graph_from_dictionary
 from sklearn.cluster import DBSCAN
-from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import StandardScaler
 from tqdm.auto import tqdm
 
+from causalgraph.common.utils import graph_from_dictionary
 from causalgraph.common import tqdm_params
-from causalGraph.dnn.models import DFFModel, MDNModel, MLPModel
+from causalgraph.models import MLPModel
 
 
 def extract_weights(model, verbose=False):
@@ -182,7 +182,7 @@ def summarize_weights(weights, feature_names, layer=0, scale=True):
 
     psd = psd.fillna(0)
     if scale:
-        scaler = MinMaxScaler()
+        scaler = StandardScaler()
         psd = pd.DataFrame(scaler.fit_transform(psd),
                            index=psd.index, columns=psd.columns)
     return psd

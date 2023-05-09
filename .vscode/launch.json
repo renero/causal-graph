@@ -6,12 +6,12 @@
     "configurations": [
 
         {
-            "python": "/Users/renero/.pyenv/shims/python",
+            "python": "/Users/renero/.virtualenvs/causality/bin/python",
             "name": "Python: Current File",
             "type": "python",
             "request": "launch",
             "program": "${file}",
-            "cwd": "/Users/renero/code/causalgraph/examples/",
+            "cwd": "/Users/renero/phd/code/causal-graph/",
             "console": "integratedTerminal",
             "justMyCode": false
         }

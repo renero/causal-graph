@@ -9,6 +9,8 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 import shap
+from sklearn.discriminant_analysis import StandardScaler
+from sklearn.linear_model import HuberRegressor
 import statsmodels.api as sm
 import torch
 from matplotlib.ticker import FormatStrFormatter
@@ -68,21 +70,26 @@ class ShapEstimator(BaseEstimator):
         self.all_feature_names_ = list(self.models.regressor.keys())
         self.shap_values = dict()
 
-        pbar = tqdm(total=len(self.all_feature_names_), 
+        pbar = tqdm(total=len(self.all_feature_names_),
                     **tqdm_params(self._fit_desc, self.prog_bar))
 
         for target_name in self.all_feature_names_:
             pbar.update(1)
             model = self.models.regressor[target_name]
-            features_tensor = model.train_loader.dataset.features
+            tensor_features = model.train_loader.dataset.features
             if self.on_gpu:
-                tensorData = torch.autograd.Variable(features_tensor).cuda()
-                explainer = shap.DeepExplainer(model.model.cuda(), tensorData)
+                tensor_data = torch.autograd.Variable(tensor_features).cuda()
+                explainer = shap.DeepExplainer(model.model.cuda(), tensor_data)
             else:
-                tensorData = torch.autograd.Variable(features_tensor)
-                explainer = shap.DeepExplainer(model.model, tensorData)
-                # explainer = shap.GradientExplainer(model.model, tensorData)
-            self.shap_values[target_name] = explainer.shap_values(tensorData)
+                tensor_data = torch.autograd.Variable(tensor_features)
+                # tensor_data.unsqueeze_(-1)
+                # explainer = shap.DeepExplainer(model.model, tensorData)
+                next_x, next_y = next(iter(model.train_loader))
+                np.random.seed(0)
+                inds = np.random.choice(next_x.shape[0], 20, replace=False)
+                # explainer = shap.GradientExplainer(model.model, next_x[inds, :])
+                explainer = shap.GradientExplainer(model.model, tensor_data)
+            self.shap_values[target_name] = explainer.shap_values(tensor_data)
             pbar.refresh()
         pbar.close()
 
@@ -97,7 +104,7 @@ class ShapEstimator(BaseEstimator):
         # X_array = check_array(X)
         check_is_fitted(self, 'is_fitted_')
 
-        pbar = tqdm(total=2, 
+        pbar = tqdm(total=2,
                     **tqdm_params("Building graph from SHAPs", self.prog_bar))
         self.parents = dict()
         for target in self.all_feature_names_:
@@ -169,7 +176,7 @@ class ShapEstimator(BaseEstimator):
             A dataframe containing the discrepancies for all features and all targets.
         """
         self.discrepancies = pd.DataFrame(columns=self.all_feature_names_)
-        for target_name in tqdm(self.all_feature_names_, 
+        for target_name in tqdm(self.all_feature_names_,
                                 **tqdm_params("Computing Shap discrepancies", self.prog_bar)):
             X, y = self.models.get_input_tensors(target_name)
             feature_names = list(X.columns)
@@ -251,22 +258,47 @@ class ShapEstimator(BaseEstimator):
             on the feature.
 
         """
-        # Compute a regression to the shap values
+        if isinstance(x, pd.Series) or isinstance(x, pd.DataFrame):
+            x = x.values
+        elif not isinstance(x, np.ndarray):
+            x = np.array(x)
+        if isinstance(y, pd.Series) or isinstance(y, pd.DataFrame):
+            y = y.values
+        elif not isinstance(y, np.ndarray):
+            y = np.array(y)
+
         feature_pos = feature_names.index(feature)
-        b_shap, m_shap = self._regress(x, shap_values[:, feature_pos])
-        b_target, m_target = self._regress(x, y)
-        corr = spearmanr(shap_values[:, feature_pos], y)
+        
+        # Normalize the data
+        x_norm = StandardScaler().fit_transform(x.reshape(-1, 1))
+        y_norm = StandardScaler().fit_transform(y.reshape(-1, 1))
+        phi_norm = StandardScaler().fit_transform(shap_values[:, feature_pos].reshape(-1, 1))
+
+        # Compute the robust regression to the shap values
+        b_shap, m_shap = self._regress(x_norm, phi_norm)
+        b_target, m_target = self._regress(x_norm, y_norm)
+        corr = spearmanr(phi_norm, y_norm)
+
+        # Compute a regression to the shap values
+        # feature_pos = feature_names.index(feature)
+        # b_shap, m_shap = self._regress(x, shap_values[:, feature_pos])
+        # b_target, m_target = self._regress(x, y)
+        # corr = spearmanr(shap_values[:, feature_pos], y)
 
         # TODO: Move the plot to a separate function
         if plot:
             # Plot the SHAP values and the regression
-            ax.scatter(x, shap_values[:, feature_pos],
-                       alpha=0.3, marker='.', label="$\phi$")
-            ax.plot(x, m_shap*x+b_shap, color='blue', linewidth=.5)
+            ax.scatter(x_norm, phi_norm, alpha=0.3, marker='.', label="$\phi$")
+            ax.plot(x_norm, m_shap * x_norm + b_shap, color='blue', linewidth=.5)
+            # ax.scatter(x, shap_values[:, feature_pos],
+            #            alpha=0.3, marker='.', label="$\phi$")
+            # ax.plot(x, m_shap*x+b_shap, color='blue', linewidth=.5)
 
             # Plot the target and the regression
-            ax.scatter(x, y, alpha=0.3, marker='+', label="target")
-            ax.plot(x, m_target*x+b_target, color='orange', linewidth=.5)
+            ax.scatter(x_norm, y_norm, alpha=0.3, marker='+', label="target")
+            ax.plot(x_norm, m_target*x_norm+b_target, color='orange', linewidth=.5)
+            # ax.scatter(x, y, alpha=0.3, marker='+', label="target")
+            # ax.plot(x, m_target*x+b_target, color='orange', linewidth=.5)
 
             ax.set_title(
                 f"corr:{corr.correlation:.2f}, $m_S:${m_shap:.2f}, $m_y:${m_target:.2f}")
@@ -282,7 +314,7 @@ class ShapEstimator(BaseEstimator):
                 'm_shap': m_shap,
                 'm_target': m_target}
 
-    def _regress(self, x, y):
+    def _regress(self, x: np.array, y: np.array):
         """Fit a linear regression on x and y.
 
         Parameters
@@ -299,8 +331,11 @@ class ShapEstimator(BaseEstimator):
         intercept : float
             The y-intercept of the fitted line.
         """
-        reg = sm.OLS(y, sm.add_constant(x)).fit()
-        b, m = reg.params[0], reg.params[1]
+        # reg = sm.OLS(y, sm.add_constant(x)).fit()
+        # b, m = reg.params[0], reg.params[1]
+        # return b, m
+        reg = HuberRegressor().fit(x, y)
+        b, m = reg.intercept_, reg.coef_[0]
         return b, m
 
     def _adjust_edges_from_shap_discrepancies(
@@ -454,6 +489,18 @@ class ShapEstimator(BaseEstimator):
 
         return input_vector
 
+    def _get_data_from_model(self, target_name:str):
+        model = self.models.regressor[target_name]
+        tensor_features = model.train_loader.dataset.features
+        tensor_target = model.train_loader.dataset.target
+        # tensor_data = torch.autograd.Variable(tensor_features)
+        # tensor_target = torch.autograd.Variable(tensor_target)
+
+        # Convert tensor to numpy array
+        tensor_data = tensor_features.data.cpu().numpy()
+        tensor_target = tensor_target.data.cpu().numpy()
+        return tensor_data, tensor_target
+
     def _debugmsg(
             self,
             msg,
@@ -547,7 +594,8 @@ class ShapEstimator(BaseEstimator):
         ax.barh(y_pos, mean_shap_values[feature_inds],
                 0.7, align='center', color="#0e73fa", alpha=0.8)
         ax.xaxis.set_major_formatter(FormatStrFormatter('%.3g'))
-        ax.set_yticks(y_pos, [feature_names[i] for i in feature_inds], fontsize=11)
+        ax.set_yticks(y_pos, [feature_names[i]
+                      for i in feature_inds], fontsize=11)
         # ax.set_yticklabels([feature_names[i] for i in feature_inds])
         # ax.set_xlabel("$\\frac{1}{m}\sum_{j=1}^p| \phi_j |$")
         ax.set_xlabel("Avg. SHAP value")
@@ -557,6 +605,52 @@ class ShapEstimator(BaseEstimator):
         fig = ax.figure if fig is None else fig
         return fig
 
+    def plot_discrepancies_for_target(self, target_name: str, **kwargs) -> None:
+        """
+        Plot the discrepancies for a target. This method extracts data from the pipeline
+        computes the shap values again, and plot them, showing the correlation and the 
+        slopes of the regression lines for SHAP values and target values.
+
+        Parameters
+        ----------
+        target_name : str
+            The name of the target to compute the discrepancies for.
+        feature_names : List[str]
+            The names of the features to compute the discrepancies for.
+
+        Returns
+        -------
+        None
+        """
+        # Setup plot
+        dpi_ = kwargs.get('dpi', 100)
+        figsize_ = kwargs.get('figsize', (10, 10))
+        num_columns = kwargs.get('num_columns', 3)
+        num_rows = int(np.ceil(10 / num_columns))
+
+        f, ax = plt.subplots(num_rows, num_columns, figsize=figsize_, dpi=dpi_)
+
+        # Setup data
+        feature_names = list(self.all_feature_names_)
+        feature_names.remove(target_name)
+        X, y = self._get_data_from_model(target_name)
+        shap_values = self.shap_values[target_name]
+
+        for idx, feature in enumerate(feature_names):
+            row, col = idx//num_columns, idx % num_columns
+            self._compute_shap_alignment(X[:, idx], shap_values,
+                                         y, feature, feature_names, ax=ax[row, col],
+                                         plot=True)
+
+        # Remove empty plots
+        for idx in range(len(feature_names), 12):
+            row, col = idx//num_columns, idx % num_columns
+            ax[row, col].set_visible(False)
+
+        plt.suptitle(f"Discrepancies for {target_name}")
+        plt.tight_layout()
+        plt.show()
+
 
 if __name__ == "__main__":
     np.set_printoptions(precision=4, linewidth=150)
@@ -564,7 +658,8 @@ if __name__ == "__main__":
 
     dataset_name = 'generated_linear_10'
     data = pd.read_csv("~/phd/data/generated_linear_10.csv")
-    ref_graph = graph_from_dot_file("/Users/renero/phd/data/generated_linear_10_mini.dot")
+    ref_graph = graph_from_dot_file(
+        "/Users/renero/phd/data/generated_linear_10_mini.dot")
     rex = load_experiment('rex', "/Users/renero/phd/output/REX")
     rex.prog_bar = False
     rex.verbose = True

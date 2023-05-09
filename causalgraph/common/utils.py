@@ -9,11 +9,14 @@ import os
 import pickle
 from os.path import join
 from pathlib import Path
-from typing import Union
+from typing import Dict, List, Tuple, Union
 
 import networkx as nx
 import pydot as pydot
 import pydotplus
+
+
+AnyGraph = Union[nx.Graph, nx.DiGraph]
 
 
 def save_experiment(obj_name: str, folder: str, results: dict):
@@ -122,3 +125,30 @@ def graph_from_dot_file(dot_file: Union[str, Path]) -> nx.DiGraph:
         final_graph.remove_node('\\n')
 
     return final_graph
+
+
+def graph_from_dictionary(d: Dict[str, List[Union[str, Tuple[str, float]]]]) -> AnyGraph:
+    """
+    Builds a graph from a dictionary like {'u': ['v', 'w'], 'x': ['y']}.
+    The elements of the list can be tuples including weight
+
+    Args:
+        d (dict): A dictionary of the form {'u': ['v', 'w'], 'x': ['y']}, where
+            an edge between 'u' goes towards 'v' and 'w', and also an edge from
+            'x' goes towards 'y'. The format can also be like:
+            {'u': [('v', 0.2), ('w', 0.7)], 'x': [('y', 0.5)]}, where the values
+            in the tuple are interpreted as weights.
+
+    Returns:
+        networkx.DiGraph with the nodes and edges specified.
+    """
+    g = nx.DiGraph()
+    for node, parents in d.items():
+        if len(parents) > 0:
+            if type(parents[0]) == tuple:
+                for parent, weight in parents:
+                    g.add_edge(parent, node, weight=weight)
+            else:
+                for parent in parents:
+                    g.add_edge(parent, node)
+    return g

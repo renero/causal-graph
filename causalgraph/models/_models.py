@@ -12,7 +12,7 @@ from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import TQDMProgressBar, EarlyStopping
 from pytorch_lightning.loggers import TensorBoardLogger
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import StandardScaler
 from torch.utils.data import DataLoader
 
 from ._base_models import MLP
@@ -117,7 +117,7 @@ class BaseModel(object):
             self.callbacks.append(bar)
 
     def init_data(self):
-        self.scaler = MinMaxScaler()
+        self.scaler = StandardScaler()
         df_scaled = pd.DataFrame(self.scaler.fit_transform(self.dataframe),
                                  columns=self.dataframe.columns)
 
