@@ -21,7 +21,7 @@ RESET = colorama.Style.RESET_ALL
 
 def select_features(values,
                     feature_names,
-                    method='knee',
+                    method='cluster',
                     tolerance=None,
                     sensitivity=1.0,
                     return_shaps=False,
@@ -80,7 +80,7 @@ def select_features(values,
         sorted_impact_values = sorted_impact_values[::-1]
     if verbose:
         print("Selecting features", )
-        print("  SHAP values........:", end="")
+        print("  Sum SHAP values....:", end="")
         print(','.join([f"({f}:{s:.03f})" for f, s in zip(
             feature_names, np.sum(np.abs(values), axis=0))]))
         print(
@@ -177,33 +177,36 @@ def cluster_change(X: List, verbose: bool = False):
     X = np.array(X).reshape(-1, 1)
     pairwise_distances = euclidean_distances(X)[0,]
     pairwise_distances = np.diff(pairwise_distances)
+    # sort pairwise_distances in descending order
+    pairwise_distances = np.sort(pairwise_distances)[::-1]
+    
     n_clusters_ = 0
     while n_clusters_ <= 1 and len(pairwise_distances) > 0:
-        min_distance = pairwise_distances.max()
+        max_distance = pairwise_distances.max()
         if verbose:
-            print(f"pairwise_distances: {pairwise_distances}")
-            print(f"min_distance: {min_distance}")
+            print(f"  pairwise_distances: {pairwise_distances}")
+            print(f"  max_distance: {max_distance}")
 
-        db = DBSCAN(eps=min_distance, min_samples=1).fit(X)
+        db = DBSCAN(eps=max_distance, min_samples=1).fit(X)
         labels = db.labels_
         # Number of clusters in labels, ignoring noise if present.
         n_clusters_ = len(set(labels)) - (1 if -1 in labels else 0)
         n_noise_ = list(labels).count(-1)
         if n_clusters_ <= 1:
             if verbose:
-                print("** Only 1 cluster generated. Increasing min_distance **")
+                print("  ** Only 1 cluster generated. Increasing min_distance **")
             pairwise_distances = pairwise_distances[1:]
 
     if pairwise_distances.size == 0:
-        print("No clusters generated") if verbose else None
+        print("** No clusters generated") if verbose else None
         return None
     
     if verbose:
-        print("Estimated number of clusters: %d" % n_clusters_)
-        print("Estimated number of noise points: %d" % n_noise_)
-        print(f"Silhouette Coefficient: {metrics.silhouette_score(X, labels):.3f}")
+        print(f"  Estimated number of clusters: {n_clusters_}")
+        print(f"  Estimated number of noise points: {n_noise_}")
+        print(f"  Silhouette Coefficient: {metrics.silhouette_score(X, labels):.3f}")
+        print(f"  > Labels: {labels}")
 
-    print(f"Labels: {labels}") if verbose else None
     winner_label = 0
     samples_in_winner_cluster = np.argwhere(X[labels == winner_label])
     return samples_in_winner_cluster[:, 0][-1]+1

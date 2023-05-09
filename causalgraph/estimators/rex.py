@@ -56,7 +56,7 @@ class Rex(BaseEstimator, ClassifierMixin):
             sensitivity=1.0,
             descending=False,
             tolerance=0.04,
-            shap_selection: str = 'abrupt',
+            shap_selection: str = 'cluster',
             iters=10,
             reciprocal=False,
             min_impact=1e-06,

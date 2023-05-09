@@ -595,10 +595,7 @@ class ShapEstimator(BaseEstimator):
         ax.barh(y_pos, mean_shap_values[feature_inds],
                 0.7, align='center', color="#0e73fa", alpha=0.8)
         ax.xaxis.set_major_formatter(FormatStrFormatter('%.3g'))
-        ax.set_yticks(y_pos, [feature_names[i]
-                      for i in feature_inds], fontsize=11)
-        # ax.set_yticklabels([feature_names[i] for i in feature_inds])
-        # ax.set_xlabel("$\\frac{1}{m}\sum_{j=1}^p| \phi_j |$")
+        ax.set_yticks(y_pos, [feature_names[i] for i in feature_inds])
         ax.set_xlabel("Avg. SHAP value")
         ax.set_title(
             target_name + " $\leftarrow$ " +

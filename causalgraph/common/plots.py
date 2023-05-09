@@ -24,7 +24,7 @@ formatting_kwargs = {"node_size": 1000,
                      }
 
 
-def setup_plot(tex=True, font="serif", dpi=100):
+def setup_plot(**kwargs): #tex=True, font="serif", dpi=100, font_size=10):
     """Customize figure settings.
 
     Args:
@@ -32,11 +32,25 @@ def setup_plot(tex=True, font="serif", dpi=100):
         font (str, optional): font type. Defaults to "serif".
         dpi (int, optional): dots per inch. Defaults to 180.
     """
+    font_size = kwargs.pop("font_size", 10)
+    usetex = kwargs.pop("usetex", True)
+    font_familiy = kwargs.pop("font_family", "serif")
+    dpi = kwargs.pop("dpi", 100)
+    format = kwargs.pop("format", "pdf")
+    title_size = kwargs.pop("title_size", 8)
+    axis_labelsize = kwargs.pop("axis_labelsize", 8)
+    xtick_labelsize = kwargs.pop("xtick_labelsize", 8)
+    ytick_labelsize = kwargs.pop("ytick_labelsize", 8)
+    legend_fontsize = kwargs.pop("legend_fontsize", 8)
+    axes_labelpad = kwargs.pop("axes_labelpad", 4)
+    xtick_majorpad = kwargs.pop("xtick_majorpad", 3)
+    ytick_majorpad = kwargs.pop("ytick_majorpad", 3)
+
     plt.rcParams.update(
         {
-            "font.size": 10,
-            "font.family": font,
-            "text.usetex": tex,
+            "font.size": font_size,
+            "font.family": font_familiy,
+            "text.usetex": usetex,
             "figure.subplot.top": 0.9,
             "figure.subplot.right": 0.9,
             "figure.subplot.left": 0.15,
@@ -44,23 +58,24 @@ def setup_plot(tex=True, font="serif", dpi=100):
             "figure.subplot.hspace": 0.4,
             "figure.dpi": dpi,
             "savefig.dpi": 180,
-            "savefig.format": "pdf",
-            "axes.titlesize": 10,
-            "axes.labelsize": 10,
+            "savefig.format": format,
+            "axes.titlesize": title_size,
+            "axes.labelsize": axis_labelsize,
             "axes.axisbelow": True,
+            "axes.labelpad": axes_labelpad,
             "xtick.direction": "in",
             "ytick.direction": "in",
             "xtick.major.size": 5,
             "xtick.minor.size": 2.25,
-            "xtick.major.pad": 7.5,
+            "xtick.major.pad": xtick_majorpad,
             "xtick.minor.pad": 7.5,
-            "ytick.major.pad": 7.5,
+            "ytick.major.pad": ytick_majorpad,
             "ytick.minor.pad": 7.5,
             "ytick.major.size": 5,
             "ytick.minor.size": 2.25,
-            "xtick.labelsize": 8,
-            "ytick.labelsize": 8,
-            "legend.fontsize": 8,
+            "xtick.labelsize": xtick_labelsize,
+            "ytick.labelsize": ytick_labelsize,
+            "legend.fontsize": legend_fontsize,
             "legend.framealpha": 1,
             "figure.titlesize": 12,
             "lines.linewidth": 2,
