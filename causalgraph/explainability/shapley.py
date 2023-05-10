@@ -188,8 +188,8 @@ class ShapEstimator(BaseEstimator):
             for feature in feature_names:
                 discrepancy = self._compute_shap_alignment(
                     X[feature].values,
-                    self.shap_values[target_name],
                     y,
+                    self.shap_values[target_name],
                     feature,
                     feature_names)
                 self.discrepancies.loc[target_name,
@@ -200,8 +200,8 @@ class ShapEstimator(BaseEstimator):
     def _compute_shap_alignment(
             self,
             x,
-            shap_values,
             y,
+            shap_values,
             feature,
             feature_names,
             ax=None,
@@ -279,26 +279,15 @@ class ShapEstimator(BaseEstimator):
         b_target, m_target = self._regress(x_norm, y_norm)
         corr = spearmanr(phi_norm, y_norm)
 
-        # Compute a regression to the shap values
-        # feature_pos = feature_names.index(feature)
-        # b_shap, m_shap = self._regress(x, shap_values[:, feature_pos])
-        # b_target, m_target = self._regress(x, y)
-        # corr = spearmanr(shap_values[:, feature_pos], y)
-
         # TODO: Move the plot to a separate function
         if plot:
             # Plot the SHAP values and the regression
             ax.scatter(x_norm, phi_norm, alpha=0.3, marker='.', label="$\phi$")
             ax.plot(x_norm, m_shap * x_norm + b_shap, color='blue', linewidth=.5)
-            # ax.scatter(x, shap_values[:, feature_pos],
-            #            alpha=0.3, marker='.', label="$\phi$")
-            # ax.plot(x, m_shap*x+b_shap, color='blue', linewidth=.5)
 
             # Plot the target and the regression
             ax.scatter(x_norm, y_norm, alpha=0.3, marker='+', label="target")
             ax.plot(x_norm, m_target*x_norm+b_target, color='red', linewidth=.5)
-            # ax.scatter(x, y, alpha=0.3, marker='+', label="target")
-            # ax.plot(x, m_target*x+b_target, color='orange', linewidth=.5)
 
             ax.set_title(
                 f"corr:{corr.correlation:.2f}, $m_S:${m_shap:.2f}, $m_y:${m_target:.2f}",
@@ -494,9 +483,6 @@ class ShapEstimator(BaseEstimator):
         model = self.models.regressor[target_name]
         tensor_features = model.train_loader.dataset.features
         tensor_target = model.train_loader.dataset.target
-        # tensor_data = torch.autograd.Variable(tensor_features)
-        # tensor_target = torch.autograd.Variable(tensor_target)
-
         # Convert tensor to numpy array
         tensor_data = tensor_features.data.cpu().numpy()
         tensor_target = tensor_target.data.cpu().numpy()
@@ -636,8 +622,8 @@ class ShapEstimator(BaseEstimator):
 
         for idx, feature in enumerate(feature_names):
             row, col = idx//num_columns, idx % num_columns
-            self._compute_shap_alignment(X[:, idx], shap_values,
-                                         y, feature, feature_names, ax=ax[row, col],
+            self._compute_shap_alignment(X[:, idx], y, shap_values,
+                                         feature, feature_names, ax=ax[row, col],
                                          plot=True)
 
         # Remove empty plots

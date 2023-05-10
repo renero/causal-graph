@@ -250,7 +250,7 @@ class Pipeline:
             step_params = steps[step_name]
             print(f"Running step {step_name} with params {step_params}") \
                 if self._verbose else None
-            # check if step is a tuple
+
             if type(step_name) is tuple:
                 vble_name, step_call = step_name
                 # create an attribute of name `name`in `self` with the value
@@ -261,6 +261,7 @@ class Pipeline:
                     if self._verbose else None
             else:
                 self.run_step(step_name, self._get_params(step_params))
+                
             print("-"*80) if self._verbose else None
             self._pbar_update(1)
         self._pbar.close()

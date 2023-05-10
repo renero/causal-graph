@@ -177,9 +177,8 @@ def cluster_change(X: List, verbose: bool = False):
     X = np.array(X).reshape(-1, 1)
     pairwise_distances = euclidean_distances(X)[0,]
     pairwise_distances = np.diff(pairwise_distances)
-    # sort pairwise_distances in descending order
     pairwise_distances = np.sort(pairwise_distances)[::-1]
-    
+
     n_clusters_ = 0
     while n_clusters_ <= 1 and len(pairwise_distances) > 0:
         max_distance = pairwise_distances.max()
