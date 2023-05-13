@@ -15,7 +15,6 @@ from causalgraph.common import RESET, GREEN, GRAY
 from causalgraph.common.pipeline import Pipeline
 from causalgraph.common.plots import subplots, plot_dags
 from causalgraph.common.utils import graph_from_dot_file, load_experiment, save_experiment
-from causalgraph.explainability.hierarchies import Hierarchies
 from causalgraph.explainability.shapley import ShapEstimator
 from causalgraph.independence.graph_independence import GraphIndependence
 from causalgraph.models.dnn import NNRegressor

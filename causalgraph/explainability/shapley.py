@@ -216,17 +216,17 @@ class ShapEstimator(BaseEstimator):
             self.shap_discrepancies[target_name] = dict()
 
             # Loop through all features and compute the discrepancy
-            for feature in feature_names:
+            for feature_name in feature_names:
                 discrepancy = self._compute_shap_alignment(
-                    X_features[feature].values,
+                    X_features[feature_name].values,
                     y.values,
-                    self.shap_values[target_name],
+                    self.shap_values_norm[target_name],
                     target_name,
-                    feature,
+                    feature_name,
                     feature_names)
                 self.discrepancies.loc[target_name,
-                                       feature] = discrepancy.shap_discrepancy
-                self.shap_discrepancies[target_name][feature] = discrepancy
+                                       feature_name] = discrepancy.shap_discrepancy
+                self.shap_discrepancies[target_name][feature_name] = discrepancy
 
         return self.discrepancies
 
@@ -236,10 +236,8 @@ class ShapEstimator(BaseEstimator):
             y,
             shap_values,
             target_name,
-            feature,
-            feature_names,
-            ax=None,
-            plot: bool = False):
+            feature_name,
+            feature_names):
         """
         Compute the alignment of the shap values for a given feature with the target
         variable. This is done by computing the correlation between the shap values and
@@ -304,13 +302,11 @@ class ShapEstimator(BaseEstimator):
         elif not isinstance(y, np.ndarray):
             y = np.array(y)
 
-        feature_pos = feature_names.index(feature)
+        feature_pos = feature_names.index(feature_name)
 
-        # Normalize the data
         x = x.reshape(-1, 1)
         y = y.reshape(-1, 1)
-        phi = StandardScaler().fit_transform(
-            shap_values[:, feature_pos].reshape(-1, 1))
+        phi = shap_values[:, feature_pos].reshape(-1, 1)
 
         # Compute the robust regression to the shap values
         b_shap, m_shap = self._regress(x, phi)
@@ -320,7 +316,7 @@ class ShapEstimator(BaseEstimator):
 
         result = ShapDiscrepancy(
             target=target_name,
-            parent=feature,
+            parent=feature_name,
             shap_discrepancy=discrepancy,
             intercept_shap=b_shap,
             slope_shap=m_shap,
@@ -505,15 +501,6 @@ class ShapEstimator(BaseEstimator):
              target_mean, source_mean])
 
         return input_vector
-
-    # def _get_data_from_model(self, target_name: str):
-    #     model = self.models.regressor[target_name]
-    #     tensor_features = model.train_loader.dataset.features
-    #     tensor_target = model.train_loader.dataset.target
-    #     # Convert tensor to numpy array
-    #     tensor_data = tensor_features.data.cpu().numpy()
-    #     tensor_target = tensor_target.data.cpu().numpy()
-    #     return tensor_data, tensor_target
 
     def _debugmsg(
             self,
