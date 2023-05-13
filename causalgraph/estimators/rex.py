@@ -359,14 +359,14 @@ if __name__ == "__main__":
     rex.plot_shap_discrepancies('V6', figsize=(7,6), num_columns=4)
 
     # Plot the SHAP values for each regression
-    # plot_args = [(target_name) for target_name in rex.shaps.all_feature_names_]
-    # subplots(rex.shaps.summary_plot, *plot_args, dpi=100);
+    plot_args = [(target_name) for target_name in rex.shaps.all_feature_names_]
+    subplots(rex.shaps.summary_plot, *plot_args, dpi=100);
 
     # Plot the predicted graph
-    # plot_dags(pred_graph, ref_graph)
+    plot_dags(pred_graph, ref_graph)
 
-    # metric = evaluate_graph(ref_graph, pred_graph, rex.shaps.all_feature_names_)
-    # print(metric)
+    metric = evaluate_graph(ref_graph, pred_graph, rex.shaps.all_feature_names_)
+    print(metric)
 
     if save:
         save_experiment('rex', "/Users/renero/phd/output/REX", rex)

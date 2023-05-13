@@ -83,6 +83,7 @@ class ShapEstimator(BaseEstimator):
 
         self.all_feature_names_ = list(self.models.regressor.keys())
         self.shap_values = dict()
+        self.shap_values_norm = dict()
 
         pbar = tqdm(total=len(self.all_feature_names_),
                     **tqdm_params(self._fit_desc, self.prog_bar))
@@ -100,6 +101,9 @@ class ShapEstimator(BaseEstimator):
             explainer = shap.GradientExplainer(model, tensor_data)
 
             self.shap_values[target_name] = explainer.shap_values(tensor_data)
+            scaler = StandardScaler()
+            self.shap_values_norm[target_name] = scaler.fit_transform(
+                self.shap_values[target_name])
             pbar.refresh()
 
         pbar.close()
@@ -502,14 +506,14 @@ class ShapEstimator(BaseEstimator):
 
         return input_vector
 
-    def _get_data_from_model(self, target_name: str):
-        model = self.models.regressor[target_name]
-        tensor_features = model.train_loader.dataset.features
-        tensor_target = model.train_loader.dataset.target
-        # Convert tensor to numpy array
-        tensor_data = tensor_features.data.cpu().numpy()
-        tensor_target = tensor_target.data.cpu().numpy()
-        return tensor_data, tensor_target
+    # def _get_data_from_model(self, target_name: str):
+    #     model = self.models.regressor[target_name]
+    #     tensor_features = model.train_loader.dataset.features
+    #     tensor_target = model.train_loader.dataset.target
+    #     # Convert tensor to numpy array
+    #     tensor_data = tensor_features.data.cpu().numpy()
+    #     tensor_target = tensor_target.data.cpu().numpy()
+    #     return tensor_data, tensor_target
 
     def _debugmsg(
             self,
@@ -647,14 +651,11 @@ class ShapEstimator(BaseEstimator):
         # Setup data
         feature_names = list(self.all_feature_names_)
         feature_names.remove(target_name)
-        # shap_values = self.shap_values[target_name]
 
         for idx, feature in enumerate(feature_names):
             row, col = idx//num_columns, idx % num_columns
-            # self._compute_shap_alignment(X[:, idx], y, shap_values,
-            #                              feature, feature_names, ax=ax[row, col],
-            #                              plot=True)
-            self._plot_discrepancy(X[:, idx], y, self.shap_values[target_name][:, idx],
+            self._plot_discrepancy(X[:, idx], y, 
+                                   self.shap_values_norm[target_name][:, idx],
                                    self.shap_discrepancies[target_name][feature], 
                                    ax=ax[row, col])
 
@@ -678,13 +679,11 @@ class ShapEstimator(BaseEstimator):
         """
         # Plot the SHAP values and the regression
         ax.scatter(x, phi, alpha=0.3, marker='.', label="$\phi$")
-        # ax.plot(x, m_shap * x + b_shap, color='blue', linewidth=.5)
         ax.plot(x, discrepancy.slope_shap * x + discrepancy.intercept_shap,
                 color='blue', linewidth=.5)
 
         # Plot the target and the regression
         ax.scatter(x, y, alpha=0.3, marker='+', label="target")
-        # ax.plot(x, m_parent*x+b_parent, color='red', linewidth=.5)
         ax.plot(x, discrepancy.slope_parent * x + discrepancy.intercept_parent,
                 color='red', linewidth=.5)
 
