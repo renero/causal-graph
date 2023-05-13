@@ -113,6 +113,7 @@ class NNRegressor(BaseEstimator):
         self.feature_names = list(X.columns)
         self.regressor = dict()
 
+        # TODO: Remove multiple model selection and use only MLP
         model = DFFModel if self.model_type == "dff" else MLPModel
         pbar_in = tqdm(total=len(self.feature_names),
                        **tqdm_params(self._fit_desc, self.prog_bar))

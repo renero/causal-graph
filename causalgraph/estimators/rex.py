@@ -2,6 +2,7 @@ from copy import copy
 from pathlib import Path
 from typing import Any, List, Tuple, Union
 import warnings
+import os
 
 import numpy as np
 import pandas as pd
@@ -203,6 +204,7 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.pdf_filename = pdf_filename
 
         self._fit_desc = "Fitting ReX method"
+        os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
     def _more_tags(self):
         return {
@@ -241,6 +243,10 @@ class Rex(BaseEstimator, ClassifierMixin):
         pipeline = Pipeline(self, prog_bar=self.prog_bar, verbose=self.verbose)
         pipeline.set_default_object_method('fit')
         pipeline.set_default_method_params(['X', 'y'])
+        # TODO:
+        # I can eliminate the need to specify the list of parameters of the method 
+        # by using the inspect module to get the list of parameters of the method.
+        # Example: inspect.getfullargspec(method).args
         steps = {
             ('regressor', NNRegressor): [
                 "model_type", "hidden_dim", "learning_rate", "dropout", "batch_size", 
@@ -286,7 +292,7 @@ class Rex(BaseEstimator, ClassifierMixin):
             ('indep', GraphIndependence): ["G_shap", "condlen", "condsize", 
                                            "prog_bar", "verbose"],
             ('G_indep', 'indep.predict'): [],
-            ('G_final', 'shaps.adjust'): ['G_indep']
+            ('G_final', 'shaps.adjust'): ['X', 'G_indep']
         }
         prediction.run(steps, "Predicting graph")
         if '\\n' in self.G_final.nodes:
@@ -320,7 +326,9 @@ class Rex(BaseEstimator, ClassifierMixin):
 
     def plot_shap_discrepancies(self, target_name:str, **kwargs):
         assert self.is_fitted_, "Model not fitted yet"
-        return self.shaps.plot_discrepancies_for_target(target_name, **kwargs)
+        X = self.X.drop(target_name, axis=1).values
+        y = self.X[target_name].values
+        return self.shaps._plot_discrepancies_for_target(X, y, target_name, **kwargs)
 
     def plot_shap_values(self, **kwargs):
         assert self.is_fitted_, "Model not fitted yet"
@@ -342,24 +350,23 @@ if __name__ == "__main__":
     if load:
         rex = load_experiment('rex', "/Users/renero/phd/output/REX")
     else:
-        rex = Rex(tolerance=0.1, descending=True).fit(data, ref_graph)
+        rex = Rex().fit(data, ref_graph)
 
     # rex.prog_bar = False
     # rex.verbose = True
-    # rex.shaps.method = 'cluster'
-    # rex.shaps.descending = True
-    # rex.shaps.tolerance = 0.1
+
     pred_graph = rex.predict(data)
+    rex.plot_shap_discrepancies('V6', figsize=(7,6), num_columns=4)
 
     # Plot the SHAP values for each regression
-    plot_args = [(target_name) for target_name in rex.shaps.all_feature_names_]
-    subplots(rex.shaps.summary_plot, *plot_args, dpi=100);
+    # plot_args = [(target_name) for target_name in rex.shaps.all_feature_names_]
+    # subplots(rex.shaps.summary_plot, *plot_args, dpi=100);
 
     # Plot the predicted graph
     # plot_dags(pred_graph, ref_graph)
 
-    metric = evaluate_graph(ref_graph, pred_graph, rex.shaps.all_feature_names_)
-    print(metric)
+    # metric = evaluate_graph(ref_graph, pred_graph, rex.shaps.all_feature_names_)
+    # print(metric)
 
     if save:
         save_experiment('rex', "/Users/renero/phd/output/REX", rex)

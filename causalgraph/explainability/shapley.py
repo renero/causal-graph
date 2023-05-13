@@ -1,9 +1,11 @@
 """
 This is a module to be used as a reference for building other modules
 """
+from dataclasses import dataclass
 from typing import List, Union
 import warnings
 from matplotlib import pyplot as plt
+import matplotlib
 
 import networkx as nx
 import numpy as np
@@ -26,6 +28,18 @@ from causalgraph.models.dnn import NNRegressor
 from causalgraph.common.utils import graph_from_dot_file, load_experiment
 
 AnyGraph = Union[nx.DiGraph, nx.Graph]
+
+
+@dataclass
+class ShapDiscrepancy:
+    target: str
+    parent: str
+    shap_discrepancy: float
+    intercept_shap: float
+    slope_shap: float
+    intercept_parent: float
+    slope_parent: float
+    correlation: float
 
 
 class ShapEstimator(BaseEstimator):
@@ -75,22 +89,19 @@ class ShapEstimator(BaseEstimator):
 
         for target_name in self.all_feature_names_:
             pbar.update(1)
-            model = self.models.regressor[target_name]
-            tensor_features = model.train_loader.dataset.features
+            model = self.models.regressor[target_name].model
+            tensor_data = X.drop(target_name, axis=1).values
+            tensor_data = torch.from_numpy(tensor_data).float()
+
             if self.on_gpu:
-                tensor_data = torch.autograd.Variable(tensor_features).cuda()
-                explainer = shap.DeepExplainer(model.model.cuda(), tensor_data)
-            else:
-                tensor_data = torch.autograd.Variable(tensor_features)
-                # tensor_data.unsqueeze_(-1)
-                # explainer = shap.DeepExplainer(model.model, tensorData)
-                next_x, next_y = next(iter(model.train_loader))
-                np.random.seed(0)
-                inds = np.random.choice(next_x.shape[0], 20, replace=False)
-                # explainer = shap.GradientExplainer(model.model, next_x[inds, :])
-                explainer = shap.GradientExplainer(model.model, tensor_data)
+                model = model.cuda()
+                tensor_data = tensor_data.cuda()
+
+            explainer = shap.GradientExplainer(model, tensor_data)
+
             self.shap_values[target_name] = explainer.shap_values(tensor_data)
             pbar.refresh()
+
         pbar.close()
 
         self.is_fitted_ = True
@@ -104,8 +115,14 @@ class ShapEstimator(BaseEstimator):
         # X_array = check_array(X)
         check_is_fitted(self, 'is_fitted_')
 
-        pbar = tqdm(total=2,
+        pbar = tqdm(total=4,
                     **tqdm_params("Building graph from SHAPs", self.prog_bar))
+
+        self._compute_shap_discrepancies(X)
+
+        pbar.update(1)
+        pbar.refresh()
+
         self.parents = dict()
         for target in self.all_feature_names_:
             candidate_causes = [
@@ -118,8 +135,10 @@ class ShapEstimator(BaseEstimator):
                 sensitivity=self.sensitivity,
                 descending=self.descending,
                 min_impact=self.min_impact, verbose=self.verbose)
+
         pbar.update(1)
         pbar.refresh()
+
         G_shap_unoriented = nx.Graph()
         for target in self.all_feature_names_:
             for parent in self.parents[target]:
@@ -129,14 +148,11 @@ class ShapEstimator(BaseEstimator):
                         G_shap_unoriented.add_edge(target, parent)
                 else:
                     G_shap_unoriented.add_edge(target, parent)
+
         pbar.update(1)
         pbar.refresh()
-        pbar.close()
 
         G_shap = nx.DiGraph()
-        desc = "Orienting causal graph"
-        pbar = tqdm(total=len(G_shap_unoriented.edges()),
-                    **tqdm_params(desc, self.prog_bar))
         for u, v in G_shap_unoriented.edges():
             pbar.update(1)
             orientation = get_edge_orientation(
@@ -149,26 +165,34 @@ class ShapEstimator(BaseEstimator):
                 pass
                 # G_shap.add_edge(u, v)
                 # G_shap.add_edge(v, u)
-            pbar.refresh()
+
+        pbar.update(1)
+        pbar.refresh()
         pbar.close()
 
         return G_shap
 
     def adjust(
             self,
+            X: np.ndarray,
             graph: AnyGraph,
             increase_tolerance: float = 0.0,
             sd_upper: float = 0.1):
 
-        self._compute_shap_discrepancies()
+        # self._compute_shap_discrepancies(X)
         new_graph = self._adjust_edges_from_shap_discrepancies(
             graph, increase_tolerance, sd_upper)
         return new_graph
 
-    def _compute_shap_discrepancies(self):
+    def _compute_shap_discrepancies(self, X: pd.DataFrame):
         """
         Compute the discrepancies between the SHAP values and the target values
         for all features and all targets.
+
+        Parameters
+        ----------
+        X : pd.DataFrame
+            The input data. Consists of all the features in a pandas DataFrame.
 
         Returns
         -------
@@ -176,24 +200,29 @@ class ShapEstimator(BaseEstimator):
             A dataframe containing the discrepancies for all features and all targets.
         """
         self.discrepancies = pd.DataFrame(columns=self.all_feature_names_)
-        for target_name in tqdm(self.all_feature_names_,
-                                **tqdm_params("Computing Shap discrepancies", self.prog_bar)):
-            X, y = self.models.get_input_tensors(target_name)
-            feature_names = list(X.columns)
-
-            # Add a new row to dataframe with the value of the target_name as index
+        self.shap_discrepancies = dict()
+        for target_name in tqdm(
+                self.all_feature_names_,
+                **tqdm_params("Computing Shap discrepancies", self.prog_bar)):
+            y = X[target_name]
+            X_features = X.drop(target_name, axis=1)
+            feature_names = [
+                f for f in self.all_feature_names_ if f != target_name]
             self.discrepancies.loc[target_name] = 0
+            self.shap_discrepancies[target_name] = dict()
 
             # Loop through all features and compute the discrepancy
             for feature in feature_names:
                 discrepancy = self._compute_shap_alignment(
-                    X[feature].values,
-                    y,
+                    X_features[feature].values,
+                    y.values,
                     self.shap_values[target_name],
+                    target_name,
                     feature,
                     feature_names)
                 self.discrepancies.loc[target_name,
-                                       feature] = discrepancy['discrepancy']
+                                       feature] = discrepancy.shap_discrepancy
+                self.shap_discrepancies[target_name][feature] = discrepancy
 
         return self.discrepancies
 
@@ -202,6 +231,7 @@ class ShapEstimator(BaseEstimator):
             x,
             y,
             shap_values,
+            target_name,
             feature,
             feature_names,
             ax=None,
@@ -239,6 +269,9 @@ class ShapEstimator(BaseEstimator):
         y : pd.DataFrame
             The target variable. This is a numpy array with the values of the target
             variable in the main model from which the SHAP values were computed.
+        target_name : str
+            The name of the target variable in the main model from which the SHAP
+            values were computed.
         feature : str
             The name of the feature used to predict the target variable in the
             main model from which the SHAP values were computed.
@@ -270,39 +303,29 @@ class ShapEstimator(BaseEstimator):
         feature_pos = feature_names.index(feature)
 
         # Normalize the data
-        x_norm = StandardScaler().fit_transform(x.reshape(-1, 1))
-        y_norm = StandardScaler().fit_transform(y.reshape(-1, 1))
-        phi_norm = StandardScaler().fit_transform(shap_values[:, feature_pos].reshape(-1, 1))
+        x = x.reshape(-1, 1)
+        y = y.reshape(-1, 1)
+        phi = StandardScaler().fit_transform(
+            shap_values[:, feature_pos].reshape(-1, 1))
 
         # Compute the robust regression to the shap values
-        b_shap, m_shap = self._regress(x_norm, phi_norm)
-        b_target, m_target = self._regress(x_norm, y_norm)
-        corr = spearmanr(phi_norm, y_norm)
+        b_shap, m_shap = self._regress(x, phi)
+        b_parent, m_parent = self._regress(x, y)
+        corr = spearmanr(phi, y)
+        discrepancy = 1 - corr.correlation
 
-        # TODO: Move the plot to a separate function
-        if plot:
-            # Plot the SHAP values and the regression
-            ax.scatter(x_norm, phi_norm, alpha=0.3, marker='.', label="$\phi$")
-            ax.plot(x_norm, m_shap * x_norm + b_shap, color='blue', linewidth=.5)
+        result = ShapDiscrepancy(
+            target=target_name,
+            parent=feature,
+            shap_discrepancy=discrepancy,
+            intercept_shap=b_shap,
+            slope_shap=m_shap,
+            intercept_parent=b_parent,
+            slope_parent=m_parent,
+            correlation=corr.correlation
+        )
 
-            # Plot the target and the regression
-            ax.scatter(x_norm, y_norm, alpha=0.3, marker='+', label="target")
-            ax.plot(x_norm, m_target*x_norm+b_target, color='red', linewidth=.5)
-
-            ax.set_title(
-                f"corr:{corr.correlation:.2f}, $m_S:${m_shap:.2f}, $m_y:${m_target:.2f}",
-                fontsize=8)
-
-            ax.set_yticks([])
-            ax.set_xticks([])
-            ax.spines['right'].set_visible(False)
-            ax.spines['top'].set_visible(False)
-            ax.set_xlabel(feature)
-            ax.legend(loc='best', fontsize=8)
-
-        return {'discrepancy': 1. - np.abs(corr.correlation),
-                'm_shap': m_shap,
-                'm_target': m_target}
+        return result
 
     def _regress(self, x: np.array, y: np.array):
         """Fit a linear regression on x and y.
@@ -479,7 +502,7 @@ class ShapEstimator(BaseEstimator):
 
         return input_vector
 
-    def _get_data_from_model(self, target_name:str):
+    def _get_data_from_model(self, target_name: str):
         model = self.models.regressor[target_name]
         tensor_features = model.train_loader.dataset.features
         tensor_target = model.train_loader.dataset.target
@@ -589,7 +612,12 @@ class ShapEstimator(BaseEstimator):
         fig = ax.figure if fig is None else fig
         return fig
 
-    def plot_discrepancies_for_target(self, target_name: str, **kwargs) -> None:
+    def _plot_discrepancies_for_target(
+            self,
+            X: np.ndarray,
+            y: np.ndarray,
+            target_name: str,
+            **kwargs) -> None:
         """
         Plot the discrepancies for a target. This method extracts data from the pipeline
         computes the shap values again, and plot them, showing the correlation and the 
@@ -597,10 +625,12 @@ class ShapEstimator(BaseEstimator):
 
         Parameters
         ----------
+        X : np.ndarray
+            All the features except the target in a numpy array.
+        y : np.ndarray
+            The target values in a numpy array.
         target_name : str
             The name of the target to compute the discrepancies for.
-        feature_names : List[str]
-            The names of the features to compute the discrepancies for.
 
         Returns
         -------
@@ -612,19 +642,21 @@ class ShapEstimator(BaseEstimator):
         num_columns = kwargs.get('num_columns', 3)
         num_rows = int(np.ceil(10 / num_columns))
 
-        f, ax = plt.subplots(num_rows, num_columns, figsize=figsize_, dpi=dpi_)
+        _, ax = plt.subplots(num_rows, num_columns, figsize=figsize_, dpi=dpi_)
 
         # Setup data
         feature_names = list(self.all_feature_names_)
         feature_names.remove(target_name)
-        X, y = self._get_data_from_model(target_name)
-        shap_values = self.shap_values[target_name]
+        # shap_values = self.shap_values[target_name]
 
         for idx, feature in enumerate(feature_names):
             row, col = idx//num_columns, idx % num_columns
-            self._compute_shap_alignment(X[:, idx], y, shap_values,
-                                         feature, feature_names, ax=ax[row, col],
-                                         plot=True)
+            # self._compute_shap_alignment(X[:, idx], y, shap_values,
+            #                              feature, feature_names, ax=ax[row, col],
+            #                              plot=True)
+            self._plot_discrepancy(X[:, idx], y, self.shap_values[target_name][:, idx],
+                                   self.shap_discrepancies[target_name][feature], 
+                                   ax=ax[row, col])
 
         # Remove empty plots
         for idx in range(len(feature_names), 12):
@@ -634,6 +666,38 @@ class ShapEstimator(BaseEstimator):
         plt.suptitle(f"Discrepancies for {target_name}")
         plt.tight_layout()
         plt.show()
+
+    def _plot_discrepancy(
+            self,
+            x: np.ndarray,
+            y: np.ndarray,
+            phi: np.ndarray,
+            discrepancy: ShapDiscrepancy,
+            ax: matplotlib.axes.Axes):
+        """
+        """
+        # Plot the SHAP values and the regression
+        ax.scatter(x, phi, alpha=0.3, marker='.', label="$\phi$")
+        # ax.plot(x, m_shap * x + b_shap, color='blue', linewidth=.5)
+        ax.plot(x, discrepancy.slope_shap * x + discrepancy.intercept_shap,
+                color='blue', linewidth=.5)
+
+        # Plot the target and the regression
+        ax.scatter(x, y, alpha=0.3, marker='+', label="target")
+        # ax.plot(x, m_parent*x+b_parent, color='red', linewidth=.5)
+        ax.plot(x, discrepancy.slope_parent * x + discrepancy.intercept_parent,
+                color='red', linewidth=.5)
+
+        ax.set_title(
+            f"corr:{discrepancy.correlation:.2f}, $m_S:${discrepancy.slope_shap:.2f}, $m_y:${discrepancy.slope_parent:.2f}",
+            fontsize=8)
+
+        ax.set_yticks([])
+        ax.set_xticks([])
+        ax.spines['right'].set_visible(False)
+        ax.spines['top'].set_visible(False)
+        ax.set_xlabel(discrepancy.parent)
+        ax.legend(loc='best', fontsize=8)
 
 
 if __name__ == "__main__":

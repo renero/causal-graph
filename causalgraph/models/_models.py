@@ -12,7 +12,7 @@ from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import TQDMProgressBar, EarlyStopping
 from pytorch_lightning.loggers import TensorBoardLogger
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
+# from sklearn.preprocessing import StandardScaler
 from torch.utils.data import DataLoader
 
 from ._base_models import MLP
@@ -117,17 +117,17 @@ class BaseModel(object):
             self.callbacks.append(bar)
 
     def init_data(self):
-        self.scaler = StandardScaler()
-        df_scaled = pd.DataFrame(self.scaler.fit_transform(self.dataframe),
-                                 columns=self.dataframe.columns)
+        # self.scaler = StandardScaler()
+        # df_scaled = pd.DataFrame(self.scaler.fit_transform(self.dataframe),
+        #                          columns=self.dataframe.columns)
 
-        self.all_columns = list(df_scaled)
-        self.columns = list(df_scaled)
+        self.all_columns = list(self.dataframe)
+        self.columns = list(self.dataframe)
         self.columns.remove(self.target)
         self.columns.append("Noise")
 
         # Compute the sizes of the splits to have round batch sizes on both.
-        self.n_rows = df_scaled.shape[0]
+        self.n_rows = self.dataframe.shape[0]
         train_split_size = np.floor((1-self.test_size) * self.n_rows)
         val_split_size = np.floor(self.test_size * self.n_rows)
         if self.batch_size > val_split_size:
@@ -135,7 +135,7 @@ class BaseModel(object):
         reminder = val_split_size % self.batch_size
         val_split_size = int(val_split_size - reminder)
         train_split_size = int(self.n_rows - val_split_size)
-        train_df, test_df = train_test_split(df_scaled,
+        train_df, test_df = train_test_split(self.dataframe,
                                              train_size=train_split_size,
                                              test_size=val_split_size,
                                              shuffle=True,
