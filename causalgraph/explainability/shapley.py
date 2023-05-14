@@ -1,45 +1,64 @@
 """
 This is a module to be used as a reference for building other modules
 """
+import math
+import types
+import warnings
 from dataclasses import dataclass
 from typing import List, Union
-import warnings
-from matplotlib import pyplot as plt
-import matplotlib
 
+import matplotlib
 import networkx as nx
 import numpy as np
 import pandas as pd
 import shap
-from sklearn.discriminant_analysis import StandardScaler
-from sklearn.linear_model import HuberRegressor
 import statsmodels.api as sm
+import statsmodels.stats.api as sms
 import torch
+from matplotlib import pyplot as plt
 from matplotlib.ticker import FormatStrFormatter
-from scipy.stats import spearmanr
+from scipy.stats import kstest, spearmanr
 from sklearn.base import BaseEstimator
+from sklearn.discriminant_analysis import StandardScaler
+from sklearn.isotonic import spearmanr
 from sklearn.utils.validation import check_is_fitted
 from tqdm.auto import tqdm
 
 from causalgraph.common import *
+from causalgraph.common.utils import graph_from_dot_file, load_experiment
 from causalgraph.independence.edge_orientation import get_edge_orientation
 from causalgraph.independence.feature_selection import select_features
 from causalgraph.models.dnn import NNRegressor
-from causalgraph.common.utils import graph_from_dot_file, load_experiment
 
 AnyGraph = Union[nx.DiGraph, nx.Graph]
+K = 180.0 / math.pi
 
+
+# @dataclass
+# class ShapDiscrepancy:
+#     target: str
+#     parent: str
+#     shap_discrepancy: float
+#     intercept_shap: float
+#     slope_shap: float
+#     intercept_parent: float
+#     slope_parent: float
+#     correlation: float
 
 @dataclass
 class ShapDiscrepancy:
     target: str
     parent: str
+    shap_heteroskedasticity: bool
+    parent_heteroskedasticity: bool
+    shap_p_value: float
+    parent_p_value: float
+    shap_model: sm.regression.linear_model.RegressionResultsWrapper
+    parent_model: sm.regression.linear_model.RegressionResultsWrapper
     shap_discrepancy: float
-    intercept_shap: float
-    slope_shap: float
-    intercept_parent: float
-    slope_parent: float
-    correlation: float
+    shap_correlation: float
+    ks_pvalue: float
+    ks_result: str
 
 
 class ShapEstimator(BaseEstimator):
@@ -75,6 +94,28 @@ class ShapEstimator(BaseEstimator):
 
         self._fit_desc = "Running SHAP explainer"
         self._pred_desc = "Building graph skeleton"
+
+    def __repr__(self):
+        forbidden_attrs = ['fit', 'predict',
+                           'score', 'get_params', 'set_params']
+        ret = f"{GREEN}REX object attributes{RESET}\n"
+        ret += f"{GRAY}{'-'*80}{RESET}\n"
+        for attr in dir(self):
+            if attr.startswith('_') or attr in forbidden_attrs or type(getattr(self, attr)) == types.MethodType:
+                continue
+            elif attr == "X" or attr == "y":
+                if isinstance(getattr(self, attr), pd.DataFrame):
+                    ret += f"{attr:25} {getattr(self, attr).shape}\n"
+                    continue
+                elif isinstance(getattr(self, attr), nx.DiGraph):
+                    n_nodes = getattr(self, attr).number_of_nodes()
+                    n_edges = getattr(self, attr).number_of_edges()
+                    ret += f"{attr:25} {n_nodes} nodes, {n_edges} edges\n"
+                    continue
+            else:
+                ret += f"{attr:25} {getattr(self, attr)}\n"
+
+        return ret
 
     def fit(self, X, y=None):
         """
@@ -122,7 +163,7 @@ class ShapEstimator(BaseEstimator):
         pbar = tqdm(total=4,
                     **tqdm_params("Building graph from SHAPs", self.prog_bar))
 
-        self._compute_shap_discrepancies(X)
+        self._compute_discrepancies(X)
 
         pbar.update(1)
         pbar.refresh()
@@ -188,7 +229,7 @@ class ShapEstimator(BaseEstimator):
             graph, increase_tolerance, sd_upper)
         return new_graph
 
-    def _compute_shap_discrepancies(self, X: pd.DataFrame):
+    def _compute_discrepancies(self, X: pd.DataFrame):
         """
         Compute the discrepancies between the SHAP values and the target values
         for all features and all targets.
@@ -208,91 +249,39 @@ class ShapEstimator(BaseEstimator):
         for target_name in tqdm(
                 self.all_feature_names_,
                 **tqdm_params("Computing Shap discrepancies", self.prog_bar)):
-            y = X[target_name]
+
             X_features = X.drop(target_name, axis=1)
+            y = X[target_name].values
+
             feature_names = [
                 f for f in self.all_feature_names_ if f != target_name]
+
             self.discrepancies.loc[target_name] = 0
             self.shap_discrepancies[target_name] = dict()
 
             # Loop through all features and compute the discrepancy
-            for feature_name in feature_names:
-                discrepancy = self._compute_shap_alignment(
-                    X_features[feature_name].values,
-                    y.values,
-                    self.shap_values_norm[target_name],
-                    target_name,
-                    feature_name,
-                    feature_names)
-                self.discrepancies.loc[target_name,
-                                       feature_name] = discrepancy.shap_discrepancy
-                self.shap_discrepancies[target_name][feature_name] = discrepancy
+            for parent_name in feature_names:
+                # Take the data that is needed at this iteration
+                parent_data = X_features[parent_name].values
+                parent_pos = feature_names.index(parent_name)
+                shap_data = self.shap_values_norm[target_name][:, parent_pos]
+
+                # Form three vectors to compute the discrepancy
+                x = parent_data.reshape(-1, 1)
+                s = shap_data.reshape(-1, 1)
+
+                # Compute the discrepancy
+                self.shap_discrepancies[target_name][parent_name] = \
+                    self._compute_discrepancy(
+                        x, y, s,
+                        target_name,
+                        parent_name)
+                SD = self.shap_discrepancies[target_name][parent_name]
+                self.discrepancies.loc[target_name, parent_name] = SD.shap_discrepancy
 
         return self.discrepancies
 
-    def _compute_shap_alignment(
-            self,
-            x,
-            y,
-            shap_values,
-            target_name,
-            feature_name,
-            feature_names):
-        """
-        Compute the alignment of the shap values for a given feature with the target
-        variable. This is done by computing the correlation between the shap values and
-        the target variable.
-
-        The discrepancy value is computed as: $1 - \\textrm{corr}(y, shap_values)$
-
-        I'm experimenting with the SHAP dependency plots. Given a target variable,
-        I plot the values of each feature against its SHAP values, and against the
-        target variable. In theory, both plots should regress to the same point, and
-        present the same slope. How similar are these slopes is what I called the
-        Discrepancy Ratio. For some predictions, it is extremely low, showing that
-        SHAP tendency actually reflects the actual influence of that feature in the
-        prediction of the target variable. For other features, though, it is high,
-        showing that the SHAP values obtained for that specific feature do not
-        correspond to the actual relationship with the target.
-
-        In this way, you can see which features are actually playing a role in the
-        prediction, and which are not. This can help you better understand the causal
-        relationships between features and the target variable.
-
-        Parameters
-        ----------
-        x : pd.DataFrame
-            The input data. This is a numpy array with the values of the feature
-            used to predict the target variable in the main model from which
-            the SHAP values were computed.
-        shap_values : pd.DataFrame
-            The SHAP values for the feature used to predict the target variable in
-            the main model from which the SHAP values were computed.
-        y : pd.DataFrame
-            The target variable. This is a numpy array with the values of the target
-            variable in the main model from which the SHAP values were computed.
-        target_name : str
-            The name of the target variable in the main model from which the SHAP
-            values were computed.
-        feature : str
-            The name of the feature used to predict the target variable in the
-            main model from which the SHAP values were computed.
-        feature_names : list
-            The names of the features used to predict the target variable in the
-            main model from which the SHAP values were computed.
-        ax : matplotlib.axes._subplots.AxesSubplot, optional
-            The axis to plot the alignment on, by default None
-        plot : bool, optional
-            Whether to plot the alignment, by default False
-
-        Returns
-        -------
-        dict{float, float, float}
-            A dictionary with the discrepancy, the slope of the SHAP values
-            regression and the slope of the regression of the target variable
-            on the feature.
-
-        """
+    def _compute_discrepancy(self, x, y, s, target_name, parent_name) -> ShapDiscrepancy:
         if isinstance(x, pd.Series) or isinstance(x, pd.DataFrame):
             x = x.values
         elif not isinstance(x, np.ndarray):
@@ -302,54 +291,161 @@ class ShapEstimator(BaseEstimator):
         elif not isinstance(y, np.ndarray):
             y = np.array(y)
 
-        feature_pos = feature_names.index(feature_name)
+        X = sm.add_constant(x)
+        model_y = sm.OLS(y, X).fit()
+        model_s = sm.OLS(s, X).fit()
 
-        x = x.reshape(-1, 1)
-        y = y.reshape(-1, 1)
-        phi = shap_values[:, feature_pos].reshape(-1, 1)
+        # Heteroskedasticity tests:
+        # The null hypothesis (H0): Signifies that Homoscedasticity is present
+        # The alternative hypothesis (H1): Signifies that Heteroscedasticity is present
+        # If the p-value is less than the significance level (0.05), we reject the
+        # null hypothesis and conclude that heteroscedasticity is present.
+        test_shap = sms.het_breuschpagan(model_s.resid, X)
+        shap_heteroskedasticity = test_shap[1] > 0.05
 
-        # Compute the robust regression to the shap values
-        b_shap, m_shap = self._regress(x, phi)
-        b_parent, m_parent = self._regress(x, y)
-        corr = spearmanr(phi, y)
-        discrepancy = 1 - corr.correlation
+        test_parent = sms.het_breuschpagan(model_y.resid, X)
+        parent_heteroskedasticity = test_parent[1] > 0.05
 
-        result = ShapDiscrepancy(
+        corr = spearmanr(s, y)
+        discrepancy = 1 - np.abs(corr.correlation)
+        # The p-value is below 5%: we reject the null hypothesis that the two
+        # distributions are the same, with 95% confidence.
+        _, ks_pvalue = kstest(s[:, 0], y)
+
+        return ShapDiscrepancy(
             target=target_name,
-            parent=feature_name,
+            parent=parent_name,
+            shap_heteroskedasticity=shap_heteroskedasticity,
+            parent_heteroskedasticity=parent_heteroskedasticity,
+            shap_p_value=test_shap[1],
+            parent_p_value=test_parent[1],
+            shap_model=model_s,
+            parent_model=model_y,
             shap_discrepancy=discrepancy,
-            intercept_shap=b_shap,
-            slope_shap=m_shap,
-            intercept_parent=b_parent,
-            slope_parent=m_parent,
-            correlation=corr.correlation
+            shap_correlation=corr.correlation,
+            ks_pvalue=ks_pvalue,
+            ks_result="Equal" if ks_pvalue > 0.05 else "Different"
         )
 
-        return result
+    # def _compute_shap_alignment(
+    #         self,
+    #         x,
+    #         y,
+    #         shap_values,
+    #         target_name,
+    #         feature_name,
+    #         feature_names):
+    #     """
+    #     Compute the alignment of the shap values for a given feature with the target
+    #     variable. This is done by computing the correlation between the shap values and
+    #     the target variable.
 
-    def _regress(self, x: np.array, y: np.array):
-        """Fit a linear regression on x and y.
+    #     The discrepancy value is computed as: $1 - \\textrm{corr}(y, shap_values)$
 
-        Parameters
-        ----------
-        x : array
-            x-coordinates of the data points.
-        y : array
-            y-coordinates of the data points.
+    #     I'm experimenting with the SHAP dependency plots. Given a target variable,
+    #     I plot the values of each feature against its SHAP values, and against the
+    #     target variable. In theory, both plots should regress to the same point, and
+    #     present the same slope. How similar are these slopes is what I called the
+    #     Discrepancy Ratio. For some predictions, it is extremely low, showing that
+    #     SHAP tendency actually reflects the actual influence of that feature in the
+    #     prediction of the target variable. For other features, though, it is high,
+    #     showing that the SHAP values obtained for that specific feature do not
+    #     correspond to the actual relationship with the target.
 
-        Returns
-        -------
-        intercept : float
-            The y-intercept of the fitted line.
-        slope : float
-            The slope of the fitted line.
-        """
-        # reg = sm.OLS(y, sm.add_constant(x)).fit()
-        # b, m = reg.params[0], reg.params[1]
-        # return b, m
-        reg = HuberRegressor().fit(x, y)
-        b, m = reg.intercept_, reg.coef_[0]
-        return b, m
+    #     In this way, you can see which features are actually playing a role in the
+    #     prediction, and which are not. This can help you better understand the causal
+    #     relationships between features and the target variable.
+
+    #     Parameters
+    #     ----------
+    #     x : pd.DataFrame
+    #         The input data. This is a numpy array with the values of the feature
+    #         used to predict the target variable in the main model from which
+    #         the SHAP values were computed.
+    #     shap_values : pd.DataFrame
+    #         The SHAP values for the feature used to predict the target variable in
+    #         the main model from which the SHAP values were computed.
+    #     y : pd.DataFrame
+    #         The target variable. This is a numpy array with the values of the target
+    #         variable in the main model from which the SHAP values were computed.
+    #     target_name : str
+    #         The name of the target variable in the main model from which the SHAP
+    #         values were computed.
+    #     feature : str
+    #         The name of the feature used to predict the target variable in the
+    #         main model from which the SHAP values were computed.
+    #     feature_names : list
+    #         The names of the features used to predict the target variable in the
+    #         main model from which the SHAP values were computed.
+    #     ax : matplotlib.axes._subplots.AxesSubplot, optional
+    #         The axis to plot the alignment on, by default None
+    #     plot : bool, optional
+    #         Whether to plot the alignment, by default False
+
+    #     Returns
+    #     -------
+    #     dict{float, float, float}
+    #         A dictionary with the discrepancy, the slope of the SHAP values
+    #         regression and the slope of the regression of the target variable
+    #         on the feature.
+
+    #     """
+    #     if isinstance(x, pd.Series) or isinstance(x, pd.DataFrame):
+    #         x = x.values
+    #     elif not isinstance(x, np.ndarray):
+    #         x = np.array(x)
+    #     if isinstance(y, pd.Series) or isinstance(y, pd.DataFrame):
+    #         y = y.values
+    #     elif not isinstance(y, np.ndarray):
+    #         y = np.array(y)
+
+    #     feature_pos = feature_names.index(feature_name)
+
+    #     x = x.reshape(-1, 1)
+    #     y = y.reshape(-1, 1)
+    #     phi = shap_values[:, feature_pos].reshape(-1, 1)
+
+    #     # Compute the robust regression to the shap values
+    #     b_shap, m_shap = self._regress(x, phi)
+    #     b_parent, m_parent = self._regress(x, y)
+    #     corr = spearmanr(phi, y)
+    #     discrepancy = 1 - corr.correlation
+
+    #     result = ShapDiscrepancy(
+    #         target=target_name,
+    #         parent=feature_name,
+    #         shap_discrepancy=discrepancy,
+    #         intercept_shap=b_shap,
+    #         slope_shap=m_shap,
+    #         intercept_parent=b_parent,
+    #         slope_parent=m_parent,
+    #         correlation=corr.correlation
+    #     )
+    #     return result
+
+    # def _regress(self, x: np.array, y: np.array):
+    #     """Fit a linear regression on x and y.
+
+    #     Parameters
+    #     ----------
+    #     x : array
+    #         x-coordinates of the data points.
+    #     y : array
+    #         y-coordinates of the data points.
+
+    #     Returns
+    #     -------
+    #     intercept : float
+    #         The y-intercept of the fitted line.
+    #     slope : float
+    #         The slope of the fitted line.
+    #     """
+    #     # reg = sm.OLS(y, sm.add_constant(x)).fit()
+    #     # b, m = reg.params[0], reg.params[1]
+    #     # return b, m
+    #     reg = HuberRegressor().fit(x, y)
+    #     b, m = reg.intercept_, reg.coef_[0]
+    #     return b, m
 
     def _adjust_edges_from_shap_discrepancies(
             self,
@@ -603,87 +699,156 @@ class ShapEstimator(BaseEstimator):
         fig = ax.figure if fig is None else fig
         return fig
 
-    def _plot_discrepancies_for_target(
-            self,
-            X: np.ndarray,
-            y: np.ndarray,
-            target_name: str,
-            **kwargs) -> None:
-        """
-        Plot the discrepancies for a target. This method extracts data from the pipeline
-        computes the shap values again, and plot them, showing the correlation and the 
-        slopes of the regression lines for SHAP values and target values.
+    def _plot_discrepancies(self, X: pd.DataFrame, target_name:str, **kwargs):
+        figsize_ = kwargs.get('figsize', (10, 16))
+        feature_names = [
+                f for f in self.all_feature_names_ if f != target_name]
+        fig, ax = plt.subplots(len(feature_names), 4, figsize=figsize_)
 
-        Parameters
-        ----------
-        X : np.ndarray
-            All the features except the target in a numpy array.
-        y : np.ndarray
-            The target values in a numpy array.
-        target_name : str
-            The name of the target to compute the discrepancies for.
+        for i, parent_name in enumerate(feature_names):
+            r = self.shap_discrepancies[target_name][parent_name]
+            x = X[parent_name].values.reshape(-1, 1)
+            y = X[target_name].values.reshape(-1, 1)
+            parent_pos = feature_names.index(parent_name)
+            s = self.shap_values_norm[target_name][:, parent_pos].reshape(-1, 1)
+            self._plot_discrepancy(x, y, s, parent_name, r, ax[i])
 
-        Returns
-        -------
-        None
-        """
-        # Setup plot
-        dpi_ = kwargs.get('dpi', 100)
-        figsize_ = kwargs.get('figsize', (10, 10))
-        num_columns = kwargs.get('num_columns', 3)
-        num_rows = int(np.ceil(10 / num_columns))
-
-        _, ax = plt.subplots(num_rows, num_columns, figsize=figsize_, dpi=dpi_)
-
-        # Setup data
-        feature_names = list(self.all_feature_names_)
-        feature_names.remove(target_name)
-
-        for idx, feature in enumerate(feature_names):
-            row, col = idx//num_columns, idx % num_columns
-            self._plot_discrepancy(X[:, idx], y, 
-                                   self.shap_values_norm[target_name][:, idx],
-                                   self.shap_discrepancies[target_name][feature], 
-                                   ax=ax[row, col])
-
-        # Remove empty plots
-        for idx in range(len(feature_names), 12):
-            row, col = idx//num_columns, idx % num_columns
-            ax[row, col].set_visible(False)
-
-        plt.suptitle(f"Discrepancies for {target_name}")
         plt.tight_layout()
-        plt.show()
+        fig.show()
 
-    def _plot_discrepancy(
-            self,
-            x: np.ndarray,
-            y: np.ndarray,
-            phi: np.ndarray,
-            discrepancy: ShapDiscrepancy,
-            ax: matplotlib.axes.Axes):
-        """
-        """
-        # Plot the SHAP values and the regression
-        ax.scatter(x, phi, alpha=0.3, marker='.', label="$\phi$")
-        ax.plot(x, discrepancy.slope_shap * x + discrepancy.intercept_shap,
-                color='blue', linewidth=.5)
+    def _plot_discrepancy(self, x, y, s, parent_name, r, ax):
+        def _remove_ticks_and_box(ax):
+            ax.set_xticks([])
+            ax.set_xticklabels([])
+            ax.set_yticks([])
+            ax.set_yticklabels([])
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+            ax.spines['left'].set_visible(False)
 
-        # Plot the target and the regression
-        ax.scatter(x, y, alpha=0.3, marker='+', label="target")
-        ax.plot(x, discrepancy.slope_parent * x + discrepancy.intercept_parent,
-                color='red', linewidth=.5)
+        b0_s, b1_s = r.shap_model.params[0], r.shap_model.params[1]
+        b0_y, b1_y = r.parent_model.params[0], r.parent_model.params[1]
+        shap_label = "heterosked" if r.shap_heteroskedasticity else "homosked"
+        parent_label = "heterosked" if r.parent_heteroskedasticity else "homosked"
 
-        ax.set_title(
-            f"corr:{discrepancy.correlation:.2f}, $m_S:${discrepancy.slope_shap:.2f}, $m_y:${discrepancy.slope_parent:.2f}",
-            fontsize=8)
+        # Represent scatter plots
+        ax[0].scatter(x, s, alpha=0.5, marker='.')
+        ax[0].scatter(x, y, alpha=0.4, marker='.')
+        ax[0].plot(x, b1_s * x + b0_s, color='blue', linewidth=.5)
+        ax[0].plot(x, b1_y * x + b0_y, color='red', linewidth=.5)
+        ax[0].set_title(f'$m_s$={math.atan(b1_s)*K:.2f} - $m_y$={math.atan(b1_y)*K:.2f}',
+                        fontsize=11)
 
-        ax.set_yticks([])
-        ax.set_xticks([])
-        ax.spines['right'].set_visible(False)
-        ax.spines['top'].set_visible(False)
-        ax.set_xlabel(discrepancy.parent)
-        ax.legend(loc='best', fontsize=8)
+        # Represent distributions
+        pd.DataFrame(s).plot(kind='density', ax=ax[1], label="shap")
+        pd.DataFrame(y).plot(kind='density', ax=ax[1], label="parent")
+        ax[1].legend().set_visible(False)
+        ax[1].set_ylabel('')
+        ax[1].set_title(f'KS({r.ks_pvalue:.2f}) - {r.ks_result}', fontsize=11)
+
+        # Represent fitted vs. residuals
+        s_resid = r.shap_model.get_influence().resid_studentized_internal
+        y_resid = r.parent_model.get_influence().resid_studentized_internal
+        scaler = StandardScaler()
+        s_fitted_scaled = scaler.fit_transform(r.shap_model.fittedvalues.reshape(-1, 1))
+        y_fitted_scaled = scaler.fit_transform(r.parent_model.fittedvalues.reshape(-1, 1))
+        ax[2].scatter(s_fitted_scaled, s_resid, alpha=0.5, marker='.')
+        ax[2].scatter(y_fitted_scaled, y_resid, alpha=0.4, 
+                    marker='.', color='tab:orange')
+        ax[2].set_title(f"Shap {shap_label} - Parent {parent_label}", fontsize=11)
+        
+        # Represent target vs. SHAP values
+        ax[3].scatter(s, y, alpha=0.3, marker='.', color='tab:grey')
+        ax[3].set_title(f"Corr: {r.shap_correlation:.2f}", fontsize=11)
+
+        for ax_idx in range(4):
+            ax[ax_idx].set_xlabel(parent_name)
+            _remove_ticks_and_box(ax[ax_idx])
+
+
+    
+    # def _plot_discrepancies_for_target(
+    #         self,
+    #         X: np.ndarray,
+    #         y: np.ndarray,
+    #         target_name: str,
+    #         **kwargs) -> None:
+    #     """
+    #     Plot the discrepancies for a target. This method extracts data from the pipeline
+    #     computes the shap values again, and plot them, showing the correlation and the 
+    #     slopes of the regression lines for SHAP values and target values.
+
+    #     Parameters
+    #     ----------
+    #     X : np.ndarray
+    #         All the features except the target in a numpy array.
+    #     y : np.ndarray
+    #         The target values in a numpy array.
+    #     target_name : str
+    #         The name of the target to compute the discrepancies for.
+
+    #     Returns
+    #     -------
+    #     None
+    #     """
+    #     # Setup plot
+    #     dpi_ = kwargs.get('dpi', 100)
+    #     figsize_ = kwargs.get('figsize', (10, 10))
+    #     num_columns = kwargs.get('num_columns', 3)
+    #     num_rows = int(np.ceil(10 / num_columns))
+
+    #     _, ax = plt.subplots(num_rows, num_columns, figsize=figsize_, dpi=dpi_)
+
+    #     # Setup data
+    #     feature_names = list(self.all_feature_names_)
+    #     feature_names.remove(target_name)
+
+    #     for idx, feature in enumerate(feature_names):
+    #         row, col = idx//num_columns, idx % num_columns
+    #         self._plot_discrepancy(X[:, idx], y,
+    #                                self.shap_values_norm[target_name][:, idx],
+    #                                self.shap_discrepancies[target_name][feature],
+    #                                ax=ax[row, col])
+
+    #     # Remove empty plots
+    #     for idx in range(len(feature_names), 12):
+    #         row, col = idx//num_columns, idx % num_columns
+    #         ax[row, col].set_visible(False)
+
+    #     plt.suptitle(f"Discrepancies for {target_name}")
+    #     plt.tight_layout()
+    #     plt.show()
+
+    # def _plot_discrepancy(
+    #         self,
+    #         x: np.ndarray,
+    #         y: np.ndarray,
+    #         phi: np.ndarray,
+    #         discrepancy: ShapDiscrepancy,
+    #         ax: matplotlib.axes.Axes):
+    #     """
+    #     """
+    #     # Plot the SHAP values and the regression
+    #     ax.scatter(x, phi, alpha=0.3, marker='.', label="$\phi$")
+    #     ax.plot(x, discrepancy.slope_shap * x + discrepancy.intercept_shap,
+    #             color='blue', linewidth=.5)
+
+    #     # Plot the target and the regression
+    #     ax.scatter(x, y, alpha=0.3, marker='+', label="target")
+    #     ax.plot(x, discrepancy.slope_parent * x + discrepancy.intercept_parent,
+    #             color='red', linewidth=.5)
+
+    #     ax.set_title(
+    #         f"corr:{discrepancy.correlation:.2f}, $m_S:${discrepancy.slope_shap:.2f}, \
+    # $m_y:${discrepancy.slope_parent:.2f}",
+    #         fontsize=8)
+
+    #     ax.set_yticks([])
+    #     ax.set_xticks([])
+    #     ax.spines['right'].set_visible(False)
+    #     ax.spines['top'].set_visible(False)
+    #     ax.set_xlabel(discrepancy.parent)
+    #     ax.legend(loc='best', fontsize=8)
 
 
 if __name__ == "__main__":

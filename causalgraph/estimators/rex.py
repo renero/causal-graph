@@ -1,5 +1,6 @@
 from copy import copy
 from pathlib import Path
+import types
 from typing import Any, List, Tuple, Union
 import warnings
 import os
@@ -307,13 +308,13 @@ class Rex(BaseEstimator, ClassifierMixin):
         ret = f"{GREEN}REX object attributes{RESET}\n"
         ret += f"{GRAY}{'-'*80}{RESET}\n"
         for attr in dir(self):
-            if attr.startswith('_') or attr in forbidden_attrs:
+            if attr.startswith('_') or attr in forbidden_attrs or type(getattr(self, attr)) == types.MethodType:
                 continue
             elif attr == "X" or attr == "y":
-                if isinstance(attr, pd.DataFrame):
+                if isinstance(getattr(self, attr), pd.DataFrame):
                     ret += f"{attr:25} {getattr(self, attr).shape}\n"
                     continue
-                elif isinstance(attr, nx.DiGraph):
+                elif isinstance(getattr(self, attr), nx.DiGraph):
                     n_nodes = getattr(self, attr).number_of_nodes()
                     n_edges = getattr(self, attr).number_of_edges()
                     ret += f"{attr:25} {n_nodes} nodes, {n_edges} edges\n"
@@ -325,9 +326,10 @@ class Rex(BaseEstimator, ClassifierMixin):
 
     def plot_shap_discrepancies(self, target_name:str, **kwargs):
         assert self.is_fitted_, "Model not fitted yet"
-        X = self.X.drop(target_name, axis=1).values
-        y = self.X[target_name].values
-        return self.shaps._plot_discrepancies_for_target(X, y, target_name, **kwargs)
+        # X = self.X.drop(target_name, axis=1)
+        # y = self.X[target_name].values
+        # return self.shaps._plot_discrepancies_for_target(X, y, target_name, **kwargs)
+        self.shaps._plot_discrepancies(self.X, target_name, **kwargs)
 
     def plot_shap_values(self, **kwargs):
         assert self.is_fitted_, "Model not fitted yet"
@@ -355,7 +357,7 @@ if __name__ == "__main__":
     # rex.verbose = True
 
     pred_graph = rex.predict(data)
-    rex.plot_shap_discrepancies('V6', figsize=(7,6), num_columns=4)
+    rex.plot_shap_discrepancies('V6')
 
     # Plot the SHAP values for each regression
     plot_args = [(target_name) for target_name in rex.shaps.all_feature_names_]
