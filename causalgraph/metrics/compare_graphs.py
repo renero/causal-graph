@@ -97,7 +97,7 @@ class Metrics:
         s = ""
         s += f"Predicted    1     0      Precision: {self.precision:.3g}\n"
         s += f"Actual     -----------    Recall...: {self.recall:.3g}\n"
-        s += f"  1       |{self.Tp:^5d} {self.Fn:^5d}|   F1.......: {self.recall:.3g}\n"
+        s += f"  1       |{self.Tp:^5d} {self.Fn:^5d}|   F1.......: {self.f1:.3g}\n"
         s += f"  0       |{self.Fp:^5d} {self.Tn:^5d}|   AuPR.....: {self.aupr:.3g}\n"
         s += f"           -----------    SHD......: {self.shd:.3g}\n"
         if self.sid_upper == self.sid_lower:

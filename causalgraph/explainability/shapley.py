@@ -713,7 +713,8 @@ class ShapEstimator(BaseEstimator):
             s = self.shap_values_norm[target_name][:, parent_pos].reshape(-1, 1)
             self._plot_discrepancy(x, y, s, parent_name, r, ax[i])
 
-        plt.tight_layout()
+        plt.suptitle(f"Discrepancies for {target_name}")
+        plt.tight_layout(rect=[0, 0.0, 1, 0.97])
         fig.show()
 
     def _plot_discrepancy(self, x, y, s, parent_name, r, ax):
@@ -728,15 +729,15 @@ class ShapEstimator(BaseEstimator):
 
         b0_s, b1_s = r.shap_model.params[0], r.shap_model.params[1]
         b0_y, b1_y = r.parent_model.params[0], r.parent_model.params[1]
-        shap_label = "heterosked" if r.shap_heteroskedasticity else "homosked"
-        parent_label = "heterosked" if r.parent_heteroskedasticity else "homosked"
+        shap_label = "HET" if r.shap_heteroskedasticity else "HOM"
+        parent_label = "HET" if r.parent_heteroskedasticity else "HOM"
 
         # Represent scatter plots
         ax[0].scatter(x, s, alpha=0.5, marker='.')
         ax[0].scatter(x, y, alpha=0.4, marker='.')
         ax[0].plot(x, b1_s * x + b0_s, color='blue', linewidth=.5)
         ax[0].plot(x, b1_y * x + b0_y, color='red', linewidth=.5)
-        ax[0].set_title(f'$m_s$={math.atan(b1_s)*K:.2f} - $m_y$={math.atan(b1_y)*K:.2f}',
+        ax[0].set_title(f'$m_s$:{math.atan(b1_s)*K:.1f}°; $m_y$:{math.atan(b1_y)*K:.1f}°',
                         fontsize=11)
 
         # Represent distributions
@@ -744,7 +745,7 @@ class ShapEstimator(BaseEstimator):
         pd.DataFrame(y).plot(kind='density', ax=ax[1], label="parent")
         ax[1].legend().set_visible(False)
         ax[1].set_ylabel('')
-        ax[1].set_title(f'KS({r.ks_pvalue:.2f}) - {r.ks_result}', fontsize=11)
+        ax[1].set_title(f'KS({r.ks_pvalue:.2g}) - {r.ks_result}', fontsize=11)
 
         # Represent fitted vs. residuals
         s_resid = r.shap_model.get_influence().resid_studentized_internal
@@ -755,7 +756,7 @@ class ShapEstimator(BaseEstimator):
         ax[2].scatter(s_fitted_scaled, s_resid, alpha=0.5, marker='.')
         ax[2].scatter(y_fitted_scaled, y_resid, alpha=0.4, 
                     marker='.', color='tab:orange')
-        ax[2].set_title(f"Shap {shap_label} - Parent {parent_label}", fontsize=11)
+        ax[2].set_title(f"Shap {shap_label}; Parent {parent_label}", fontsize=11)
         
         # Represent target vs. SHAP values
         ax[3].scatter(s, y, alpha=0.3, marker='.', color='tab:grey')
