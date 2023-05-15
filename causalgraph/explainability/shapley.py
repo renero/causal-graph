@@ -113,27 +113,39 @@ class ShapEstimator(BaseEstimator):
 
         self.all_feature_names_ = list(self.models.regressor.keys())
         self.shap_values = dict()
-        self.shap_values_norm = dict()
+        self.shap_scaled_values = dict()
+        self.shap_mean_values = dict()
+        self.feature_order = dict()
 
         pbar = tqdm(total=len(self.all_feature_names_),
                     **tqdm_params(self._fit_desc, self.prog_bar))
 
         for target_name in self.all_feature_names_:
             pbar.update(1)
+
+            # Get the model and the data (tensor form)
             model = self.models.regressor[target_name].model
             tensor_data = X.drop(target_name, axis=1).values
             tensor_data = torch.from_numpy(tensor_data).float()
 
+            # Move to GPU if available
             if self.on_gpu:
                 model = model.cuda()
                 tensor_data = tensor_data.cuda()
 
+            # Run the selected SHAP explainer
             explainer = shap.GradientExplainer(model, tensor_data)
-
             self.shap_values[target_name] = explainer.shap_values(tensor_data)
             scaler = StandardScaler()
-            self.shap_values_norm[target_name] = scaler.fit_transform(
+            self.shap_scaled_values[target_name] = scaler.fit_transform(
                 self.shap_values[target_name])
+
+            # Create the order list of features, in decreasing mean SHAP value
+            self.feature_order[target_name] = np.argsort(
+                np.sum(np.abs(self.shap_values[target_name]), axis=0))
+            self.shap_mean_values[target_name] = np.abs(
+                self.shap_values[target_name]).mean(0)
+
             pbar.refresh()
 
         pbar.close()
@@ -253,7 +265,7 @@ class ShapEstimator(BaseEstimator):
                 # Take the data that is needed at this iteration
                 parent_data = X_features[parent_name].values
                 parent_pos = feature_names.index(parent_name)
-                shap_data = self.shap_values_norm[target_name][:, parent_pos]
+                shap_data = self.shap_scaled_values[target_name][:, parent_pos]
 
                 # Form three vectors to compute the discrepancy
                 x = parent_data.reshape(-1, 1)
@@ -266,7 +278,8 @@ class ShapEstimator(BaseEstimator):
                         target_name,
                         parent_name)
                 SD = self.shap_discrepancies[target_name][parent_name]
-                self.discrepancies.loc[target_name, parent_name] = SD.shap_discrepancy
+                self.discrepancies.loc[target_name,
+                                       parent_name] = SD.shap_discrepancy
 
         return self.discrepancies
 
@@ -494,42 +507,14 @@ class ShapEstimator(BaseEstimator):
         if len(cycles) > 0 and self._nodes_in_cycles(cycles, feature, target):
             print(f"    ~~ Cycles: {cycles}")
 
-    def summary_plot(
+    def _plot_shap_summary(
             self,
+            # feature_names: List[str],
             target_name: str,
-            ax=None,
-            max_features_to_display: int = 20,
-            **kwargs):
-        """
-        This code has been extracted from the summary_plot in SHAP package
-        If you want to produce the original plot, simply type:
-
-        >>> shap.summary_plot(shap_values, plot_type='bar',
-                              feature_names=feature_names_no_target)
-
-        """
-        feature_order = np.argsort(
-            np.sum(np.abs(self.shap_values[target_name]), axis=0))
-        feature_inds = feature_order[:max_features_to_display]
-        mean_shap_values = np.abs(self.shap_values[target_name]).mean(0)
-
-        return self.plot_shap_summary(
-            [feat for feat in self.all_feature_names_ if feat != target_name],
-            target_name,
-            mean_shap_values,
-            feature_inds,
-            selected_features=[parent for parent in self.parents[target_name]],
-            ax=ax,
-            **kwargs)
-
-    def plot_shap_summary(
-            self,
-            feature_names: List[str],
-            target_name: str,
-            mean_shap_values,
-            feature_inds,
-            selected_features,
+            # feature_inds,
+            # selected_features,
             ax,
+            max_features_to_display: int = 20,
             **kwargs):
         """
         Plots the summary of the SHAP values for a given target.
@@ -555,9 +540,13 @@ class ShapEstimator(BaseEstimator):
         if ax is None:
             fig, ax = plt.subplots(1, 1, figsize=figsize_)
 
+        feature_inds = self.feature_order[target_name][:max_features_to_display]
+        feature_names = [f for f in self.all_feature_names_ if f != target_name]
+        selected_features = [parent for parent in self.parents[target_name]]
+
         y_pos = np.arange(len(feature_inds))
         ax.grid(True, axis='x')
-        ax.barh(y_pos, mean_shap_values[feature_inds],
+        ax.barh(y_pos, self.shap_mean_values[target_name][feature_inds],
                 0.7, align='center', color="#0e73fa", alpha=0.8)
         ax.xaxis.set_major_formatter(FormatStrFormatter('%.3g'))
         ax.set_yticks(y_pos, [feature_names[i] for i in feature_inds])
@@ -568,10 +557,10 @@ class ShapEstimator(BaseEstimator):
         fig = ax.figure if fig is None else fig
         return fig
 
-    def _plot_discrepancies(self, X: pd.DataFrame, target_name:str, **kwargs):
+    def _plot_discrepancies(self, X: pd.DataFrame, target_name: str, **kwargs):
         figsize_ = kwargs.get('figsize', (10, 16))
         feature_names = [
-                f for f in self.all_feature_names_ if f != target_name]
+            f for f in self.all_feature_names_ if f != target_name]
         fig, ax = plt.subplots(len(feature_names), 4, figsize=figsize_)
 
         for i, parent_name in enumerate(feature_names):
@@ -579,7 +568,8 @@ class ShapEstimator(BaseEstimator):
             x = X[parent_name].values.reshape(-1, 1)
             y = X[target_name].values.reshape(-1, 1)
             parent_pos = feature_names.index(parent_name)
-            s = self.shap_values_norm[target_name][:, parent_pos].reshape(-1, 1)
+            s = self.shap_scaled_values[target_name][:,
+                                                     parent_pos].reshape(-1, 1)
             self._plot_discrepancy(x, y, s, parent_name, r, ax[i])
 
         plt.suptitle(f"Discrepancies for {target_name}")
@@ -620,13 +610,16 @@ class ShapEstimator(BaseEstimator):
         s_resid = r.shap_model.get_influence().resid_studentized_internal
         y_resid = r.parent_model.get_influence().resid_studentized_internal
         scaler = StandardScaler()
-        s_fitted_scaled = scaler.fit_transform(r.shap_model.fittedvalues.reshape(-1, 1))
-        y_fitted_scaled = scaler.fit_transform(r.parent_model.fittedvalues.reshape(-1, 1))
+        s_fitted_scaled = scaler.fit_transform(
+            r.shap_model.fittedvalues.reshape(-1, 1))
+        y_fitted_scaled = scaler.fit_transform(
+            r.parent_model.fittedvalues.reshape(-1, 1))
         ax[2].scatter(s_fitted_scaled, s_resid, alpha=0.5, marker='.')
-        ax[2].scatter(y_fitted_scaled, y_resid, alpha=0.4, 
-                    marker='.', color='tab:orange')
-        ax[2].set_title(f"Shap {shap_label}; Parent {parent_label}", fontsize=11)
-        
+        ax[2].scatter(y_fitted_scaled, y_resid, alpha=0.4,
+                      marker='.', color='tab:orange')
+        ax[2].set_title(
+            f"Shap {shap_label}; Parent {parent_label}", fontsize=11)
+
         # Represent target vs. SHAP values
         ax[3].scatter(s, y, alpha=0.3, marker='.', color='tab:grey')
         ax[3].set_title(f"Corr: {r.shap_correlation:.2f}", fontsize=11)

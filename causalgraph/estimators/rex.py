@@ -334,7 +334,7 @@ class Rex(BaseEstimator, ClassifierMixin):
     def plot_shap_values(self, **kwargs):
         assert self.is_fitted_, "Model not fitted yet"
         plot_args = [(target_name) for target_name in self.shaps.all_feature_names_]
-        return subplots(self.shaps.summary_plot, *plot_args, **kwargs);
+        return subplots(self.shaps._plot_shap_summary, *plot_args, **kwargs);
 
 
 if __name__ == "__main__":
