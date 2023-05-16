@@ -101,6 +101,8 @@ class ShapEstimator(BaseEstimator):
                     n_edges = getattr(self, attr).number_of_edges()
                     ret += f"{attr:25} {n_nodes} nodes, {n_edges} edges\n"
                     continue
+            elif isinstance(getattr(self, attr), pd.DataFrame):
+                ret += f"{attr:25} DataFrame {getattr(self, attr).shape}\n"
             else:
                 ret += f"{attr:25} {getattr(self, attr)}\n"
 
@@ -509,10 +511,7 @@ class ShapEstimator(BaseEstimator):
 
     def _plot_shap_summary(
             self,
-            # feature_names: List[str],
             target_name: str,
-            # feature_inds,
-            # selected_features,
             ax,
             max_features_to_display: int = 20,
             **kwargs):

@@ -12,6 +12,8 @@ import numpy as np
 from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.figure import Figure
 from matplotlib.ticker import FormatStrFormatter, MultipleLocator
+from pydot import Dot
+
 
 # Defaults for the graphs plotted
 formatting_kwargs = {"node_size": 1000,
@@ -284,3 +286,59 @@ def _cleanup_graph(G: nx.DiGraph) -> nx.DiGraph:
     if '\\n' in G.nodes:
         G.remove_node('\\n')
     return G
+
+
+def dag2dot(
+    G: nx.DiGraph,
+    undirected=False,
+    name: str = "my_dotgraph",
+    odots: bool = True,
+    **kwargs,
+) -> Dot:
+    """
+    Display a DOT of the graph in the notebook.
+
+    Args:
+        G (nx.Graph or DiGraph): the graph to be represented.
+        undirected (bool): default False, indicates whether the plot is forced
+            to contain no arrows.
+        plot (bool): default is True, this flag can be used to simply generate
+            the object but not plot, in case the object is needed to generate
+            a PNG version of the DOT, for instance.
+        name (str): the name to be embedded in the Dot object for this graph.
+        odots (bool): represent edges with biconnections with circles (odots). if
+            this is set to false, then the edge simply has no arrowheads.
+
+    Returns:
+        pydot.Dot object
+    """
+    if len(list(G.edges())) == 0:
+        return None
+    # Obtain the DOT version of the NX.DiGraph and visualize it.
+    if undirected:
+        G = G.to_undirected()
+        dot_object = nx.nx_pydot.to_pydot(G)
+    else:
+        # Make a dot Object with edges reflecting biconnections as non-connected edges
+        # or arrowheads as circles.
+        dot_str = "strict digraph" + name + "{\nconcentrate=true;\n"
+        for node in G.nodes():
+            dot_str += f"{node};\n"
+        if odots:
+            options = "[arrowhead=odot, arrowtail=odot, dir=both]"
+        else:
+            options = "[dir=none]"
+        for u, v in G.edges():
+            if G.has_edge(v, u):
+                dot_str += f"{u} -> {v} {options};\n"
+            else:
+                dot_str += f"{u} -> {v};\n"
+        dot_str += "}\n"
+        dot_object = pydotplus.graph_from_dot_data(dot_str)
+
+    # This is to display single arrows with two heads instead of two arrows with
+    # one head towards each direction.
+    dot_object.set_concentrate(True)
+    dot_object.del_node('"\\n"')
+
+    return dot_object
