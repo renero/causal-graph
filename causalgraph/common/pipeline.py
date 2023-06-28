@@ -58,9 +58,10 @@ class Pipeline:
     Pipeline is initialized with a host object that contains the parameters to be
     used in the execution steps.
     At each step, the pipeline can call either a function or a class. If a class
-    is called, the pipeline will call the fit method of the class. It it's a function,
-    it must be present globally or inside the host object.
-    The pipeline can also create an attribute in the host object with the value
+    is called, the pipeline will call the default method of the class. Such a default
+    method must be specified in the pipeline constructor.
+    If a function is called, it must be present globally or inside the host object.
+    The pipeline can also create an attribute inside the host object with the value
     returned by the function or the fit method of the class.
 
     Example:
@@ -145,7 +146,7 @@ class Pipeline:
 
     def run_step(self, step_name: Union[Any, str], list_of_params: List[Any] = []) -> Any:
         """
-        Run a step.
+        Run a step of the pipeline.
 
         Parameters
         ----------
@@ -295,8 +296,10 @@ class Pipeline:
 
 if __name__ == "__main__":
     host = Host('value1', 'value2')
-    pipeline = Pipeline(host)
+    pipeline = Pipeline(host, prog_bar=False, verbose=True)
     pipeline.set_default_object_method('fit')
+    print(f"Host object: {host}")
+    print(f"Pipeline initiated: {pipeline} default method: {pipeline._default_object_method}")
     steps = {
         ('myobject', SampleClass): ['param1', True],
         'myobject.method': [],
