@@ -2,12 +2,14 @@
 Pipeline class to define and run several execution steps.
 (C) J. Renero, 2023
 """
+import inspect
 import types
 from typing import Any, List, Union
 
 from tqdm.auto import tqdm
 
 from causalgraph.common import tqdm_params
+
 
 class SampleClass:
     def __init__(self, param1=None, param2=False):
@@ -113,7 +115,72 @@ class Pipeline:
         self._default_object_method = None
         self._default_method_params = None
 
-    def _get_params(self, param_names) -> List[Any]:
+    def _get_method_params(self, step_name):
+        """
+        Get the parameters of a method.
+
+        Parameters
+        ----------
+        step_name: str
+            Name of the method.
+
+        Returns
+        -------
+        list
+            List of parameters of the method.
+        """
+
+        # Check if step_name is a string or a tuple. In the later case the tuple can
+        # also include a return_value name and/or a dictionary with values.
+        if type(step_name) is tuple:
+            if len(step_name) == 3:
+                return_value, step_call, values = step_name
+            elif len(step_name) == 2 and type(step_name[1]) is dict:
+                step_call, values = step_name
+                return_value = None
+            elif len(step_name) == 2:
+                return_value, step_call = step_name
+                values = None
+            else:
+                raise ValueError(
+                    f"Tuple {step_name} must have 2 or 3 elements")
+        else:
+            step_call = step_name
+            return_value = None
+            values = None
+
+        # Check if step_name is a method within Host, a method or a function in globals
+        method = self._get_callable_method(step_call)
+        parameters = inspect.signature(method).parameters
+        method_params = list(parameters.keys())
+        # If method_params has 'self' as first parameter, remove it. Consider the case 
+        # where the only parameter is 'self'.
+        if len(method_params) > 0 and method_params[0] == 'self':
+            method_params.pop()
+
+        return return_value, step_call, method_params
+
+    def _get_callable_method(self, step_call):
+        """
+        Get the callable method from the host object or globals.
+        """
+        method = None
+        if type(step_call) is type:
+            method = getattr(step_call, self._default_object_method)
+        else:
+            if hasattr(self.host, step_call):
+                method = getattr(self.host, step_call)
+            elif hasattr(self, step_call):
+                method = getattr(self, step_call)
+            elif step_call in globals():
+                method = globals()[step_call]
+            else:
+                raise ValueError(
+                    f"Parameter {method} not found in host object or globals")
+                
+        return method
+
+    def _get_params(self, method, param_names) -> List[Any]:
         """
         Get the parameters from the host object.
 
@@ -130,12 +197,14 @@ class Pipeline:
         params = []
         for arg in param_names:
             if type(arg) is str:
-                if hasattr(self.host, arg):
-                    param = getattr(self.host, arg)
-                elif hasattr(self, arg):
-                    param = getattr(self, arg)
-                elif arg in globals():
-                    param = globals()[arg]
+                if hasattr(method, arg):
+                    param = getattr(method, arg)
+                # if hasattr(self.host, arg):
+                #     param = getattr(self.host, arg)
+                # elif hasattr(self, arg):
+                #     param = getattr(self, arg)
+                # elif arg in globals():
+                #     param = globals()[arg]
                 else:
                     raise ValueError(
                         f"Parameter {arg} not found in host object or globals")
@@ -223,7 +292,7 @@ class Pipeline:
         print("  > Return value:", return_value) if self._verbose else None
         return return_value
 
-    def run(self, steps: dict, desc: str = "Running pipeline"):
+    def run(self, steps: list, desc: str = "Running pipeline"):
         """
         Run the pipeline.
 
@@ -242,29 +311,39 @@ class Pipeline:
             function or class. Each parameter must be a string corresponding to
             an attribute of the host object or a value.
         """
-        self._pbar = tqdm(total=len(steps.keys()), 
+        self._pbar = tqdm(total=len(steps), 
                           **tqdm_params(desc, self._prog_bar, leave=False, position=0))
         self._pbar.update(0)
         print("-"*80) if self._verbose else None
 
-        for step_name in steps.keys():
-            step_params = steps[step_name]
+        for step_name in steps:
+            # step_params = steps[step_name]
+            vble_name, step_call, step_params = self._get_method_params(step_name)
+
             print(f"Running step {step_name} with params {step_params}") \
                 if self._verbose else None
-
-            if type(step_name) is tuple:
-                vble_name, step_call = step_name
-                # create an attribute of name `name`in `self` with the value
-                # returned by the function `run_step`
-                value = self.run_step(step_call, self._get_params(step_params))
+            
+            # step_params = self._get_params(step_call, step_params)
+            value = self.run_step(step_call, step_params)
+            if vble_name is not None:
                 setattr(self.host, vble_name, value)
                 print(f"      New attribute {vble_name}: {getattr(self.host, vble_name)}") \
                     if self._verbose else None
-            else:
-                self.run_step(step_name, self._get_params(step_params))
+
+            # if type(step_name) is tuple:
+            #     vble_name, step_call = step_name
+            #     # create an attribute of name `name`in `self` with the value
+            #     # returned by the function `run_step`
+            #     value = self.run_step(step_call, self._get_params(step_params))
+            #     setattr(self.host, vble_name, value)
+            #     print(f"      New attribute {vble_name}: {getattr(self.host, vble_name)}") \
+            #         if self._verbose else None
+            # else:
+            #     self.run_step(step_name, self._get_params(step_params))
                 
             print("-"*80) if self._verbose else None
             self._pbar_update(1)
+
         self._pbar.close()
 
     def _pbar_update(self, step=1):
@@ -300,13 +379,27 @@ if __name__ == "__main__":
     pipeline.set_default_object_method('fit')
     print(f"Host object: {host}")
     print(f"Pipeline initiated: {pipeline} default method: {pipeline._default_object_method}")
-    steps = {
-        ('myobject', SampleClass): ['param1', True],
-        'myobject.method': [],
-        'host_method': [],
-        'my_method': ['param1', 'param2'],
-        ('r1', 'm1'): ['m1_message'],
-        ('r2', 'm2'): ['r1']
-    }
+
+    # Old way
+    # steps = {
+    #     ('myobject', SampleClass): ['param1', True],
+    #     'myobject.method': [],
+    #     'host_method': [],
+    #     'my_method': ['param1', 'param2'],
+    #     ('r1', 'm1'): ['m1_message'],
+    #     ('r2', 'm2'): ['r1']
+    # }
+
+    steps = [
+        'host_method',
+        ('my_method'),
+        ('r1', 'm1'),
+        ('r2', 'm2'),
+        ('myobject1', SampleClass),
+        'myobject1.method'
+        # ('myobject2', SampleClass, {'param2': True}),
+        # 'myobject2.method'
+    ]
+
 
     pipeline.run(steps)
