@@ -150,7 +150,7 @@ class Pipeline:
             values = None
 
         # Check if step_name is a method within Host, a method or a function in globals
-        method = self._get_callable_method(step_call)
+        method = self._get_step_components(step_call)
         parameters = inspect.signature(method).parameters
         method_params = list(parameters.keys())
         # If method_params has 'self' as first parameter, remove it. Consider the case 
@@ -160,23 +160,49 @@ class Pipeline:
 
         return return_value, step_call, method_params
 
-    def _get_callable_method(self, step_call):
+    def _get_step_components(self, step_call):
         """
-        Get the callable method from the host object or globals.
+        Get the callable method from the host object or globals, the potential
+        return value name to be stored and the arguments to be used in the method.
+
+        Parameters
+        ----------
+        step_call: str
+            Name of the method.
+
+        Returns
+        ------- 
+        tuple
+            Tuple containing the return value name, the callable method and the
+            arguments to be used in the method.
+
+        TODO: Allow recursive resolution of nested objects, when the step_call
+        contains a dot (.) to access an object attribute.
         """
         method = None
+        # If the step call is a class, get the default method of the class.
         if type(step_call) is type:
-            method = getattr(step_call, self._default_object_method)
-        else:
-            if hasattr(self.host, step_call):
-                method = getattr(self.host, step_call)
-            elif hasattr(self, step_call):
-                method = getattr(self, step_call)
-            elif step_call in globals():
-                method = globals()[step_call]
+            return getattr(step_call, self._default_object_method)
+
+        if hasattr(self.host, step_call):
+            method = getattr(self.host, step_call)
+        elif hasattr(self, step_call):
+            method = getattr(self, step_call)
+        elif step_call in globals():
+            method = globals()[step_call]
+        # Check if 'step_call' contains a dot (.) and if so, try to get the
+        # method from the object after the dot.
+        elif '.' in step_call:
+            obj_name, method_name = step_call.split('.')
+            if hasattr(self.host, obj_name):
+                obj = getattr(self.host, obj_name)
+                method = getattr(obj, method_name)
             else:
                 raise ValueError(
-                    f"Parameter {method} not found in host object or globals")
+                    f"Object {obj_name} not found in host object")
+        else:
+            raise ValueError(
+                f"Parameter {step_call} not found in host object or globals")
                 
         return method
 
@@ -197,17 +223,10 @@ class Pipeline:
         params = []
         for arg in param_names:
             if type(arg) is str:
-                if hasattr(method, arg):
-                    param = getattr(method, arg)
-                # if hasattr(self.host, arg):
-                #     param = getattr(self.host, arg)
-                # elif hasattr(self, arg):
-                #     param = getattr(self, arg)
-                # elif arg in globals():
-                #     param = globals()[arg]
-                else:
+                if not hasattr(method, arg):
                     raise ValueError(
                         f"Parameter {arg} not found in host object or globals")
+                param = getattr(method, arg)
             else:
                 param = arg
             params.append(param)
@@ -317,11 +336,10 @@ class Pipeline:
         print("-"*80) if self._verbose else None
 
         for step_name in steps:
+            print(f"Running step {step_name}") if self._verbose else None
+
             # step_params = steps[step_name]
             vble_name, step_call, step_params = self._get_method_params(step_name)
-
-            print(f"Running step {step_name} with params {step_params}") \
-                if self._verbose else None
             
             # step_params = self._get_params(step_call, step_params)
             value = self.run_step(step_call, step_params)
@@ -329,17 +347,6 @@ class Pipeline:
                 setattr(self.host, vble_name, value)
                 print(f"      New attribute {vble_name}: {getattr(self.host, vble_name)}") \
                     if self._verbose else None
-
-            # if type(step_name) is tuple:
-            #     vble_name, step_call = step_name
-            #     # create an attribute of name `name`in `self` with the value
-            #     # returned by the function `run_step`
-            #     value = self.run_step(step_call, self._get_params(step_params))
-            #     setattr(self.host, vble_name, value)
-            #     print(f"      New attribute {vble_name}: {getattr(self.host, vble_name)}") \
-            #         if self._verbose else None
-            # else:
-            #     self.run_step(step_name, self._get_params(step_params))
                 
             print("-"*80) if self._verbose else None
             self._pbar_update(1)
