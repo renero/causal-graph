@@ -13,18 +13,19 @@ from causalgraph.common import tqdm_params
 
 class SampleClass:
     def __init__(self, param1=None, param2=False):
-        if param1 is not None:
-            self.param1 = param1
-            self.param2 = param2
+        self.param1 = param1
+        self.param2 = param2
+        print(f"    > Into the init of class {self.__class__}")
+        print(f"      > I got params: {self.param1}, {self.param2}")
 
     def fit(self):
-        # print(f"  Into the fit of class {self.__class__}")
-        # print(f"    I got params: {self.param1}, {self.param2}")
+        print(f"    > Into the fit of class {self.__class__}")
+        print(f"      > I got params: {self.param1}, {self.param2}")
         return self
 
     def method(self):
-        # print(f"  Into the method {self.method.__name__}")
-        return ("MyClass.method")
+        print(f"    > Into the method {self.method.__name__}")
+        return "MyClass.method"
 
 
 def my_method(param1, param2):
@@ -115,7 +116,7 @@ class Pipeline:
         self._default_object_method = None
         self._default_method_params = None
 
-    def _get_method_params(self, step_name):
+    def _get_step_components(self, step_name):
         """
         Get the parameters of a method.
 
@@ -140,17 +141,17 @@ class Pipeline:
                 return_value = None
             elif len(step_name) == 2:
                 return_value, step_call = step_name
-                values = None
+                values = []
             else:
                 raise ValueError(
                     f"Tuple {step_name} must have 2 or 3 elements")
         else:
             step_call = step_name
             return_value = None
-            values = None
+            values = []
 
         # Check if step_name is a method within Host, a method or a function in globals
-        method = self._get_step_components(step_call)
+        method = self._get_callable_method(step_call)
         parameters = inspect.signature(method).parameters
         method_params = list(parameters.keys())
         # If method_params has 'self' as first parameter, remove it. Consider the case 
@@ -160,7 +161,7 @@ class Pipeline:
 
         return return_value, step_call, method_params
 
-    def _get_step_components(self, step_call):
+    def _get_callable_method(self, step_call):
         """
         Get the callable method from the host object or globals, the potential
         return value name to be stored and the arguments to be used in the method.
@@ -339,7 +340,7 @@ class Pipeline:
             print(f"Running step {step_name}") if self._verbose else None
 
             # step_params = steps[step_name]
-            vble_name, step_call, step_params = self._get_method_params(step_name)
+            vble_name, step_call, step_params = self._get_step_components(step_name)
             
             # step_params = self._get_params(step_call, step_params)
             value = self.run_step(step_call, step_params)
@@ -403,9 +404,9 @@ if __name__ == "__main__":
         ('r1', 'm1'),
         ('r2', 'm2'),
         ('myobject1', SampleClass),
-        'myobject1.method'
-        # ('myobject2', SampleClass, {'param2': True}),
-        # 'myobject2.method'
+        'myobject1.method',
+        ('myobject2', SampleClass, {'param2': True}),
+        'myobject2.method'
     ]
 
 
