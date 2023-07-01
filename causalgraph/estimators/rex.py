@@ -248,15 +248,20 @@ class Rex(BaseEstimator, ClassifierMixin):
         # I can eliminate the need to specify the list of parameters of the method 
         # by using the inspect module to get the list of parameters of the method.
         # Example: inspect.getfullargspec(method).args
-        steps = {
-            ('regressor', NNRegressor): [
-                "model_type", "hidden_dim", "learning_rate", "dropout", "batch_size", 
-                "num_epochs", "loss_fn", "devices", "test_size", "early_stop", "patience", 
-                "min_delta", "random_state", "verbose", "prog_bar"],
-            ('shaps', ShapEstimator): [
-                "regressor", "shap_selection", "sensitivity", "tolerance", "descending", 
-                "iters", "reciprocal", "min_impact", "have_gpu", "verbose", "prog_bar"]
-        }
+        # steps = {
+        #     ('regressor', NNRegressor): [
+        #         "model_type", "hidden_dim", "learning_rate", "dropout", "batch_size", 
+        #         "num_epochs", "loss_fn", "devices", "test_size", "early_stop", "patience", 
+        #         "min_delta", "random_state", "verbose", "prog_bar"],
+        #     ('shaps', ShapEstimator): [
+        #         "regressor", "shap_selection", "sensitivity", "tolerance", "descending", 
+        #         "iters", "reciprocal", "min_impact", "have_gpu", "verbose", "prog_bar"]
+        # }
+        steps = [
+            ('regressor', NNRegressor),
+            'regressor.fit',
+            ('shaps', ShapEstimator, {'models': 'regressor'})
+        ]
         pipeline.run(steps, "Training REX")
 
         self.is_fitted_ = True
@@ -344,7 +349,7 @@ if __name__ == "__main__":
     np.set_printoptions(precision=4, linewidth=150)
     warnings.filterwarnings('ignore')
 
-    load = True
+    load = False
     save = False
     dataset_name = 'generated_linear_10'
 

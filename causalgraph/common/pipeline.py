@@ -1,6 +1,8 @@
 """
+
 Pipeline class to define and run several execution steps.
 (C) J. Renero, 2023
+
 """
 import inspect
 import types
@@ -10,6 +12,8 @@ from tqdm.auto import tqdm
 
 from causalgraph.common import tqdm_params
 
+
+# TODO: Eliminate the need to pass the host object to the pipeline
 
 class Host:
     def __init__(self, param1, param2):
@@ -46,8 +50,8 @@ def my_method(param1, param2):
     return f"my_method({param1} {param2})"
 
 
-def m1(what):
-    return (f"m1_return_value={what}")
+def m1(message="default_message"):
+    return (f"m1_return_value={message}")
 
 
 def m2(what):
@@ -58,6 +62,8 @@ what = "(argument for m1 and m2)"
 
 
 # TODO: Eliminate the need to pass the host object to the pipeline
+# TODO: COnsider the case when parameters are not specified and do not exist, but
+#       the method does not need them because they are optional.
 class Pipeline:
     """
     Pipeline class allows to define several execution steps to run sequentially.
@@ -136,32 +142,34 @@ class Pipeline:
         # also include a return_value name and/or a dictionary with values.
         if type(step_name) is tuple:
             if len(step_name) == 3:
-                return_value, step_call, step_parameters = step_name
+                return_value, step_call, step_arguments = step_name
             elif len(step_name) == 2 and type(step_name[1]) is dict:
-                step_call, step_parameters = step_name
+                step_call, step_arguments = step_name
                 return_value = None
             elif len(step_name) == 2:
                 return_value, step_call = step_name
-                step_parameters = []
+                step_arguments = []
             else:
                 raise ValueError(
                     f"Tuple {step_name} must have 2 or 3 elements")
         else:
             step_call = step_name
             return_value = None
-            step_parameters = []
+            step_arguments = []
 
         # Check if step_name is a method within Host, a method or a function in globals
         method = self._get_callable_method(step_call)
         arguments = inspect.signature(method).parameters
-        method_arguments = list(arguments.keys())
+        # method_arguments = list(arguments.keys())
+        # Build a dictionary called "dv" where keys are the arguments of the method
+        # and values are the default values of the arguments.
+        step_parameters = {arg: arguments[arg].default for arg in arguments.keys()}
 
-        # If method_params has 'self' as first parameter, remove it. Consider the case 
-        # where the only parameter is 'self'.
-        if len(method_arguments) > 0 and method_arguments[0] == 'self':
-            method_arguments.pop(0)
+        # If step_parameters has 'self' as first key, remove it.
+        if 'self' in step_parameters.keys():
+            step_parameters.pop('self')
 
-        return return_value, step_call, method_arguments, step_parameters
+        return return_value, step_call, step_parameters, step_arguments
 
     def _get_callable_method(self, step_call):
         """
@@ -236,19 +244,25 @@ class Pipeline:
             params.append(param)
         return params
     
-    def _build_params(self, method_arguments, param_values) -> dict:
+    def _build_params(self, method_parameters, method_arguments) -> dict:
         params = {}
-        for param in method_arguments:
-            if param in param_values:
-                params[param] = param_values[param]
+        for parameter, default_value in method_parameters.items():
+            # If the parameter is in method_arguments, use the value from method_arguments.
+            if parameter in method_arguments:
+                params[parameter] = method_arguments[parameter]
                 continue
-            if hasattr(self.host, param):
-                params[param] = getattr(self.host, param)
-            elif param in globals():
-                params[param] = globals()[param]
+            # or if the parameter has a default value, use it.
+            elif default_value is not inspect.Parameter.empty:
+                params[parameter] = default_value
+                continue
+            # Otherwise, try to get the parameter from the host object or globals.
+            if hasattr(self.host, parameter):
+                params[parameter] = getattr(self.host, parameter)
+            elif parameter in globals():
+                params[parameter] = globals()[parameter]
             else:
                 raise ValueError(
-                    f"Parameter \'{param}\' not found in host object or globals")
+                    f"Parameter \'{parameter}\' not found in host object or globals")
         return params
     
     def run(self, steps: list, desc: str = "Running pipeline"):
@@ -278,10 +292,10 @@ class Pipeline:
         for step_name in steps:
             print(f"Running step {step_name}") if self._verbose else None
 
-            vble_name, step_call, step_arguments, step_values = \
+            vble_name, step_call, step_parameters, step_arguments = \
                 self._get_step_components(step_name)
             
-            step_parameters = self._build_params(step_arguments, step_values)
+            step_parameters = self._build_params(step_parameters, step_arguments)
             return_value = self.run_step(step_call, step_parameters)
             if vble_name is not None:
                 setattr(self.host, vble_name, return_value)
@@ -333,12 +347,6 @@ class Pipeline:
             # check if type of step_name is a class
             elif type(step_name) is type:
                 obj = step_name(**list_of_params)
-                # step_name = getattr(obj, self._default_object_method)
-                # if self._default_method_params is not None:
-                #     step_params = self._get_params(self._default_method_params)
-                # else:
-                #     step_params = []
-                # return_value = step_name(*step_params)
                 return_value = obj
                 self._objects.append(obj)
             else:
@@ -348,7 +356,7 @@ class Pipeline:
             step_name = getattr(self.host, step_name)
             # check if type of step_name is a function
             if type(step_name) is types.FunctionType or type(step_name) is types.MethodType:
-                return_value = step_name(*list_of_params)
+                return_value = step_name(**list_of_params)
             else:
                 raise TypeError(
                     "step_name inside host object must be a function")
@@ -368,7 +376,7 @@ class Pipeline:
                 obj = getattr(root_object, obj_name)
                 call_name = getattr(obj, method_name)
                 method_call = '.'.join(method_name.split('.')[1:])
-            return_value = call_name(*list_of_params)
+            return_value = call_name(**list_of_params)
 
         print("  > Return value:", return_value) if self._verbose else None
         return return_value
@@ -376,28 +384,6 @@ class Pipeline:
     def _pbar_update(self, step=1):
         self._pbar.update(step)
         self._pbar.refresh()
-
-    def set_default_object_method(self, method_name: str):
-        """
-        Set the default method to be called when the step name is a class.
-
-        Parameters
-        ----------
-        method_name: str
-            Name of the method to be called.
-        """
-        self._default_object_method = method_name
-
-    def set_default_method_params(self, params: list):
-        """
-        Set the default parameters to be passed to the default method.
-
-        Parameters
-        ----------
-        params: list
-            List of parameters to be passed to the default method.
-        """
-        self._default_method_params = params
 
 
 if __name__ == "__main__":
@@ -407,8 +393,8 @@ if __name__ == "__main__":
     print(f"Pipeline initiated: {pipeline}")
 
     steps = [
-        ('r2', 'm2', {'what': 'new_what_value'}),
         ('r1', 'm1'),
+        ('r2', 'm2', {'what': 'new_what_value'}),
         ('myobject2', SampleClass, {'param2': True}),
         ('myobject2.fit'),
         'myobject2.method',
