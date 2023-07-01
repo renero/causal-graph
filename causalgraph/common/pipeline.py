@@ -166,9 +166,6 @@ class Pipeline:
         # Check if step_name is a method within Host, a method or a function in globals
         method = self._get_callable_method(step_call)
         arguments = inspect.signature(method).parameters
-        # method_arguments = list(arguments.keys())
-        # Build a dictionary called "dv" where keys are the arguments of the method
-        # and values are the default values of the arguments.
         step_parameters = {arg: arguments[arg].default for arg in arguments.keys()}
 
         # If step_parameters has 'self' as first key, remove it.
@@ -409,14 +406,13 @@ if __name__ == "__main__":
     steps = [
         ('myobject1', SampleClass),
         ('method_with_object', {'obj': 'myobject1'})
-
-        # ('r1', 'm1'),
-        # ('r2', 'm2', {'what': 'new_what_value'}),
-        # ('myobject2', SampleClass, {'param2': True}),
-        # ('myobject2.fit'),
-        # 'myobject2.method',
-        # 'host_method',
-        # ('my_method')
+        ('r1', 'm1'),
+        ('r2', 'm2', {'what': 'new_what_value'}),
+        ('myobject2', SampleClass, {'param2': True}),
+        ('myobject2.fit'),
+        'myobject2.method',
+        'host_method',
+        ('my_method')
     ]
 
     pipeline.run(steps)
