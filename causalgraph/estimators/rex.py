@@ -241,8 +241,7 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.X = copy(X)
         self.y = copy(y) if y is not None else None
 
-        # pipeline = Pipeline(self, prog_bar=self.prog_bar, verbose=self.verbose)
-        pipeline = Pipeline(self, prog_bar=False, verbose=True)
+        pipeline = Pipeline(self, prog_bar=self.prog_bar, verbose=self.verbose)
         steps = [
             ('regressor', NNRegressor),
             'regressor.fit',
@@ -272,21 +271,19 @@ class Rex(BaseEstimator, ClassifierMixin):
 
         # Create a new pipeline for the prediction stages.
         prediction = Pipeline(self, prog_bar=self.prog_bar, verbose=self.verbose)
-        prediction.set_default_object_method('fit')
-        prediction.set_default_method_params(['X', 'y'])
         
         # Overwrite values for prog_bar and verbosity with current pipeline
         # values, in case predict is called from a loaded experiment
         self.shaps.prog_bar = self.prog_bar
         self.shaps.verbose = self.verbose
 
-        steps = {
-            ('G_shap', 'shaps.predict'): ["X"],
-            ('indep', GraphIndependence): ["G_shap", "condlen", "condsize", 
-                                           "prog_bar", "verbose"],
-            ('G_indep', 'indep.predict'): [],
-            ('G_final', 'shaps.adjust'): ['X', 'G_indep']
-        }
+        steps = [
+            ('G_shap', 'shaps.predict'),
+            ('indep', GraphIndependence, {'base_graph': 'G_shap'}),
+            'indep.fit',
+            ('G_indep', 'indep.predict'),
+            ('G_final', 'shaps.adjust', {'graph': 'G_indep'})
+        ]
         prediction.run(steps, "Predicting graph")
         if '\\n' in self.G_final.nodes:
             self.G_final.remove_node('\\n')
@@ -336,15 +333,15 @@ if __name__ == "__main__":
     np.set_printoptions(precision=4, linewidth=150)
     warnings.filterwarnings('ignore')
 
-    load = False
+    load = True
     save = False
     dataset_name = 'generated_linear_10'
 
-    data = pd.read_csv("~/phd/data/generated_linear_10.csv")
-    ref_graph = graph_from_dot_file("/Users/renero/phd/data/generated_linear_10.dot")
+    data = pd.read_csv("~/phd/data/generated_linear_10_mini.csv")
+    ref_graph = graph_from_dot_file("/Users/renero/phd/data/generated_linear_10_mini.dot")
 
     if load:
-        rex = load_experiment('rex', "/Users/renero/phd/output/REX")
+        rex = load_experiment('rex', "/Users/renero/phd/output/RC3")
     else:
         rex = Rex().fit(data, ref_graph)
 
@@ -356,7 +353,7 @@ if __name__ == "__main__":
 
     # Plot the SHAP values for each regression
     plot_args = [(target_name) for target_name in rex.shaps.all_feature_names_]
-    subplots(rex.shaps.summary_plot, *plot_args, dpi=100);
+    subplots(rex.shaps._plot_shap_summary, *plot_args, dpi=100);
 
     # Plot the predicted graph
     plot_dags(pred_graph, ref_graph)

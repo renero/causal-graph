@@ -315,7 +315,6 @@ class Pipeline:
                 # add it to the list of objects.
                 if type(return_value) is not type:
                     self._objects[vble_name] = return_value
-                    print("APPENDED to object_names") if self._verbose else None
                 print(f"      New attribute {vble_name}: \'{getattr(self.host, vble_name)}\'") \
                     if self._verbose else None
                 

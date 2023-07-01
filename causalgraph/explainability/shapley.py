@@ -103,6 +103,9 @@ class ShapEstimator(BaseEstimator):
                     continue
             elif isinstance(getattr(self, attr), pd.DataFrame):
                 ret += f"{attr:25} DataFrame {getattr(self, attr).shape}\n"
+            elif isinstance(getattr(self, attr), dict):
+                keys_list = [f"{k}:{type(getattr(self, attr)[k])}" for k in getattr(self, attr).keys()]
+                ret += f"{attr:25} dict {keys_list}\n"
             else:
                 ret += f"{attr:25} {getattr(self, attr)}\n"
 
