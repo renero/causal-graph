@@ -1,3 +1,4 @@
+import types
 import warnings
 from typing import List, Union
 
@@ -8,7 +9,7 @@ from sklearn.base import BaseEstimator
 from sklearn.utils.validation import check_array, check_is_fitted
 from tqdm.auto import tqdm
 
-from causalgraph.common import tqdm_params
+from causalgraph.common import GRAY, GREEN, RESET, tqdm_params
 
 from ._models import MLPModel
 
@@ -194,6 +195,24 @@ class NNRegressor(BaseEstimator):
         y = pd.DataFrame(target_tensor.detach().numpy(), columns=[target_name])
 
         return X, y
+
+    def __repr__(self):
+        forbidden_attrs = ['fit', 'predict', 'score', 'get_params', 'set_params']
+        ret = f"{GREEN}REX object attributes{RESET}\n"
+        ret += f"{GRAY}{'-'*80}{RESET}\n"
+        for attr in dir(self):
+            if attr.startswith('_') or attr in forbidden_attrs or type(getattr(self, attr)) == types.MethodType:
+                continue
+            elif attr == "X" or attr == "y":
+                if isinstance(getattr(self, attr), pd.DataFrame):
+                    ret += f"{attr:25} {getattr(self, attr).shape}\n"
+                    continue
+            elif isinstance(getattr(self, attr), pd.DataFrame):
+                ret += f"{attr:25} DataFrame {getattr(self, attr).shape}\n"
+            else:
+                ret += f"{attr:25} {getattr(self, attr)}\n"
+
+        return ret
 
 
 if __name__ == "__main__":

@@ -241,26 +241,13 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.X = copy(X)
         self.y = copy(y) if y is not None else None
 
-        pipeline = Pipeline(self, prog_bar=self.prog_bar, verbose=self.verbose)
-        pipeline.set_default_object_method('fit')
-        pipeline.set_default_method_params(['X', 'y'])
-        # TODO:
-        # I can eliminate the need to specify the list of parameters of the method 
-        # by using the inspect module to get the list of parameters of the method.
-        # Example: inspect.getfullargspec(method).args
-        # steps = {
-        #     ('regressor', NNRegressor): [
-        #         "model_type", "hidden_dim", "learning_rate", "dropout", "batch_size", 
-        #         "num_epochs", "loss_fn", "devices", "test_size", "early_stop", "patience", 
-        #         "min_delta", "random_state", "verbose", "prog_bar"],
-        #     ('shaps', ShapEstimator): [
-        #         "regressor", "shap_selection", "sensitivity", "tolerance", "descending", 
-        #         "iters", "reciprocal", "min_impact", "have_gpu", "verbose", "prog_bar"]
-        # }
+        # pipeline = Pipeline(self, prog_bar=self.prog_bar, verbose=self.verbose)
+        pipeline = Pipeline(self, prog_bar=False, verbose=True)
         steps = [
             ('regressor', NNRegressor),
             'regressor.fit',
-            ('shaps', ShapEstimator, {'models': 'regressor'})
+            ('shaps', ShapEstimator, {'models': 'regressor'}),
+            'shaps.fit'
         ]
         pipeline.run(steps, "Training REX")
 

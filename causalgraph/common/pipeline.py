@@ -41,13 +41,19 @@ class SampleClass:
 
     def method(self):
         print(f"  > Into method \'{self.method.__name__}\'")
-        return "MyClass.method"
+        return "<Have been in SampleClass.method>"
 
 
 def my_method(param1, param2):
     print(f"  > Into the method \'{my_method.__name__}\'")
     print(f"    > I got params: {param1}, {param2}")
     return f"my_method({param1} {param2})"
+
+
+def method_with_object(obj):
+    print(f"  > Into the method \'{method_with_object.__name__}\'")
+    print(f"    > I got object: {obj}")
+    return f"{obj.method()}>"
 
 
 def m1(message="default_message"):
@@ -115,7 +121,7 @@ class Pipeline:
         self.host = host
         self._verbose = verbose
         self._prog_bar = prog_bar
-        self._objects = [self.host]
+        self._objects = {'host': self.host}
 
         # When passing a class to the pipeline, the pipeline will call the 
         # default method specified by _default_object_method, and will pass
@@ -249,7 +255,13 @@ class Pipeline:
         for parameter, default_value in method_parameters.items():
             # If the parameter is in method_arguments, use the value from method_arguments.
             if parameter in method_arguments:
-                params[parameter] = method_arguments[parameter]
+                # Two possibilities here: either the parameter is a normal value, 
+                # in which case we simply take it, or is the name of an object created
+                # in a previous step, in which case we take the object.
+                if method_arguments[parameter] in self._objects.keys():
+                    params[parameter] = self._objects[method_arguments[parameter]]
+                else:
+                    params[parameter] = method_arguments[parameter]
                 continue
             # or if the parameter has a default value, use it.
             elif default_value is not inspect.Parameter.empty:
@@ -299,6 +311,11 @@ class Pipeline:
             return_value = self.run_step(step_call, step_parameters)
             if vble_name is not None:
                 setattr(self.host, vble_name, return_value)
+                # Check if the new attribute created is an object and if so, 
+                # add it to the list of objects.
+                if type(return_value) is not type:
+                    self._objects[vble_name] = return_value
+                    print("APPENDED to object_names") if self._verbose else None
                 print(f"      New attribute {vble_name}: \'{getattr(self.host, vble_name)}\'") \
                     if self._verbose else None
                 
@@ -335,7 +352,6 @@ class Pipeline:
             elif type(step_name) is type:
                 obj = step_name(**list_of_params)
                 obj.fit()
-                self._objects.append(obj)
                 return_value = obj
             else:
                 raise TypeError("step_name must be a class or a function")
@@ -348,7 +364,6 @@ class Pipeline:
             elif type(step_name) is type:
                 obj = step_name(**list_of_params)
                 return_value = obj
-                self._objects.append(obj)
             else:
                 raise TypeError("step_name must be a class or a function")
         # Check if step_name is a method of the host object
@@ -393,15 +408,16 @@ if __name__ == "__main__":
     print(f"Pipeline initiated: {pipeline}")
 
     steps = [
-        ('r1', 'm1'),
-        ('r2', 'm2', {'what': 'new_what_value'}),
-        ('myobject2', SampleClass, {'param2': True}),
-        ('myobject2.fit'),
-        'myobject2.method',
-        'host_method',
-        ('my_method'),
         ('myobject1', SampleClass),
-        'myobject1.method'
+        ('method_with_object', {'obj': 'myobject1'})
+
+        # ('r1', 'm1'),
+        # ('r2', 'm2', {'what': 'new_what_value'}),
+        # ('myobject2', SampleClass, {'param2': True}),
+        # ('myobject2.fit'),
+        # 'myobject2.method',
+        # 'host_method',
+        # ('my_method')
     ]
 
     pipeline.run(steps)
