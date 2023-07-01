@@ -87,7 +87,7 @@ class ShapEstimator(BaseEstimator):
     def __repr__(self):
         forbidden_attrs = ['fit', 'predict',
                            'score', 'get_params', 'set_params']
-        ret = f"{GREEN}REX object attributes{RESET}\n"
+        ret = f"{GREEN}SHAP object attributes{RESET}\n"
         ret += f"{GRAY}{'-'*80}{RESET}\n"
         for attr in dir(self):
             if attr.startswith('_') or attr in forbidden_attrs or type(getattr(self, attr)) == types.MethodType:
@@ -103,6 +103,9 @@ class ShapEstimator(BaseEstimator):
                     continue
             elif isinstance(getattr(self, attr), pd.DataFrame):
                 ret += f"{attr:25} DataFrame {getattr(self, attr).shape}\n"
+            elif isinstance(getattr(self, attr), dict):
+                keys_list = [f"{k}:{type(getattr(self, attr)[k])}" for k in getattr(self, attr).keys()]
+                ret += f"{attr:25} dict {keys_list}\n"
             else:
                 ret += f"{attr:25} {getattr(self, attr)}\n"
 
