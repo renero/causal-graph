@@ -333,12 +333,12 @@ if __name__ == "__main__":
     np.set_printoptions(precision=4, linewidth=150)
     warnings.filterwarnings('ignore')
 
-    load = True
+    load = False
     save = False
     dataset_name = 'generated_linear_10'
 
-    data = pd.read_csv("~/phd/data/generated_linear_10_mini.csv")
-    ref_graph = graph_from_dot_file("/Users/renero/phd/data/generated_linear_10_mini.dot")
+    data = pd.read_csv("~/phd/data/generated_linear_10.csv")
+    ref_graph = graph_from_dot_file("/Users/renero/phd/data/generated_linear_10.dot")
 
     if load:
         rex = load_experiment('rex', "/Users/renero/phd/output/RC3")
@@ -348,6 +348,7 @@ if __name__ == "__main__":
     # rex.prog_bar = False
     # rex.verbose = True
 
+    rex.verbose = True
     pred_graph = rex.predict(data)
     rex.plot_shap_discrepancies('V6')
 

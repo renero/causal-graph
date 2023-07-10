@@ -21,6 +21,7 @@ from scipy.stats import kstest, spearmanr
 from sklearn.base import BaseEstimator
 from sklearn.discriminant_analysis import StandardScaler
 from sklearn.isotonic import spearmanr
+from sklearn.model_selection import train_test_split
 from sklearn.utils.validation import check_is_fitted
 from tqdm.auto import tqdm
 
@@ -124,23 +125,23 @@ class ShapEstimator(BaseEstimator):
 
         pbar = tqdm(total=len(self.all_feature_names_),
                     **tqdm_params(self._fit_desc, self.prog_bar))
+        
+        self.X_train, self.X_test = train_test_split(X, test_size=0.2, random_state=42)
 
         for target_name in self.all_feature_names_:
             pbar.update(1)
 
             # Get the model and the data (tensor form)
             model = self.models.regressor[target_name].model
-            tensor_data = X.drop(target_name, axis=1).values
-            tensor_data = torch.from_numpy(tensor_data).float()
-
-            # Move to GPU if available
-            if self.on_gpu:
-                model = model.cuda()
-                tensor_data = tensor_data.cuda()
+            model = model.cuda() if self.on_gpu else model.cpu()
+            X_train_tensor = torch.tensor(self.X_train.drop(target_name, axis=1).values).float()
+            X_test_tensor = torch.tensor(self.X_test.drop(target_name, axis=1).values).float()
 
             # Run the selected SHAP explainer
-            explainer = shap.GradientExplainer(model, tensor_data)
-            self.shap_values[target_name] = explainer.shap_values(tensor_data)
+            explainer = shap.GradientExplainer(model, X_train_tensor)
+            self.shap_values[target_name] = explainer.shap_values(X_test_tensor)
+
+            # Scale the SHAP values
             scaler = StandardScaler()
             self.shap_scaled_values[target_name] = scaler.fit_transform(
                 self.shap_values[target_name])
@@ -158,6 +159,39 @@ class ShapEstimator(BaseEstimator):
         self.is_fitted_ = True
         return self
 
+    def _extract_data(self, X, target_name):
+        """
+        Extract the data and the model for the given target.
+
+        Parameters
+        ----------
+        model: torch.nn.Module
+            The model for the given target.
+        X : pd.DataFrame
+            The input data.
+        target_name : str
+            The name of the target feature.
+
+        Returns
+        -------
+        X_train : PyTorch.Tensor object
+            The training data.
+        X_test : PyTorch.Tensor object
+            The testing data.
+        """
+        tensor_data = X.drop(target_name, axis=1).values
+        tensor_data = torch.from_numpy(tensor_data).float()
+
+        X_train, X_test = self._train_test_split_tensors(
+            tensor_data, test_size=0.2, random_state=42)
+
+        # Move to GPU if available
+        if self.on_gpu:
+            X_train = X_train.cuda()
+            X_test = X_test.cuda()
+
+        return X_train, X_test
+    
     def predict(self, X):
         """
         Builds a causal graph from the shap values using a selection mechanism based
@@ -169,7 +203,7 @@ class ShapEstimator(BaseEstimator):
         pbar = tqdm(total=4,
                     **tqdm_params("Building graph from SHAPs", self.prog_bar))
 
-        self._compute_discrepancies(X)
+        self._compute_discrepancies(self.X_test) # (X)
 
         pbar.update(1)
         pbar.refresh()
@@ -567,8 +601,8 @@ class ShapEstimator(BaseEstimator):
 
         for i, parent_name in enumerate(feature_names):
             r = self.shap_discrepancies[target_name][parent_name]
-            x = X[parent_name].values.reshape(-1, 1)
-            y = X[target_name].values.reshape(-1, 1)
+            x = self.X_test[parent_name].values.reshape(-1, 1)
+            y = self.X_test[target_name].values.reshape(-1, 1)
             parent_pos = feature_names.index(parent_name)
             s = self.shap_scaled_values[target_name][:,
                                                      parent_pos].reshape(-1, 1)

@@ -206,6 +206,6 @@ def cluster_change(X: List, verbose: bool = False):
         print(f"  Silhouette Coefficient: {metrics.silhouette_score(X, labels):.3f}")
         print(f"  > Labels: {labels}")
 
-    winner_label = 0
-    samples_in_winner_cluster = np.argwhere(X[labels == winner_label])
+    winner_label = n_clusters_ - 1
+    samples_in_winner_cluster = np.argwhere(X[labels != winner_label])
     return samples_in_winner_cluster[:, 0][-1]+1
