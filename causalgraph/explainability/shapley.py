@@ -7,7 +7,7 @@ import warnings
 from dataclasses import dataclass
 from typing import List, Union
 
-import matplotlib
+import matplotlib as mpl
 import networkx as nx
 import numpy as np
 import pandas as pd
@@ -21,6 +21,7 @@ from scipy.stats import kstest, spearmanr
 from sklearn.base import BaseEstimator
 from sklearn.discriminant_analysis import StandardScaler
 from sklearn.isotonic import spearmanr
+from sklearn.model_selection import train_test_split
 from sklearn.utils.validation import check_is_fitted
 from tqdm.auto import tqdm
 
@@ -56,6 +57,7 @@ class ShapEstimator(BaseEstimator):
 
     def __init__(
             self,
+            explainer = shap.Explainer,
             models: NNRegressor = None,
             method: str = 'cluster',
             sensitivity: float = 1.0,
@@ -69,6 +71,7 @@ class ShapEstimator(BaseEstimator):
             prog_bar: bool = True):
         """
         """
+        self.explainer = explainer
         self.models = models
         self.method = method
         self.sensitivity = sensitivity
@@ -81,7 +84,7 @@ class ShapEstimator(BaseEstimator):
         self.prog_bar = prog_bar
         self.on_gpu = on_gpu
 
-        self._fit_desc = "Running SHAP explainer"
+        self._fit_desc = f"Running SHAP explainer ({explainer.__name__})"
         self._pred_desc = "Building graph skeleton"
 
     def __repr__(self):
@@ -124,23 +127,26 @@ class ShapEstimator(BaseEstimator):
 
         pbar = tqdm(total=len(self.all_feature_names_),
                     **tqdm_params(self._fit_desc, self.prog_bar))
+        
+        self.X_train, self.X_test = train_test_split(X, test_size=0.2, random_state=42)
 
         for target_name in self.all_feature_names_:
             pbar.update(1)
 
             # Get the model and the data (tensor form)
             model = self.models.regressor[target_name].model
-            tensor_data = X.drop(target_name, axis=1).values
-            tensor_data = torch.from_numpy(tensor_data).float()
-
-            # Move to GPU if available
-            if self.on_gpu:
-                model = model.cuda()
-                tensor_data = tensor_data.cuda()
+            model = model.cuda() if self.on_gpu else model.cpu()
+            # if self.explainer == shap.DeepExplainer or self.explainer == shap.GradientExplainer:
+            X_train_tensor = torch.tensor(self.X_train.drop(target_name, axis=1).values).float()
+            X_test_tensor = torch.tensor(self.X_test.drop(target_name, axis=1).values).float()
+            X_train = X_train_tensor.cpu().numpy()
+            X_test = X_test_tensor.cpu().numpy()
 
             # Run the selected SHAP explainer
-            explainer = shap.GradientExplainer(model, tensor_data)
-            self.shap_values[target_name] = explainer.shap_values(tensor_data)
+            my_explainer = self.explainer(model.predict, X_train)
+            self.shap_values[target_name] = my_explainer(X_test).values
+
+            # Scale the SHAP values
             scaler = StandardScaler()
             self.shap_scaled_values[target_name] = scaler.fit_transform(
                 self.shap_values[target_name])
@@ -158,6 +164,39 @@ class ShapEstimator(BaseEstimator):
         self.is_fitted_ = True
         return self
 
+    def _extract_data(self, X, target_name):
+        """
+        Extract the data and the model for the given target.
+
+        Parameters
+        ----------
+        model: torch.nn.Module
+            The model for the given target.
+        X : pd.DataFrame
+            The input data.
+        target_name : str
+            The name of the target feature.
+
+        Returns
+        -------
+        X_train : PyTorch.Tensor object
+            The training data.
+        X_test : PyTorch.Tensor object
+            The testing data.
+        """
+        tensor_data = X.drop(target_name, axis=1).values
+        tensor_data = torch.from_numpy(tensor_data).float()
+
+        X_train, X_test = self._train_test_split_tensors(
+            tensor_data, test_size=0.2, random_state=42)
+
+        # Move to GPU if available
+        if self.on_gpu:
+            X_train = X_train.cuda()
+            X_test = X_test.cuda()
+
+        return X_train, X_test
+    
     def predict(self, X):
         """
         Builds a causal graph from the shap values using a selection mechanism based
@@ -169,7 +208,7 @@ class ShapEstimator(BaseEstimator):
         pbar = tqdm(total=4,
                     **tqdm_params("Building graph from SHAPs", self.prog_bar))
 
-        self._compute_discrepancies(X)
+        self._compute_discrepancies(self.X_test) # (X)
 
         pbar.update(1)
         pbar.refresh()
@@ -560,6 +599,7 @@ class ShapEstimator(BaseEstimator):
         return fig
 
     def _plot_discrepancies(self, X: pd.DataFrame, target_name: str, **kwargs):
+        mpl.rcParams['figure.dpi'] = 150
         figsize_ = kwargs.get('figsize', (10, 16))
         feature_names = [
             f for f in self.all_feature_names_ if f != target_name]
@@ -567,18 +607,18 @@ class ShapEstimator(BaseEstimator):
 
         for i, parent_name in enumerate(feature_names):
             r = self.shap_discrepancies[target_name][parent_name]
-            x = X[parent_name].values.reshape(-1, 1)
-            y = X[target_name].values.reshape(-1, 1)
+            x = self.X_test[parent_name].values.reshape(-1, 1)
+            y = self.X_test[target_name].values.reshape(-1, 1)
             parent_pos = feature_names.index(parent_name)
             s = self.shap_scaled_values[target_name][:,
                                                      parent_pos].reshape(-1, 1)
-            self._plot_discrepancy(x, y, s, parent_name, r, ax[i])
+            self._plot_discrepancy(x, y, s, target_name, parent_name, r, ax[i])
 
         plt.suptitle(f"Discrepancies for {target_name}")
         plt.tight_layout(rect=[0, 0.0, 1, 0.97])
         fig.show()
 
-    def _plot_discrepancy(self, x, y, s, parent_name, r, ax):
+    def _plot_discrepancy(self, x, y, s, target_name, parent_name, r, ax):
         def _remove_ticks_and_box(ax):
             ax.set_xticks([])
             ax.set_xticklabels([])
@@ -595,39 +635,42 @@ class ShapEstimator(BaseEstimator):
 
         # Represent scatter plots
         ax[0].scatter(x, s, alpha=0.5, marker='.')
-        ax[0].scatter(x, y, alpha=0.4, marker='.')
+        ax[0].scatter(x, y, alpha=0.5, marker='.')
         ax[0].plot(x, b1_s * x + b0_s, color='blue', linewidth=.5)
         ax[0].plot(x, b1_y * x + b0_y, color='red', linewidth=.5)
         ax[0].set_title(f'$m_s$:{math.atan(b1_s)*K:.1f}°; $m_y$:{math.atan(b1_y)*K:.1f}°',
                         fontsize=11)
+        ax[0].set_xlabel(parent_name)
+        ax[0].set_ylabel(f"$$ \mathrm{{{target_name}}} / \phi_{{{target_name}}} $$")
+
 
         # Represent distributions
         pd.DataFrame(s).plot(kind='density', ax=ax[1], label="shap")
         pd.DataFrame(y).plot(kind='density', ax=ax[1], label="parent")
         ax[1].legend().set_visible(False)
         ax[1].set_ylabel('')
+        ax[1].set_xlabel(f"$$ \mathrm{{{target_name}}} /  \phi_{{{target_name}}} $$")
         ax[1].set_title(f'KS({r.ks_pvalue:.2g}) - {r.ks_result}', fontsize=11)
 
         # Represent fitted vs. residuals
         s_resid = r.shap_model.get_influence().resid_studentized_internal
         y_resid = r.parent_model.get_influence().resid_studentized_internal
         scaler = StandardScaler()
-        s_fitted_scaled = scaler.fit_transform(
-            r.shap_model.fittedvalues.reshape(-1, 1))
-        y_fitted_scaled = scaler.fit_transform(
-            r.parent_model.fittedvalues.reshape(-1, 1))
+        s_fitted_scaled = scaler.fit_transform(r.shap_model.fittedvalues.reshape(-1, 1))
+        y_fitted_scaled = scaler.fit_transform(r.parent_model.fittedvalues.reshape(-1, 1))
         ax[2].scatter(s_fitted_scaled, s_resid, alpha=0.5, marker='.')
-        ax[2].scatter(y_fitted_scaled, y_resid, alpha=0.4,
-                      marker='.', color='tab:orange')
-        ax[2].set_title(
-            f"Shap {shap_label}; Parent {parent_label}", fontsize=11)
+        ax[2].scatter(y_fitted_scaled, y_resid, alpha=0.5, marker='.', color='tab:orange')
+        ax[2].set_title(f"Shap {shap_label}; Parent {parent_label}", fontsize=11)
+        ax[2].set_xlabel(f"$$ \mathrm{{{target_name}}} /  \phi_{{{target_name}}} $$")
+        ax[2].set_ylabel(f"$$ \epsilon_{{{target_name}}} / \epsilon_\phi $$")
 
         # Represent target vs. SHAP values
-        ax[3].scatter(s, y, alpha=0.3, marker='.', color='tab:grey')
+        ax[3].scatter(s, y, alpha=0.3, marker='.', color='tab:green')
         ax[3].set_title(f"Corr: {r.shap_correlation:.2f}", fontsize=11)
+        ax[3].set_xlabel(f"$$ \phi_{{{target_name}}} $$")
+        ax[3].set_ylabel(f"$$ \mathrm{{{target_name}}} $$")
 
         for ax_idx in range(4):
-            ax[ax_idx].set_xlabel(parent_name)
             _remove_ticks_and_box(ax[ax_idx])
 
 
@@ -636,10 +679,12 @@ if __name__ == "__main__":
     warnings.filterwarnings('ignore')
 
     dataset_name = 'generated_linear_10'
-    data = pd.read_csv("~/phd/data/generated_linear_10.csv")
+    data = pd.read_csv("~/phd/data/generated_linear_10_tiny.csv")
     ref_graph = graph_from_dot_file(
-        "/Users/renero/phd/data/generated_linear_10_mini.dot")
-    rex = load_experiment('rex', "/Users/renero/phd/output/REX")
+        "/Users/renero/phd/data/generated_linear_10_tiny.dot")
+    rex = load_experiment('rex', "/Users/renero/phd/output/RC3")
+    # rex = Rex(prog_bar=False, verbose=True).fit(data, ref_graph)
     rex.prog_bar = False
     rex.verbose = True
-    rex.shaps = ShapEstimator(rex.regressor).fit(data)
+    rex.shaps = ShapEstimator(models=rex.regressor)
+    rex.shaps.fit(data)

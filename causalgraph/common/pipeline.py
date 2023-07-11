@@ -312,8 +312,7 @@ class Pipeline:
                 # add it to the list of objects.
                 if type(return_value) is not type:
                     self._objects[vble_name] = return_value
-                print(f"      New attribute {vble_name}: \'{getattr(self.host, vble_name)}\'") \
-                    if self._verbose else None
+                print(f"      New attribute: <{vble_name}>") if self._verbose else None
                 
             print("-"*80) if self._verbose else None
             self._pbar_update(1)
@@ -389,7 +388,7 @@ class Pipeline:
                 method_call = '.'.join(method_name.split('.')[1:])
             return_value = call_name(**list_of_params)
 
-        print("  > Return value:", return_value) if self._verbose else None
+        print("  > Return value:", type(return_value)) if self._verbose else None
         return return_value
 
     def _pbar_update(self, step=1):

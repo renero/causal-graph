@@ -1,25 +1,27 @@
+import os
+import types
+import warnings
 from copy import copy
 from pathlib import Path
-import types
 from typing import Any, List, Tuple, Union
-import warnings
-import os
 
+import networkx as nx
 import numpy as np
 import pandas as pd
-import networkx as nx
+import shap
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.utils.validation import (check_array, check_is_fitted,
                                       check_random_state)
 
-from causalgraph.common import RESET, GREEN, GRAY
+from causalgraph.common import GRAY, GREEN, RESET
 from causalgraph.common.pipeline import Pipeline
-from causalgraph.common.plots import subplots, plot_dags
-from causalgraph.common.utils import graph_from_dot_file, load_experiment, save_experiment
+from causalgraph.common.plots import plot_dags, subplots
+from causalgraph.common.utils import (graph_from_dot_file, load_experiment,
+                                      save_experiment)
 from causalgraph.explainability.shapley import ShapEstimator
 from causalgraph.independence.graph_independence import GraphIndependence
-from causalgraph.models.dnn import NNRegressor
 from causalgraph.metrics.compare_graphs import evaluate_graph
+from causalgraph.models.dnn import NNRegressor
 
 
 class Rex(BaseEstimator, ClassifierMixin):
@@ -54,6 +56,7 @@ class Rex(BaseEstimator, ClassifierMixin):
             loss_fn='mse',
             devices="auto",
             test_size=0.1,
+            explainer=shap.Explainer,
             sensitivity=1.0,
             descending=False,
             tolerance=0.04,
@@ -100,6 +103,7 @@ class Rex(BaseEstimator, ClassifierMixin):
             gpus (int): The number of GPUs to use. Default is 0.
             test_size (float): The proportion of the data to use for testing. Default
                 is 0.1.
+            explainer (shap.Explainer): The explainer to use for the shap values.
             sensitivity (float): The sensitivity of the Knee algorithm. Default is 1.0.
             descending (bool): Whether to determine the cutoff for the most
                 influencing shap values starting from the higher one. Default is False.
@@ -170,6 +174,7 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.devices = devices
         self.have_gpu = (isinstance(self.devices, int) and self.devices != 0)
         self.test_size = test_size
+        self.explainer = explainer
         self.min_impact = min_impact
         self.early_stop = early_stop
         self.patience = patience
@@ -203,7 +208,7 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.dpi = dpi
         self.pdf_filename = pdf_filename
 
-        self._fit_desc = "Fitting ReX method"
+        self._fit_desc = "Running Causal Discovery pipeline"
         os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
     def _more_tags(self):
@@ -333,12 +338,12 @@ if __name__ == "__main__":
     np.set_printoptions(precision=4, linewidth=150)
     warnings.filterwarnings('ignore')
 
-    load = True
+    load = False
     save = False
     dataset_name = 'generated_linear_10'
 
-    data = pd.read_csv("~/phd/data/generated_linear_10_mini.csv")
-    ref_graph = graph_from_dot_file("/Users/renero/phd/data/generated_linear_10_mini.dot")
+    data = pd.read_csv("~/phd/data/generated_linear_10.csv")
+    ref_graph = graph_from_dot_file("/Users/renero/phd/data/generated_linear_10.dot")
 
     if load:
         rex = load_experiment('rex', "/Users/renero/phd/output/RC3")
@@ -348,6 +353,7 @@ if __name__ == "__main__":
     # rex.prog_bar = False
     # rex.verbose = True
 
+    rex.verbose = True
     pred_graph = rex.predict(data)
     rex.plot_shap_discrepancies('V6')
 
