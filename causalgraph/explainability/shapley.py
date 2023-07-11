@@ -7,7 +7,7 @@ import warnings
 from dataclasses import dataclass
 from typing import List, Union
 
-import matplotlib
+import matplotlib as mpl
 import networkx as nx
 import numpy as np
 import pandas as pd
@@ -599,6 +599,7 @@ class ShapEstimator(BaseEstimator):
         return fig
 
     def _plot_discrepancies(self, X: pd.DataFrame, target_name: str, **kwargs):
+        mpl.rcParams['figure.dpi'] = 150
         figsize_ = kwargs.get('figsize', (10, 16))
         feature_names = [
             f for f in self.all_feature_names_ if f != target_name]
@@ -648,6 +649,7 @@ class ShapEstimator(BaseEstimator):
         pd.DataFrame(y).plot(kind='density', ax=ax[1], label="parent")
         ax[1].legend().set_visible(False)
         ax[1].set_ylabel('')
+        ax[1].set_xlabel(f"$$ \mathrm{{{target_name}}} /  \phi_{{{target_name}}} $$")
         ax[1].set_title(f'KS({r.ks_pvalue:.2g}) - {r.ks_result}', fontsize=11)
 
         # Represent fitted vs. residuals
@@ -663,7 +665,7 @@ class ShapEstimator(BaseEstimator):
         ax[2].set_ylabel(f"$$ \epsilon_{{{target_name}}} / \epsilon_\phi $$")
 
         # Represent target vs. SHAP values
-        ax[3].scatter(s, y, alpha=0.3, marker='.', color='tab:grey')
+        ax[3].scatter(s, y, alpha=0.3, marker='.', color='tab:green')
         ax[3].set_title(f"Corr: {r.shap_correlation:.2f}", fontsize=11)
         ax[3].set_xlabel(f"$$ \phi_{{{target_name}}} $$")
         ax[3].set_ylabel(f"$$ \mathrm{{{target_name}}} $$")
