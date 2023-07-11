@@ -57,6 +57,7 @@ class ShapEstimator(BaseEstimator):
 
     def __init__(
             self,
+            explainer = shap.Explainer,
             models: NNRegressor = None,
             method: str = 'cluster',
             sensitivity: float = 1.0,
@@ -70,6 +71,7 @@ class ShapEstimator(BaseEstimator):
             prog_bar: bool = True):
         """
         """
+        self.explainer = explainer
         self.models = models
         self.method = method
         self.sensitivity = sensitivity
@@ -134,12 +136,15 @@ class ShapEstimator(BaseEstimator):
             # Get the model and the data (tensor form)
             model = self.models.regressor[target_name].model
             model = model.cuda() if self.on_gpu else model.cpu()
+            # if self.explainer == shap.DeepExplainer or self.explainer == shap.GradientExplainer:
             X_train_tensor = torch.tensor(self.X_train.drop(target_name, axis=1).values).float()
             X_test_tensor = torch.tensor(self.X_test.drop(target_name, axis=1).values).float()
+            X_train = X_train_tensor.cpu().numpy()
+            X_test = X_test_tensor.cpu().numpy()
 
             # Run the selected SHAP explainer
-            explainer = shap.GradientExplainer(model, X_train_tensor)
-            self.shap_values[target_name] = explainer.shap_values(X_test_tensor)
+            my_explainer = self.explainer(model.predict, X_train)
+            self.shap_values[target_name] = my_explainer(X_test).values
 
             # Scale the SHAP values
             scaler = StandardScaler()
@@ -670,10 +675,12 @@ if __name__ == "__main__":
     warnings.filterwarnings('ignore')
 
     dataset_name = 'generated_linear_10'
-    data = pd.read_csv("~/phd/data/generated_linear_10.csv")
+    data = pd.read_csv("~/phd/data/generated_linear_10_tiny.csv")
     ref_graph = graph_from_dot_file(
-        "/Users/renero/phd/data/generated_linear_10_mini.dot")
-    rex = load_experiment('rex', "/Users/renero/phd/output/REX")
+        "/Users/renero/phd/data/generated_linear_10_tiny.dot")
+    rex = load_experiment('rex', "/Users/renero/phd/output/RC3")
+    # rex = Rex(prog_bar=False, verbose=True).fit(data, ref_graph)
     rex.prog_bar = False
     rex.verbose = True
-    rex.shaps = ShapEstimator(rex.regressor).fit(data)
+    rex.shaps = ShapEstimator(models=rex.regressor)
+    rex.shaps.fit(data)

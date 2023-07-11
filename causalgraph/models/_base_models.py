@@ -111,6 +111,16 @@ class MLP(pl.LightningModule):
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
         return optimizer
+    
+    # To allow compatibility with SHAP Explainers different from DeepExplainer and
+    # GradientExplainer
+    def predict(self, x):
+        # x is numpy not tensor, return is numpy
+        xx = torch.tensor(x, dtype=torch.float32).to('cpu')
+        with torch.no_grad():
+            probs = torch.exp(self.forward(xx))
+        return probs.numpy()
+
 
 
 class DFF(pl.LightningModule):
