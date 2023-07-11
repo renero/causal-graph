@@ -208,7 +208,7 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.dpi = dpi
         self.pdf_filename = pdf_filename
 
-        self._fit_desc = "Fitting ReX method"
+        self._fit_desc = "Running Causal Discovery pipeline"
         os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
     def _more_tags(self):

@@ -113,7 +113,8 @@ class MLP(pl.LightningModule):
         return optimizer
     
     # To allow compatibility with SHAP Explainers different from DeepExplainer and
-    # GradientExplainer
+    # GradientExplainer. Taken from: 
+    # https://jamesmccaffrey.wordpress.com/2022/10/11/an-example-of-using-the-shap-library-for-a-pytorch-model/
     def predict(self, x):
         # x is numpy not tensor, return is numpy
         xx = torch.tensor(x, dtype=torch.float32).to('cpu')

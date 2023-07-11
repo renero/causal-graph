@@ -84,7 +84,7 @@ class ShapEstimator(BaseEstimator):
         self.prog_bar = prog_bar
         self.on_gpu = on_gpu
 
-        self._fit_desc = "Running SHAP explainer"
+        self._fit_desc = f"Running SHAP explainer ({explainer.__name__})"
         self._pred_desc = "Building graph skeleton"
 
     def __repr__(self):
@@ -611,13 +611,13 @@ class ShapEstimator(BaseEstimator):
             parent_pos = feature_names.index(parent_name)
             s = self.shap_scaled_values[target_name][:,
                                                      parent_pos].reshape(-1, 1)
-            self._plot_discrepancy(x, y, s, parent_name, r, ax[i])
+            self._plot_discrepancy(x, y, s, target_name, parent_name, r, ax[i])
 
         plt.suptitle(f"Discrepancies for {target_name}")
         plt.tight_layout(rect=[0, 0.0, 1, 0.97])
         fig.show()
 
-    def _plot_discrepancy(self, x, y, s, parent_name, r, ax):
+    def _plot_discrepancy(self, x, y, s, target_name, parent_name, r, ax):
         def _remove_ticks_and_box(ax):
             ax.set_xticks([])
             ax.set_xticklabels([])
@@ -634,11 +634,14 @@ class ShapEstimator(BaseEstimator):
 
         # Represent scatter plots
         ax[0].scatter(x, s, alpha=0.5, marker='.')
-        ax[0].scatter(x, y, alpha=0.4, marker='.')
+        ax[0].scatter(x, y, alpha=0.5, marker='.')
         ax[0].plot(x, b1_s * x + b0_s, color='blue', linewidth=.5)
         ax[0].plot(x, b1_y * x + b0_y, color='red', linewidth=.5)
         ax[0].set_title(f'$m_s$:{math.atan(b1_s)*K:.1f}°; $m_y$:{math.atan(b1_y)*K:.1f}°',
                         fontsize=11)
+        ax[0].set_xlabel(parent_name)
+        ax[0].set_ylabel(f"$$ \mathrm{{{target_name}}} / \phi_{{{target_name}}} $$")
+
 
         # Represent distributions
         pd.DataFrame(s).plot(kind='density', ax=ax[1], label="shap")
@@ -651,22 +654,21 @@ class ShapEstimator(BaseEstimator):
         s_resid = r.shap_model.get_influence().resid_studentized_internal
         y_resid = r.parent_model.get_influence().resid_studentized_internal
         scaler = StandardScaler()
-        s_fitted_scaled = scaler.fit_transform(
-            r.shap_model.fittedvalues.reshape(-1, 1))
-        y_fitted_scaled = scaler.fit_transform(
-            r.parent_model.fittedvalues.reshape(-1, 1))
+        s_fitted_scaled = scaler.fit_transform(r.shap_model.fittedvalues.reshape(-1, 1))
+        y_fitted_scaled = scaler.fit_transform(r.parent_model.fittedvalues.reshape(-1, 1))
         ax[2].scatter(s_fitted_scaled, s_resid, alpha=0.5, marker='.')
-        ax[2].scatter(y_fitted_scaled, y_resid, alpha=0.4,
-                      marker='.', color='tab:orange')
-        ax[2].set_title(
-            f"Shap {shap_label}; Parent {parent_label}", fontsize=11)
+        ax[2].scatter(y_fitted_scaled, y_resid, alpha=0.5, marker='.', color='tab:orange')
+        ax[2].set_title(f"Shap {shap_label}; Parent {parent_label}", fontsize=11)
+        ax[2].set_xlabel(f"$$ \mathrm{{{target_name}}} /  \phi_{{{target_name}}} $$")
+        ax[2].set_ylabel(f"$$ \epsilon_{{{target_name}}} / \epsilon_\phi $$")
 
         # Represent target vs. SHAP values
         ax[3].scatter(s, y, alpha=0.3, marker='.', color='tab:grey')
         ax[3].set_title(f"Corr: {r.shap_correlation:.2f}", fontsize=11)
+        ax[3].set_xlabel(f"$$ \phi_{{{target_name}}} $$")
+        ax[3].set_ylabel(f"$$ \mathrm{{{target_name}}} $$")
 
         for ax_idx in range(4):
-            ax[ax_idx].set_xlabel(parent_name)
             _remove_ticks_and_box(ax[ax_idx])
 
 
