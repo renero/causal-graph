@@ -78,6 +78,7 @@ class Rex(BaseEstimator, ClassifierMixin):
             condsize: int = 0,
             verbose: bool = False,
             prog_bar=True,
+            silent: bool = False,
             do_plot_correlations: bool = False,
             do_plot_shap: bool = False,
             do_plot_discrepancies: bool = False,
@@ -143,6 +144,8 @@ class Rex(BaseEstimator, ClassifierMixin):
                 Default is False.
             verbose (bool): Whether to print the progress of the training. Default
                 is False.
+            silent (bool): Whether to print anything. Default is False. This overrides
+                the verbose argument and the prog_bar argument.
             random_state (int): The seed for the random number generator.
                 Default is 1234.
 
@@ -196,6 +199,7 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.condsize = condsize
         self.prog_bar = prog_bar
         self.verbose = verbose
+        self.silent = silent
         self.random_state = random_state
 
         self.do_plot_correlations = do_plot_correlations
@@ -246,7 +250,8 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.X = copy(X)
         self.y = copy(y) if y is not None else None
 
-        pipeline = Pipeline(self, prog_bar=self.prog_bar, verbose=self.verbose)
+        pipeline = Pipeline(self, prog_bar=self.prog_bar, verbose=self.verbose,
+                            silent=self.silent)
         steps = [
             ('regressor', NNRegressor),
             'regressor.fit',

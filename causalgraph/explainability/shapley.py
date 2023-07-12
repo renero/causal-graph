@@ -15,6 +15,8 @@ import shap
 import statsmodels.api as sm
 import statsmodels.stats.api as sms
 import torch
+
+from shap.maskers import Independent
 from matplotlib import pyplot as plt
 from matplotlib.ticker import FormatStrFormatter
 from scipy.stats import kstest, spearmanr
@@ -68,7 +70,8 @@ class ShapEstimator(BaseEstimator):
             min_impact: float = 1e-06,
             on_gpu: bool = False,
             verbose: bool = False,
-            prog_bar: bool = True):
+            prog_bar: bool = True,
+            silent: bool = False):
         """
         """
         self.explainer = explainer
@@ -82,6 +85,7 @@ class ShapEstimator(BaseEstimator):
         self.min_impact = min_impact
         self.verbose = verbose
         self.prog_bar = prog_bar
+        self.silent_ = silent
         self.on_gpu = on_gpu
 
         self._fit_desc = f"Running SHAP explainer ({explainer.__name__})"
@@ -120,13 +124,14 @@ class ShapEstimator(BaseEstimator):
         # X, y = check_X_y(X, y, accept_sparse=True)
 
         self.all_feature_names_ = list(self.models.regressor.keys())
+        self.shap_explainer = dict()
         self.shap_values = dict()
         self.shap_scaled_values = dict()
         self.shap_mean_values = dict()
         self.feature_order = dict()
 
         pbar = tqdm(total=len(self.all_feature_names_),
-                    **tqdm_params(self._fit_desc, self.prog_bar))
+                    **tqdm_params(self._fit_desc, self.prog_bar, silent=self.silent_))
         
         self.X_train, self.X_test = train_test_split(X, test_size=0.2, random_state=42)
 
@@ -136,15 +141,19 @@ class ShapEstimator(BaseEstimator):
             # Get the model and the data (tensor form)
             model = self.models.regressor[target_name].model
             model = model.cuda() if self.on_gpu else model.cpu()
-            # if self.explainer == shap.DeepExplainer or self.explainer == shap.GradientExplainer:
-            X_train_tensor = torch.tensor(self.X_train.drop(target_name, axis=1).values).float()
-            X_test_tensor = torch.tensor(self.X_test.drop(target_name, axis=1).values).float()
-            X_train = X_train_tensor.cpu().numpy()
-            X_test = X_test_tensor.cpu().numpy()
+            X_train = self.X_train.drop(target_name, axis=1).values
+            X_test = self.X_test.drop(target_name, axis=1).values
+            if X_test.shape[0] > 200:
+                X_test = shap.sample(X_test, 200)
+                print(f"Reduced X_test to {X_test.shape[0]} samples") if self.verbose else None
 
             # Run the selected SHAP explainer
-            my_explainer = self.explainer(model.predict, X_train)
-            self.shap_values[target_name] = my_explainer(X_test).values
+            self.shap_explainer[target_name] = self.explainer(model.predict, X_train)
+            if self.explainer == shap.KernelExplainer:
+                self.shap_values[target_name] = self.shap_explainer[target_name].shap_values(X_test)[0]
+            else:
+                explanation = self.shap_explainer[target_name](X_test)
+                self.shap_values[target_name] = explanation.values
 
             # Scale the SHAP values
             scaler = StandardScaler()
@@ -206,7 +215,8 @@ class ShapEstimator(BaseEstimator):
         check_is_fitted(self, 'is_fitted_')
 
         pbar = tqdm(total=4,
-                    **tqdm_params("Building graph from SHAPs", self.prog_bar))
+                    **tqdm_params("Building graph from SHAPs", self.prog_bar,
+                                  silent=self.silent_))
 
         self._compute_discrepancies(self.X_test) # (X)
 
@@ -293,7 +303,8 @@ class ShapEstimator(BaseEstimator):
         self.shap_discrepancies = dict()
         for target_name in tqdm(
                 self.all_feature_names_,
-                **tqdm_params("Computing Shap discrepancies", self.prog_bar)):
+                **tqdm_params("Computing Shap discrepancies", self.prog_bar,
+                              silent=self.silent_)):
 
             X_features = X.drop(target_name, axis=1)
             y = X[target_name].values
@@ -347,10 +358,10 @@ class ShapEstimator(BaseEstimator):
         # If the p-value is less than the significance level (0.05), we reject the
         # null hypothesis and conclude that heteroscedasticity is present.
         test_shap = sms.het_breuschpagan(model_s.resid, X)
-        shap_heteroskedasticity = test_shap[1] > 0.05
+        shap_heteroskedasticity = test_shap[1] < 0.05
 
         test_parent = sms.het_breuschpagan(model_y.resid, X)
-        parent_heteroskedasticity = test_parent[1] > 0.05
+        parent_heteroskedasticity = test_parent[1] < 0.05
 
         corr = spearmanr(s, y)
         discrepancy = 1 - np.abs(corr.correlation)
@@ -660,7 +671,7 @@ class ShapEstimator(BaseEstimator):
         y_fitted_scaled = scaler.fit_transform(r.parent_model.fittedvalues.reshape(-1, 1))
         ax[2].scatter(s_fitted_scaled, s_resid, alpha=0.5, marker='.')
         ax[2].scatter(y_fitted_scaled, y_resid, alpha=0.5, marker='.', color='tab:orange')
-        ax[2].set_title(f"Shap {shap_label}; Parent {parent_label}", fontsize=11)
+        ax[2].set_title(f"Parent {parent_label}; Shap {shap_label}", fontsize=10)
         ax[2].set_xlabel(f"$$ \mathrm{{{target_name}}} /  \phi_{{{target_name}}} $$")
         ax[2].set_ylabel(f"$$ \epsilon_{{{target_name}}} / \epsilon_\phi $$")
 
@@ -678,13 +689,14 @@ if __name__ == "__main__":
     np.set_printoptions(precision=4, linewidth=150)
     warnings.filterwarnings('ignore')
 
-    dataset_name = 'generated_linear_10'
-    data = pd.read_csv("~/phd/data/generated_linear_10_tiny.csv")
+    dataset_name = 'rex_generated_polynomial_1'
+    data = pd.read_csv(f"~/phd/data/RC3/{dataset_name}.csv")
     ref_graph = graph_from_dot_file(
-        "/Users/renero/phd/data/generated_linear_10_tiny.dot")
+        "/Users/renero/phd/data/RC3/rex_generated_polynomial_1.dot")
     rex = load_experiment('rex', "/Users/renero/phd/output/RC3")
     # rex = Rex(prog_bar=False, verbose=True).fit(data, ref_graph)
     rex.prog_bar = False
     rex.verbose = True
-    rex.shaps = ShapEstimator(models=rex.regressor)
+    rex.shaps = ShapEstimator(models=rex.regressor, explainer=shap.KernelExplainer)
     rex.shaps.fit(data)
+    rex.shaps.predict(data)

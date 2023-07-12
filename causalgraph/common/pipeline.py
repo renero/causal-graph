@@ -111,7 +111,8 @@ class Pipeline:
             self, 
             host: type, 
             prog_bar: bool = True, 
-            verbose: bool = False):
+            verbose: bool = False,
+            silent: bool = False):
         """
         Parameters
         ----------
@@ -119,9 +120,10 @@ class Pipeline:
             Object containing the parameters to be used in the execution steps.
         """
         self.host = host
-        self._verbose = verbose
-        self._prog_bar = prog_bar
-        self._objects = {'host': self.host}
+        self.verbose_ = verbose
+        self.prog_bar_ = prog_bar
+        self.silent_ = silent
+        self.objects_ = {'host': self.host}
 
         # When passing a class to the pipeline, the pipeline will call the 
         # default method specified by _default_object_method, and will pass
@@ -255,8 +257,8 @@ class Pipeline:
                 # Two possibilities here: either the parameter is a normal value, 
                 # in which case we simply take it, or is the name of an object created
                 # in a previous step, in which case we take the object.
-                if method_arguments[parameter] in self._objects.keys():
-                    params[parameter] = self._objects[method_arguments[parameter]]
+                if method_arguments[parameter] in self.objects_.keys():
+                    params[parameter] = self.objects_[method_arguments[parameter]]
                 else:
                     params[parameter] = method_arguments[parameter]
                 continue
@@ -294,12 +296,13 @@ class Pipeline:
             an attribute of the host object or a value.
         """
         self._pbar = tqdm(total=len(steps), 
-                          **tqdm_params(desc, self._prog_bar, leave=False, position=0))
+                          **tqdm_params(desc, self.prog_bar_, leave=False, position=0,
+                                        silent=self.silent_))
         self._pbar.update(0)
-        print("-"*80) if self._verbose else None
+        print("-"*80) if self.verbose_ else None
 
         for step_name in steps:
-            print(f"Running step {step_name}") if self._verbose else None
+            print(f"Running step {step_name}") if self.verbose_ else None
 
             vble_name, step_call, step_parameters, step_arguments = \
                 self._get_step_components(step_name)
@@ -311,10 +314,10 @@ class Pipeline:
                 # Check if the new attribute created is an object and if so, 
                 # add it to the list of objects.
                 if type(return_value) is not type:
-                    self._objects[vble_name] = return_value
-                print(f"      New attribute: <{vble_name}>") if self._verbose else None
+                    self.objects_[vble_name] = return_value
+                print(f"      New attribute: <{vble_name}>") if self.verbose_ else None
                 
-            print("-"*80) if self._verbose else None
+            print("-"*80) if self.verbose_ else None
             self._pbar_update(1)
 
         self._pbar.close()
@@ -388,7 +391,7 @@ class Pipeline:
                 method_call = '.'.join(method_name.split('.')[1:])
             return_value = call_name(**list_of_params)
 
-        print("  > Return value:", type(return_value)) if self._verbose else None
+        print("  > Return value:", type(return_value)) if self.verbose_ else None
         return return_value
 
     def _pbar_update(self, step=1):

@@ -22,12 +22,14 @@ from causalgraph.common import tqdm_params
 class GraphIndependence(object):
 
     def __init__(self, base_graph, condlen: int = 1,
-                 condsize: int = 0, prog_bar: bool = True, verbose: bool = False):
+                 condsize: int = 0, prog_bar: bool = True, verbose: bool = False,
+                 silent: bool = False):
         self.base_graph = base_graph
         self.condlen = condlen
         self.condsize = condsize
         self.prog_bar = prog_bar
         self.verbose = verbose
+        self.silent_ = silent
 
         self._fit_desc = "Removing independent edges"
 
@@ -77,7 +79,7 @@ class GraphIndependence(object):
                 self.G_skl.add_node(col)
 
         pbar = tqdm(total=len(self.feature_names), 
-                    **tqdm_params(self._fit_desc, self.prog_bar))
+                    **tqdm_params(self._fit_desc, self.prog_bar, silent=self.silent_))
         for feature_name in self.feature_names:
             pbar.refresh()
             self._remove_independent_edges(feature_name, self.condlen, self.condsize)

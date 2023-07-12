@@ -347,11 +347,12 @@ def infer_causal_relationships(
         prune: bool = False,
         verbose=False,
         plot=False,
-        prog_bar=True
+        prog_bar=True,
+        silent=False
 ):
     shap_values = dict()
     pbar = tqdm(total=len(feature_names), 
-                **tqdm_params("Computing SHAPLEY values", prog_bar))
+                **tqdm_params("Computing SHAPLEY values", prog_bar, silent=silent))
                 # desc="Computing SHAPLEY values",
                 # disable=not prog_bar, position=1, leave=False)
     for target_name in feature_names:

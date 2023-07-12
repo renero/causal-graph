@@ -43,7 +43,8 @@ class NNRegressor(BaseEstimator):
             min_delta: float,
             random_state: int = 1234,
             verbose: bool = False,
-            prog_bar: bool = False):
+            prog_bar: bool = False,
+            silent: bool = False):
         """
         Train DFF networks for all variables in data. Each network will be trained to
         predict one of the variables in the data, using the rest as predictors plus one
@@ -89,6 +90,7 @@ class NNRegressor(BaseEstimator):
         self.random_state = random_state
         self.verbose = verbose
         self.prog_bar = prog_bar
+        self.silent_ = silent
 
         self.regressor = None
         self._fit_desc = "Training NNs"
@@ -117,7 +119,8 @@ class NNRegressor(BaseEstimator):
         # TODO: Remove multiple model selection and use only MLP
         model = DFFModel if self.model_type == "dff" else MLPModel
         pbar_in = tqdm(total=len(self.feature_names),
-                       **tqdm_params(self._fit_desc, self.prog_bar))
+                       **tqdm_params(self._fit_desc, self.prog_bar, 
+                                     silent=self.silent_))
                     # desc=f"{self._fit_desc:<25s}", position=1, leave=False,
                     # disable=not self.prog_bar)
         for target in self.feature_names:

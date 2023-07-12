@@ -15,7 +15,8 @@ def pairwise_mic(
     c=15,
     to_return='mic',
     est="mic_approx", 
-    progbar=True):
+    progbar=True, 
+    silent=False):
     """
     From a dataframe, compute the MIC for each pair of features. See
     https://github.com/minepy/minepy and https://github.com/minepy/mictools for 
@@ -47,7 +48,7 @@ def pairwise_mic(
     mic_p, tic_p = pstats(data.values.T, alpha=alpha, c=c, est=est)
     m = len(data.columns)
     mic, tic = np.ones((m, m)), np.ones((m, m))
-    pbar = tqdm(total=m*(m-1)/2, **tqdm_params("Computing MIC", progbar))
+    pbar = tqdm(total=m*(m-1)/2, **tqdm_params("Computing MIC", progbar, silent=silent))
                 # desc="Computing MIC", disable=not progbar, 
                 # position=1, leave=False)
     for i in range(m):
@@ -66,7 +67,7 @@ def pairwise_mic(
 
 
 @deprecated("Use pairwise_mic instead")
-def pairwise_MIC(data: pd.DataFrame, c=15, alpha=0.6, progbar=True):
+def pairwise_MIC(data: pd.DataFrame, c=15, alpha=0.6, progbar=True, silent=False):
     """
     From a dataframe, compute the MIC for each pair of features.
 
@@ -83,7 +84,8 @@ def pairwise_MIC(data: pd.DataFrame, c=15, alpha=0.6, progbar=True):
     list_pairs = list(combinations(list_nodes, 2))
     mine = MINE(alpha=alpha, c=c)
     score_df = pd.DataFrame(0, index=data.columns, columns=data.columns)
-    pbar = tqdm(total=len(list_pairs), **tqdm_params("Computing MIC", progbar))
+    pbar = tqdm(total=len(list_pairs), **tqdm_params("Computing MIC", progbar, 
+                                                     silent=silent))
                 # disable=not progbar, desc="Computing MIC", position=1, leave=False)
     for feat1, feat2 in list_pairs:
         pbar.update(1)
