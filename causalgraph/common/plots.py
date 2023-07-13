@@ -26,7 +26,7 @@ formatting_kwargs = {"node_size": 1000,
                      }
 
 
-def setup_plot(**kwargs): #tex=True, font="serif", dpi=100, font_size=10):
+def setup_plot(**kwargs): #tex=True, font="serif", dpi=75, font_size=10):
     """Customize figure settings.
 
     Args:
@@ -37,7 +37,7 @@ def setup_plot(**kwargs): #tex=True, font="serif", dpi=100, font_size=10):
     font_size = kwargs.pop("font_size", 10)
     usetex = kwargs.pop("usetex", True)
     font_familiy = kwargs.pop("font_family", "serif")
-    dpi = kwargs.pop("dpi", 100)
+    dpi = kwargs.pop("dpi", 75)
     format = kwargs.pop("format", "pdf")
     title_size = kwargs.pop("title_size", 8)
     axis_labelsize = kwargs.pop("axis_labelsize", 8)
