@@ -120,9 +120,9 @@ class Pipeline:
             Object containing the parameters to be used in the execution steps.
         """
         self.host = host
-        self.verbose_ = verbose
-        self.prog_bar_ = prog_bar
-        self.silent_ = silent
+        self.verbose = verbose
+        self.prog_bar = prog_bar
+        self.silent = silent
         self.objects_ = {'host': self.host}
 
         # When passing a class to the pipeline, the pipeline will call the 
@@ -262,15 +262,15 @@ class Pipeline:
                 else:
                     params[parameter] = method_arguments[parameter]
                 continue
-            # or if the parameter has a default value, use it.
-            elif default_value is not inspect.Parameter.empty:
-                params[parameter] = default_value
-                continue
-            # Otherwise, try to get the parameter from the host object or globals.
-            if hasattr(self.host, parameter):
+            # But always, try to get the parameter from the host object or globals.
+            elif hasattr(self.host, parameter):
                 params[parameter] = getattr(self.host, parameter)
             elif parameter in globals():
                 params[parameter] = globals()[parameter]
+            # or if the parameter has a default value, use it.
+            elif default_value is not inspect.Parameter.empty:
+                params[parameter] = default_value
+                # continue
             else:
                 raise ValueError(
                     f"Parameter \'{parameter}\' not found in host object or globals")
@@ -296,13 +296,13 @@ class Pipeline:
             an attribute of the host object or a value.
         """
         self._pbar = tqdm(total=len(steps), 
-                          **tqdm_params(desc, self.prog_bar_, leave=False, position=0,
-                                        silent=self.silent_))
+                          **tqdm_params(desc, self.prog_bar, leave=False, position=0,
+                                        silent=self.silent))
         self._pbar.update(0)
-        print("-"*80) if self.verbose_ else None
+        print("-"*80) if self.verbose else None
 
         for step_name in steps:
-            print(f"Running step {step_name}") if self.verbose_ else None
+            print(f"Running step {step_name}") if self.verbose else None
 
             vble_name, step_call, step_parameters, step_arguments = \
                 self._get_step_components(step_name)
@@ -315,9 +315,9 @@ class Pipeline:
                 # add it to the list of objects.
                 if type(return_value) is not type:
                     self.objects_[vble_name] = return_value
-                print(f"      New attribute: <{vble_name}>") if self.verbose_ else None
+                print(f"      New attribute: <{vble_name}>") if self.verbose else None
                 
-            print("-"*80) if self.verbose_ else None
+            print("-"*80) if self.verbose else None
             self._pbar_update(1)
 
         self._pbar.close()
@@ -391,7 +391,7 @@ class Pipeline:
                 method_call = '.'.join(method_name.split('.')[1:])
             return_value = call_name(**list_of_params)
 
-        print("  > Return value:", type(return_value)) if self.verbose_ else None
+        print("  > Return value:", type(return_value)) if self.verbose else None
         return return_value
 
     def _pbar_update(self, step=1):

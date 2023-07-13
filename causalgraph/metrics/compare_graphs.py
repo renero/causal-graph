@@ -208,8 +208,21 @@ def evaluate_graph(
     metrics["f1"] = _f1(metrics)
     metrics["aupr"] = _aupr(metrics)
     metrics["SHD"] = _SHD(metrics)
+    # Cross check if the number of nodes in the predicted graph is the same as the
+    # number of nodes in the ground truth graph
+    if len(predicted_graph.nodes()) < len(ground_truth.nodes()):
+        # Determine what are the nodes missing in the predicted graph
+        missing_nodes = list(set(ground_truth.nodes()) -
+                                set(predicted_graph.nodes()))
+        # Create a copy of the predicted graph
+        predicted_graph_copy = predicted_graph.copy()
+        # Add the missing nodes to the predicted graph
+        predicted_graph_copy.add_nodes_from(missing_nodes)
+        predicted_graph_array = nx.to_numpy_array(predicted_graph_copy)
+    else:
+        predicted_graph_array = nx.to_numpy_array(predicted_graph)
     metrics["SID"] = SID(trueGraph=nx.to_numpy_array(ground_truth), 
-                         estGraph=nx.to_numpy_array(predicted_graph))
+                         estGraph=predicted_graph_array)
 
     return Metrics(metrics["Tp"], metrics["Tn"], metrics["Fn"], metrics["Fp"],
                    metrics["precision"], metrics["recall"], metrics["aupr"],

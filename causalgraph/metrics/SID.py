@@ -381,16 +381,12 @@ def SID(
     Gp_undir = np.multiply(estGraph, estGraph.T)
     # Build an undirected graph from Gp_undir adjacency matrix
     gp_undir = nx.from_numpy_array(Gp_undir)
-    # gp_undir = np.array(Gp_undir)
     conn_comp = list(nx.connected_components(gp_undir))
     numConnComp = len(conn_comp)
     GpIsEssentialGraph = True
     for ll in range(numConnComp):
         conn_comp[ll] = np.array(list(conn_comp[ll]), dtype=int)
         if len(conn_comp[ll]) > 1:
-            # undir_adjacency = Gp_undir[np.ix_(conn_comp[ll], conn_comp[ll])]
-            # undir_graph = nx.from_numpy_array(undir_adjacency, create_using=nx.Graph)
-            # chordal = nx.is_chordal(undir_graph)
             chordal = igraph._igraph.GraphBase.is_chordal(
                 igraph.Graph.Weighted_Adjacency(
                     Gp_undir[np.ix_(conn_comp[ll], conn_comp[ll])].tolist(),
@@ -410,16 +406,21 @@ def SID(
             if len(conn_comp[ll]) > 1:
                 mmm = allDagsJonas(estGraph, conn_comp[ll])
             else:
-                # mmm = np.matrix(estGraph).reshape(1, p**2)
                 mmm = estGraph.flatten(order='F')
             if np.sum(mmm == -1) == 1:
                 GpIsEssentialGraph = False
-                # mmm = np.matrix(estGraph).reshape(1, p**2)
                 mmm = estGraph.flatten(order='F')
             newInd = np.arange(
                 1, p**3, p) - np.repeat(np.arange(0, (p-1)*((p**2)-1)+1, (p**2)-1), p)
-            #  Fix that Python starts counting from 0 instead 1, in R.
+            # Fix that Python starts counting from 0 instead 1, in R.
             newInd = newInd - 1
+            # Got an ocasional error here, when newInd is out of bounds.
+            # This is a quick fix, but should be investigated further.
+            # if int(np.sqrt(mmm.shape[1])) != p:
+            #     q = int(np.sqrt(mmm.shape[1]))
+            #     newInd = np.arange(
+            #         1, q**3, q) - np.repeat(np.arange(0, (q-1)*((q**2)-1)+1, (q**2)-1), q)
+            #     newInd = newInd - 1
             dimM = mmm.shape
             mmm = np.matrix(mmm[:, newInd]).reshape(dimM)
 

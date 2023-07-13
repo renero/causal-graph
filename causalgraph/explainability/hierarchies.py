@@ -31,19 +31,10 @@ class Hierarchies:
             alpha: float = 0.6,
             c: int = 15,
             linkage_method: str = 'complete',
-            **kwargs):
-        self.method = method
-        self.alpha = alpha
-        self.c = c
-        self.linkage_method = linkage_method
-        self.progbar = kwargs.get("progbar", False)
-
-
-    def fit(self, X: pd.DataFrame, y=None):
+            progbar: bool = False,
+            verbose: bool = False,
+            silent: bool = False):
         """
-        Compute the hierarchy of links between variables using the correlation method
-        specified in `corr_method`.
-
         Parameters
         ----------
             method (str or Callable) : Method to use to compute the correlation. 
@@ -53,6 +44,21 @@ class Hierarchies:
             linkage_method (str) : Method to use to compute the linkage. 
                 Default is 'complete'.
             **kwargs : Keyword arguments to be passed to the plot_dendogram function.
+        """
+        self.method = method
+        self.alpha = alpha
+        self.c = c
+        self.linkage_method = linkage_method
+        self.progbar_ = progbar
+        self.verbose_ = verbose
+        self.silent_ = silent
+
+
+    def fit(self, X: pd.DataFrame, y=None):
+        """
+        Compute the hierarchy of links between variables using the correlation method
+        specified in `corr_method`.
+
 
         Returns
         -------
@@ -66,7 +72,7 @@ class Hierarchies:
             self.correlations = self.data.corr(method=self.method)
         elif self.method == 'mic':
             self.correlations = pairwise_mic(
-                self.data, alpha=alpha, c=c, progbar=self.progbar)
+                self.data, alpha=alpha, c=c, progbar=self.progbar_)
         else:
             raise ValueError(
                 f"Unknown correlation method: {self.method}. \

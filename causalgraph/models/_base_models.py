@@ -107,6 +107,7 @@ class MLP(pl.LightningModule):
         yhat = self(x)
         loss = self.loss_fn(yhat, y)
         self.log("val_loss", loss, on_step=False, on_epoch=True)
+        return loss # xxx check out
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)

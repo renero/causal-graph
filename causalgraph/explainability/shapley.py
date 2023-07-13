@@ -85,10 +85,10 @@ class ShapEstimator(BaseEstimator):
         self.min_impact = min_impact
         self.verbose = verbose
         self.prog_bar = prog_bar
-        self.silent_ = silent
+        self.silent = silent
         self.on_gpu = on_gpu
 
-        self._fit_desc = f"Running SHAP explainer ({explainer.__name__})"
+        self._fit_desc = f"Running SHAP explainer ({self.explainer.__name__})"
         self._pred_desc = "Building graph skeleton"
 
     def __repr__(self):
@@ -131,7 +131,7 @@ class ShapEstimator(BaseEstimator):
         self.feature_order = dict()
 
         pbar = tqdm(total=len(self.all_feature_names_),
-                    **tqdm_params(self._fit_desc, self.prog_bar, silent=self.silent_))
+                    **tqdm_params(self._fit_desc, self.prog_bar, silent=self.silent))
         
         self.X_train, self.X_test = train_test_split(X, test_size=0.2, random_state=42)
 
@@ -148,10 +148,16 @@ class ShapEstimator(BaseEstimator):
                 print(f"Reduced X_test to {X_test.shape[0]} samples") if self.verbose else None
 
             # Run the selected SHAP explainer
-            self.shap_explainer[target_name] = self.explainer(model.predict, X_train)
             if self.explainer == shap.KernelExplainer:
+                self.shap_explainer[target_name] = self.explainer(model.predict, X_train)
                 self.shap_values[target_name] = self.shap_explainer[target_name].shap_values(X_test)[0]
+            elif self.explainer == shap.GradientExplainer:
+                X_train_tensor = torch.from_numpy(X_train).float()
+                X_test_tensor = torch.from_numpy(X_test).float()
+                self.shap_explainer[target_name] = self.explainer(model.predict, X_train_tensor)
+                self.shap_values[target_name] = self.shap_explainer[target_name].shap_values(X_test_tensor)[0]
             else:
+                self.shap_explainer[target_name] = self.explainer(model.predict, X_train)
                 explanation = self.shap_explainer[target_name](X_test)
                 self.shap_values[target_name] = explanation.values
 
@@ -216,7 +222,7 @@ class ShapEstimator(BaseEstimator):
 
         pbar = tqdm(total=4,
                     **tqdm_params("Building graph from SHAPs", self.prog_bar,
-                                  silent=self.silent_))
+                                  silent=self.silent))
 
         self._compute_discrepancies(self.X_test) # (X)
 
@@ -304,7 +310,7 @@ class ShapEstimator(BaseEstimator):
         for target_name in tqdm(
                 self.all_feature_names_,
                 **tqdm_params("Computing Shap discrepancies", self.prog_bar,
-                              silent=self.silent_)):
+                              silent=self.silent)):
 
             X_features = X.drop(target_name, axis=1)
             y = X[target_name].values
@@ -610,7 +616,7 @@ class ShapEstimator(BaseEstimator):
         return fig
 
     def _plot_discrepancies(self, X: pd.DataFrame, target_name: str, **kwargs):
-        mpl.rcParams['figure.dpi'] = 150
+        mpl.rcParams['figure.dpi'] = kwargs.get('dpi', 75)
         figsize_ = kwargs.get('figsize', (10, 16))
         feature_names = [
             f for f in self.all_feature_names_ if f != target_name]

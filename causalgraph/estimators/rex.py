@@ -22,6 +22,7 @@ from causalgraph.explainability.shapley import ShapEstimator
 from causalgraph.independence.graph_independence import GraphIndependence
 from causalgraph.metrics.compare_graphs import evaluate_graph
 from causalgraph.models.dnn import NNRegressor
+from causalgraph.explainability.hierarchies import Hierarchies
 
 
 class Rex(BaseEstimator, ClassifierMixin):
@@ -52,7 +53,7 @@ class Rex(BaseEstimator, ClassifierMixin):
             learning_rate: float = 0.0035,
             dropout: float = 0.065,
             batch_size: int = 45,
-            num_epochs: int = 25, #250,
+            num_epochs: int = 50,
             loss_fn='mse',
             devices="auto",
             test_size=0.1,
@@ -254,11 +255,13 @@ class Rex(BaseEstimator, ClassifierMixin):
                             silent=self.silent)
         steps = [
             ('regressor', NNRegressor),
-            'regressor.fit',
+            ('regressor.fit'),
             ('shaps', ShapEstimator, {'models': 'regressor'}),
-            'shaps.fit'
+            ('shaps.fit'),
+            ('hierarchies', Hierarchies),
+            ('hierarchies.fit')
         ]
-        pipeline.run(steps, "Training REX")
+        pipeline.run(steps, self._fit_desc)
 
         self.is_fitted_ = True
         return self
@@ -339,38 +342,75 @@ class Rex(BaseEstimator, ClassifierMixin):
         return subplots(self.shaps._plot_shap_summary, *plot_args, **kwargs);
 
 
-if __name__ == "__main__":
+def main():
     np.set_printoptions(precision=4, linewidth=150)
     warnings.filterwarnings('ignore')
 
     load = False
     save = False
-    dataset_name = 'generated_linear_10'
+    input_path = "/Users/renero/phd/data/RC3/"
+    output_path = input_path.replace('data', 'output')
+    dataset_name = 'rex_generated_polynomial_1'
 
-    data = pd.read_csv("~/phd/data/generated_linear_10.csv")
-    ref_graph = graph_from_dot_file("/Users/renero/phd/data/generated_linear_10.dot")
+    data = pd.read_csv(f"{input_path}{dataset_name}.csv")
+    ref_graph = graph_from_dot_file(f"{input_path}{dataset_name}.dot")
 
     if load:
-        rex = load_experiment('rex', "/Users/renero/phd/output/RC3")
+        rex = load_experiment('rex', output_path)
     else:
-        rex = Rex().fit(data, ref_graph)
+        rex = Rex(explainer=shap.Explainer, num_epochs=100, hidden_dim=[10],
+                  early_stop=False, learning_rate=0.002, batch_size=64, dropout=0.05)
+        rex.fit(data, ref_graph)
 
-    # rex.prog_bar = False
-    # rex.verbose = True
-
-    rex.verbose = True
+    rex.prog_bar = True
+    rex.verbose = False
     pred_graph = rex.predict(data)
-    rex.plot_shap_discrepancies('V6')
-
-    # Plot the SHAP values for each regression
-    plot_args = [(target_name) for target_name in rex.shaps.all_feature_names_]
-    subplots(rex.shaps._plot_shap_summary, *plot_args, dpi=100);
-
-    # Plot the predicted graph
-    plot_dags(pred_graph, ref_graph)
 
     metric = evaluate_graph(ref_graph, pred_graph, rex.shaps.all_feature_names_)
     print(metric)
 
+    rex.plot_shap_discrepancies('V6')
+
+    # Plot the SHAP values for each regression
+    plot_args = [(target_name) for target_name in rex.shaps.all_feature_names_]
+    subplots(rex.shaps._plot_shap_summary, *plot_args, dpi=75);
+
+    # Plot the predicted graph
+    plot_dags(pred_graph, ref_graph)
+
+
     if save:
         save_experiment('rex', "/Users/renero/phd/output/REX", rex)
+
+
+def main2():
+    import warnings
+    import shap
+
+    import numpy as np
+    import pandas as pd
+    from causalgraph.common.utils import graph_from_dot_file
+    from causalgraph.estimators.rex import Rex
+    from causalgraph.metrics.compare_graphs import evaluate_graph
+    from sklearn.preprocessing import StandardScaler
+
+    np.set_printoptions(precision=4, linewidth=150)
+    warnings.filterwarnings('ignore')
+
+    path = "/Users/renero/phd/data/RC3/"
+    dataset_name = 'rex_generated_polynomial_1'
+
+    ref_graph = graph_from_dot_file(f"{path}{dataset_name}.dot")
+    data = pd.read_csv(f"{path}{dataset_name}.csv")
+    scaler = StandardScaler()
+    data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)
+
+    rex = Rex(explainer=shap.Explainer, num_epochs=100, hidden_dim=[10],
+            early_stop=False, learning_rate=0.002, batch_size=64, dropout=0.05)
+    rex.fit(data, ref_graph)
+    pred_graph = rex.predict(data)
+    print(evaluate_graph(ref_graph, rex.G_shap, rex.shaps.all_feature_names_))
+
+
+if __name__ == "__main__":
+    main2()

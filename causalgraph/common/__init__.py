@@ -8,7 +8,7 @@ RESET = colorama.Style.RESET_ALL
 def tqdm_params(desc, progbar, leave=False, position=1, silent=False):
    return {
     "desc": f"{desc:<25}",
-    "disable": not progbar | silent, 
+    "disable": ((not progbar) or silent), 
     "position": position, 
     "leave": leave,
     # "ascii": True,

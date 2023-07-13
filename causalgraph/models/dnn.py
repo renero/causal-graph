@@ -10,8 +10,7 @@ from sklearn.utils.validation import check_array, check_is_fitted
 from tqdm.auto import tqdm
 
 from causalgraph.common import GRAY, GREEN, RESET, tqdm_params
-
-from ._models import MLPModel
+from causalgraph.models._models import MLPModel
 
 # import sys
 # sys.path.append("../dnn")
@@ -90,7 +89,7 @@ class NNRegressor(BaseEstimator):
         self.random_state = random_state
         self.verbose = verbose
         self.prog_bar = prog_bar
-        self.silent_ = silent
+        self.silent = silent
 
         self.regressor = None
         self._fit_desc = "Training NNs"
@@ -120,7 +119,7 @@ class NNRegressor(BaseEstimator):
         model = DFFModel if self.model_type == "dff" else MLPModel
         pbar_in = tqdm(total=len(self.feature_names),
                        **tqdm_params(self._fit_desc, self.prog_bar, 
-                                     silent=self.silent_))
+                                     silent=self.silent))
                     # desc=f"{self._fit_desc:<25s}", position=1, leave=False,
                     # disable=not self.prog_bar)
         for target in self.feature_names:
@@ -223,15 +222,15 @@ if __name__ == "__main__":
 
     warnings.filterwarnings("ignore", category=UserWarning)
 
-    dataset_name = 'generated_linear_10'
-    data = pd.read_csv("~/phd/data/generated_linear_10.csv")
+    dataset_name = 'rex_generated_polynomial_1'
+    data = pd.read_csv(f"~/phd/data/RC3/{dataset_name}.csv")
 
     nn = NNRegressor(
         model_type="mlp",
-        hidden_dim=[40, 60, 40],
-        learning_rate=0.1,
+        hidden_dim=[10, 5],
+        learning_rate=0.2,
         dropout=0.05,
-        batch_size=16,
+        batch_size=32,
         num_epochs=50,
         loss_fn="mse",
         devices="auto",
