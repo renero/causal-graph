@@ -4,6 +4,7 @@ import warnings
 from copy import copy
 from pathlib import Path
 from typing import Any, List, Tuple, Union
+import inspect
 
 import networkx as nx
 import numpy as np
@@ -12,6 +13,7 @@ import shap
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.utils.validation import (check_array, check_is_fitted,
                                       check_random_state)
+from sklearn.ensemble import GradientBoostingRegressor
 
 from causalgraph.common import GRAY, GREEN, RESET
 from causalgraph.common.pipeline import Pipeline
@@ -48,15 +50,7 @@ class Rex(BaseEstimator, ClassifierMixin):
 
     def __init__(
             self,
-            model_type: str = 'mlp',
-            hidden_dim: Union[int, List[int]] = [20, 20, 40],
-            learning_rate: float = 0.0035,
-            dropout: float = 0.065,
-            batch_size: int = 45,
-            num_epochs: int = 50,
-            loss_fn='mse',
-            devices="auto",
-            test_size=0.1,
+            model_type: BaseEstimator = NNRegressor,
             explainer=shap.Explainer,
             sensitivity=1.0,
             descending=False,
@@ -65,9 +59,6 @@ class Rex(BaseEstimator, ClassifierMixin):
             iters=10,
             reciprocal=False,
             min_impact=1e-06,
-            early_stop: bool = True,
-            patience: int = 10,
-            min_delta: float = 0.001,
             corr_method: str = 'spearman',
             corr_alpha: float = 0.6,
             corr_clusters: int = 15,
@@ -89,22 +80,13 @@ class Rex(BaseEstimator, ClassifierMixin):
             shap_fsize: Tuple[int, int] = (10, 10),
             dpi: int = 75,
             pdf_filename: str = None,
-            random_state=1234):
+            random_state=1234, 
+            **kwargs):
         """
         Arguments:
         ----------
-            model_type (str): The type of neural network to use. Either 'dff' or 'mlp'.
-            hidden_dim (int): The dimensions of each hidden layer. For DFF networks
-                this is a single integer. For MLP networks this is an array with the
-                dimensions of each hidden layer.
-            learning_rate (float): The learning rate for the optimizer.
-            dropout (float): The dropout rate for the dropout layer.
-            batch_size (int): The batch size for the optimizer.
-            num_epochs (int): The number of epochs for the optimizer.
-            loss_fn (str): The loss function to use. Default is "mse".
-            gpus (int): The number of GPUs to use. Default is 0.
-            test_size (float): The proportion of the data to use for testing. Default
-                is 0.1.
+            model_type (BaseEstimator): The type of model to use. Either NNRegressor 
+                or SKLearn GradientBoostingRegressor.
             explainer (shap.Explainer): The explainer to use for the shap values.
             sensitivity (float): The sensitivity of the Knee algorithm. Default is 1.0.
             descending (bool): Whether to determine the cutoff for the most
@@ -120,10 +102,6 @@ class Rex(BaseEstimator, ClassifierMixin):
             min_impact (float): The minimum impact of all features to be selected.
                 If all features have an impact below this value, then none of them
                 will be selected. Default is 1e-06.
-            early_stop (bool): Whether to use early stopping. Default is True.
-            patience (int): The patience for the early stopping. Default is 10.
-            min_delta (float): The minimum change in the loss to trigger the early
-                stopping. Default is 0.001.
             corr_method (str): The method to use for the correlation.
                 Default is "spearman", but it can also be 'pearson', 'kendall or 'mic'.
             corr_alpha (float): The alpha value for the correlation. Default is 0.6.
@@ -169,20 +147,8 @@ class Rex(BaseEstimator, ClassifierMixin):
                     be saved. Default is None, producing no pdf file.
         """
         self.model_type = model_type
-        self.hidden_dim = hidden_dim
-        self.learning_rate = learning_rate
-        self.dropout = dropout
-        self.batch_size = batch_size
-        self.num_epochs = num_epochs
-        self.loss_fn = loss_fn
-        self.devices = devices
-        self.have_gpu = (isinstance(self.devices, int) and self.devices != 0)
-        self.test_size = test_size
         self.explainer = explainer
         self.min_impact = min_impact
-        self.early_stop = early_stop
-        self.patience = patience
-        self.min_delta = min_delta
         self.sensitivity = sensitivity
         self.descending = descending
         self.tolerance = tolerance
@@ -212,6 +178,15 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.shap_fsize = shap_fsize
         self.dpi = dpi
         self.pdf_filename = pdf_filename
+
+        # Check if any of the arguments required by Regressor (model_type) are
+        # present in the kwargs. If so, take them as a property of the class.
+        arguments = inspect.signature(self.model_type.__init__).parameters
+        constructor_parameters = {arg: arguments[arg].default for arg in arguments.keys()}
+        constructor_parameters.pop('self', None)
+        for param in constructor_parameters.keys():
+            if param in kwargs:
+                setattr(self, param, kwargs[param])
 
         self._fit_desc = "Running Causal Discovery pipeline"
         os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
@@ -254,7 +229,7 @@ class Rex(BaseEstimator, ClassifierMixin):
         pipeline = Pipeline(self, prog_bar=self.prog_bar, verbose=self.verbose,
                             silent=self.silent)
         steps = [
-            ('regressor', NNRegressor),
+            ('regressor', self.model_type),
             ('regressor.fit'),
             ('shaps', ShapEstimator, {'models': 'regressor'}),
             ('shaps.fit'),
@@ -405,8 +380,10 @@ def main2():
     scaler = StandardScaler()
     data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)
 
-    rex = Rex(explainer=shap.GradientExplainer, num_epochs=1, hidden_dim=[10],
+    rex = Rex(model_type=GradientBoostingRegressor, explainer=shap.Explainer, 
+              num_epochs=1, hidden_dim=[10],
             early_stop=False, learning_rate=0.002, batch_size=64, dropout=0.2)
+    print(rex)
     rex.fit(data, ref_graph)
     pred_graph = rex.predict(data)
     print(evaluate_graph(ref_graph, rex.G_shap, rex.shaps.all_feature_names_))

@@ -197,7 +197,7 @@ class Pipeline:
         """
         method = None
         # If the step call is a class, get the default method of the class.
-        if type(step_call) is type:
+        if type(step_call) is type or inspect.isclass(step_call):
             # return getattr(step_call, self._default_object_method)
             return getattr(step_call, '__init__')
 
@@ -359,7 +359,7 @@ class Pipeline:
             if type(step_name) is types.FunctionType or type(step_name) is types.MethodType:
                 return_value = step_name(**list_of_params)
             # check if type of step_name is a class
-            elif type(step_name) is type:
+            elif type(step_name) is type or inspect.isclass(step_name):
                 obj = step_name(**list_of_params)
                 return_value = obj
             else:

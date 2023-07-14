@@ -25,6 +25,7 @@ from sklearn.discriminant_analysis import StandardScaler
 from sklearn.isotonic import spearmanr
 from sklearn.model_selection import train_test_split
 from sklearn.utils.validation import check_is_fitted
+from sklearn.base import BaseEstimator
 from tqdm.auto import tqdm
 
 from causalgraph.common import *
@@ -60,7 +61,7 @@ class ShapEstimator(BaseEstimator):
     def __init__(
             self,
             explainer = shap.Explainer,
-            models: NNRegressor = None,
+            models: BaseEstimator = None,
             method: str = 'cluster',
             sensitivity: float = 1.0,
             tolerance: float = None,

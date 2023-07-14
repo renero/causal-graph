@@ -28,18 +28,17 @@ class NNRegressor(BaseEstimator):
 
     def __init__(
             self,
-            model_type: str,
-            hidden_dim: Union[int, List[int]],
-            learning_rate: float,
-            dropout: float,
-            batch_size: int,
-            num_epochs: int,
-            loss_fn: str,
-            devices: Union[int, str],
-            test_size: float,
-            early_stop: bool,
-            patience: int,
-            min_delta: float,
+            hidden_dim: Union[int, List[int]] = [36, 12],
+            learning_rate: float = 0.0035,
+            dropout: float = 0.065,
+            batch_size: int = 45,
+            num_epochs: int = 50,
+            loss_fn: str = 'mse',
+            devices: Union[int, str] = "auto",
+            test_size: float = 0.1,
+            early_stop: bool = True,
+            patience: int = 10,
+            min_delta: float = 0.001,
             random_state: int = 1234,
             verbose: bool = False,
             prog_bar: bool = False,
@@ -74,7 +73,6 @@ class NNRegressor(BaseEstimator):
             dict: A dictionary with the trained DFF networks, using the name of the
                 variables as the key.
         """
-        self.model_type = model_type
         self.hidden_dim = hidden_dim
         self.learning_rate = learning_rate
         self.dropout = dropout
@@ -115,16 +113,13 @@ class NNRegressor(BaseEstimator):
         self.feature_names = list(X.columns)
         self.regressor = dict()
 
-        # TODO: Remove multiple model selection and use only MLP
-        model = DFFModel if self.model_type == "dff" else MLPModel
         pbar_in = tqdm(total=len(self.feature_names),
                        **tqdm_params(self._fit_desc, self.prog_bar, 
                                      silent=self.silent))
-                    # desc=f"{self._fit_desc:<25s}", position=1, leave=False,
-                    # disable=not self.prog_bar)
+
         for target in self.feature_names:
             pbar_in.refresh()
-            self.regressor[target] = model(
+            self.regressor[target] = MLPModel(
                 target=target,
                 input_size=self.n_features_in_,
                 hidden_dim=self.hidden_dim,
@@ -226,7 +221,6 @@ if __name__ == "__main__":
     data = pd.read_csv(f"~/phd/data/RC3/{dataset_name}.csv")
 
     nn = NNRegressor(
-        model_type="mlp",
         hidden_dim=[10, 5],
         learning_rate=0.2,
         dropout=0.05,
