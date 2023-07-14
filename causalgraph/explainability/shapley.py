@@ -154,8 +154,8 @@ class ShapEstimator(BaseEstimator):
             elif self.explainer == shap.GradientExplainer:
                 X_train_tensor = torch.from_numpy(X_train).float()
                 X_test_tensor = torch.from_numpy(X_test).float()
-                self.shap_explainer[target_name] = self.explainer(model.predict, X_train_tensor)
-                self.shap_values[target_name] = self.shap_explainer[target_name].shap_values(X_test_tensor)[0]
+                self.shap_explainer[target_name] = self.explainer(model, X_train_tensor)
+                self.shap_values[target_name] = self.shap_explainer[target_name](X_test_tensor).values
             else:
                 self.shap_explainer[target_name] = self.explainer(model.predict, X_train)
                 explanation = self.shap_explainer[target_name](X_test)

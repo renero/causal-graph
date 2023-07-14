@@ -405,8 +405,8 @@ def main2():
     scaler = StandardScaler()
     data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)
 
-    rex = Rex(explainer=shap.Explainer, num_epochs=100, hidden_dim=[10],
-            early_stop=False, learning_rate=0.002, batch_size=64, dropout=0.05)
+    rex = Rex(explainer=shap.GradientExplainer, num_epochs=1, hidden_dim=[10],
+            early_stop=False, learning_rate=0.002, batch_size=64, dropout=0.2)
     rex.fit(data, ref_graph)
     pred_graph = rex.predict(data)
     print(evaluate_graph(ref_graph, rex.G_shap, rex.shaps.all_feature_names_))
