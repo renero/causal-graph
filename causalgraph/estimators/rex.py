@@ -5,6 +5,7 @@ from copy import copy
 from pathlib import Path
 from typing import Any, List, Tuple, Union
 import inspect
+from matplotlib import pyplot as plt
 
 import networkx as nx
 import numpy as np
@@ -13,6 +14,7 @@ import shap
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.utils.validation import (check_array, check_is_fitted,
                                       check_random_state)
+from sklearn.inspection import permutation_importance
 
 from causalgraph.common import GRAY, GREEN, RESET
 from causalgraph.common.pipeline import Pipeline
@@ -46,16 +48,6 @@ class Rex(BaseEstimator, ClassifierMixin):
     >>> estimator.fit(X, y)
     TemplateEstimator()
     """
-    """
-            method: str = 'cluster',
-            sensitivity: float = 1.0,
-            tolerance: float = None,
-            descending: bool = False,
-            iters: int = 20,
-            reciprocity: False = False,
-            min_impact: float = 1e-06,
-            on_gpu: bool = False,
-"""
 
     def __init__(
             self,
@@ -214,9 +206,9 @@ class Rex(BaseEstimator, ClassifierMixin):
         pipeline = Pipeline(self, prog_bar=self.prog_bar, verbose=self.verbose,
                             silent=self.silent)
         steps = [
-            ('regressor', self.model_type),
-            'regressor.fit',
-            ('shaps', ShapEstimator, {'models': 'regressor'}),
+            ('models', self.model_type),
+            'models.fit',
+            ('shaps', ShapEstimator, {'models': 'models'}),
             'shaps.fit',
             ('hierarchies', Hierarchies),
             'hierarchies.fit'
@@ -301,6 +293,28 @@ class Rex(BaseEstimator, ClassifierMixin):
         plot_args = [(target_name) for target_name in self.feature_names_]
         return subplots(self.shaps._plot_shap_summary, *plot_args, **kwargs);
 
+    def plot_permutation_importance(self, **kwargs):
+        assert self.is_fitted_, "Model not fitted yet"
+        plot_args = [(target_name) for target_name in self.feature_names_]
+        return subplots(self._plot_perm_imp, *plot_args, **kwargs);
+
+    def _plot_perm_imp(self, target, ax, **kwargs):
+        figsize_ = kwargs.get('figsize', (6, 3))
+        fig = None
+        if ax is None:
+            fig, ax = plt.subplots(1, 1, figsize=figsize_)
+
+        clf = self.models.regressor[target]
+        X = self.X.drop(columns=[target])
+        y = self.X[target]
+        result = permutation_importance(clf, X, y, n_repeats=10, random_state=0)
+        sorted_idx = result.importances_mean.argsort()
+        ax.barh(X.columns[sorted_idx], result.importances_mean[sorted_idx], 
+                xerr=result.importances_std[sorted_idx], align='center', alpha=0.5)
+
+        ax.set_title(f"Perm.Imp. {target}")
+        fig = ax.figure if fig is None else fig
+        return fig
 
 def main():
     np.set_printoptions(precision=4, linewidth=150)

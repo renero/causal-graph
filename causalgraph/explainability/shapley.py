@@ -148,6 +148,7 @@ class ShapEstimator(BaseEstimator):
                 model = model.cuda() if self.on_gpu else model.cpu()
             else:
                 model = self.models.regressor[target_name]
+
             X_train = self.X_train.drop(target_name, axis=1).values
             X_test = self.X_test.drop(target_name, axis=1).values
             if X_test.shape[0] > 200:
@@ -159,8 +160,8 @@ class ShapEstimator(BaseEstimator):
             if self.explainer == shap.KernelExplainer:
                 self.shap_explainer[target_name] = self.explainer(
                     model.predict, X_train)
-                self.shap_values[target_name] = self.shap_explainer[target_name].shap_values(X_test)[
-                    0]
+                self.shap_values[target_name] = self.shap_explainer[target_name].\
+                    shap_values(X_test)[0]
             elif self.explainer == shap.GradientExplainer:
                 X_train_tensor = torch.from_numpy(X_train).float()
                 X_test_tensor = torch.from_numpy(X_test).float()
@@ -727,8 +728,8 @@ class ShapEstimator(BaseEstimator):
         fig, ax = plt.subplots(1, 2, figsize=figsize)
         ax[0].set_title("Probability density")
         ax[1].set_title("Cumulative density")
-        ax[0].set_xlabel("SHAP value")
-        ax[1].set_xlabel("SHAP value")
+        ax[0].set_xlabel("Mean SHAP values")
+        ax[1].set_xlabel("Mean SHAP values")
         ax[0].set_ylabel("Probability")
         ax[1].set_ylabel("Cumulative probability")
         sns.histplot(data=self.all_mean_shap_values.flatten(),

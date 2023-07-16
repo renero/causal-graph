@@ -56,7 +56,7 @@ class GBTRegressor(GradientBoostingRegressor):
 
         self.silent = silent
         self.prog_bar = prog_bar
-        self._estimator_type = 'regressor'
+        self.regressor = None
         self._estimator_name = 'gbt'
         self._estimator_class = GradientBoostingRegressor
         self._fit_desc = "Training GBTs"

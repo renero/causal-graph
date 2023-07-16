@@ -8,6 +8,7 @@ of variables linked together?
 from typing import Callable, List, Tuple, Union
 
 import matplotlib.pyplot as plt
+import seaborn as sns
 import networkx as nx
 import numpy as np
 import pandas as pd
@@ -52,7 +53,6 @@ class Hierarchies:
         self.progbar_ = progbar
         self.verbose_ = verbose
         self.silent_ = silent
-
 
     def fit(self, X: pd.DataFrame, y=None):
         """
@@ -321,13 +321,13 @@ class Hierarchies:
         return cm
 
 
-    def plot(self, threshold=0.15, **kwargs):
+    def plot(self, threshold=0.1, **kwargs):
         """
         Plot the hierarchical clustering and correlation matrix of the data.
 
         https://www.kaggle.com/code/sgalella/correlation-heatmaps-with-hierarchical-clustering/notebook
         """
-        f_size = kwargs.get('figsize', (12, 4))
+        f_size = kwargs.get('figsize', (9, 4))
         title = kwargs.get('title', 'Correlation matrix')
         fontsize = kwargs.get('fontsize', 9)
         xrot = kwargs.get('xrot', 0)
@@ -346,7 +346,6 @@ class Hierarchies:
         ax1.set_ylabel("Dissimilarity")
         ax1.set_ylim(0, 1)
 
-        # correlations = clustered.corr()
         correlations, sorted_colnames = self._cluster_features(
             "spearman", threshold)
 
