@@ -197,7 +197,7 @@ class Pipeline:
         """
         method = None
         # If the step call is a class, get the default method of the class.
-        if type(step_call) is type:
+        if type(step_call) is type or inspect.isclass(step_call):
             # return getattr(step_call, self._default_object_method)
             return getattr(step_call, '__init__')
 
@@ -304,11 +304,19 @@ class Pipeline:
         for step_name in steps:
             print(f"Running step {step_name}") if self.verbose else None
 
+            # Get the method to be called, the parameters that the
+            # method accepts and the arguments to be passed to the method. 
+            # The variable name is the name to be given to the result of the call.
             vble_name, step_call, step_parameters, step_arguments = \
                 self._get_step_components(step_name)
             
+            # Given the parameters that the method accepts and the arguments
+            # passed for the method, build the parameters to be passed to the
+            # method, using default values or values from the host object.
             step_parameters = self._build_params(step_parameters, step_arguments)
             return_value = self.run_step(step_call, step_parameters)
+
+            # If return value needs to be stored in a variable, do it.
             if vble_name is not None:
                 setattr(self.host, vble_name, return_value)
                 # Check if the new attribute created is an object and if so, 
@@ -359,7 +367,7 @@ class Pipeline:
             if type(step_name) is types.FunctionType or type(step_name) is types.MethodType:
                 return_value = step_name(**list_of_params)
             # check if type of step_name is a class
-            elif type(step_name) is type:
+            elif type(step_name) is type or inspect.isclass(step_name):
                 obj = step_name(**list_of_params)
                 return_value = obj
             else:
