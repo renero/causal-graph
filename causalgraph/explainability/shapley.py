@@ -11,12 +11,11 @@ import matplotlib as mpl
 import networkx as nx
 import numpy as np
 import pandas as pd
+import seaborn as sns
 import shap
 import statsmodels.api as sm
 import statsmodels.stats.api as sms
 import torch
-
-from shap.maskers import Independent
 from matplotlib import pyplot as plt
 from matplotlib.ticker import FormatStrFormatter
 from scipy.stats import kstest, spearmanr
@@ -25,7 +24,6 @@ from sklearn.discriminant_analysis import StandardScaler
 from sklearn.isotonic import spearmanr
 from sklearn.model_selection import train_test_split
 from sklearn.utils.validation import check_is_fitted
-from sklearn.base import BaseEstimator
 from tqdm.auto import tqdm
 
 from causalgraph.common import *
@@ -124,19 +122,20 @@ class ShapEstimator(BaseEstimator):
         """
         # X, y = check_X_y(X, y, accept_sparse=True)
 
-        self.all_feature_names_ = list(self.models.regressor.keys())
+        self.feature_names_ = list(self.models.regressor.keys())
         self.shap_explainer = dict()
         self.shap_values = dict()
         self.shap_scaled_values = dict()
         self.shap_mean_values = dict()
         self.feature_order = dict()
+        self.all_mean_shap_values = []
 
-        pbar = tqdm(total=len(self.all_feature_names_),
+        pbar = tqdm(total=len(self.feature_names_),
                     **tqdm_params(self._fit_desc, self.prog_bar, silent=self.silent))
         
         self.X_train, self.X_test = train_test_split(X, test_size=0.2, random_state=42)
 
-        for target_name in self.all_feature_names_:
+        for target_name in self.feature_names_:
             pbar.update(1)
 
             # Get the model and the data (tensor form)
@@ -175,11 +174,13 @@ class ShapEstimator(BaseEstimator):
                 np.sum(np.abs(self.shap_values[target_name]), axis=0))
             self.shap_mean_values[target_name] = np.abs(
                 self.shap_values[target_name]).mean(0)
+            self.all_mean_shap_values.append(self.shap_mean_values[target_name])
 
             pbar.refresh()
 
         pbar.close()
 
+        self.all_mean_shap_values = np.array(self.all_mean_shap_values)
         self.is_fitted_ = True
         return self
 
@@ -234,9 +235,9 @@ class ShapEstimator(BaseEstimator):
         pbar.refresh()
 
         self.parents = dict()
-        for target in self.all_feature_names_:
+        for target in self.feature_names_:
             candidate_causes = [
-                f for f in self.all_feature_names_ if f != target]
+                f for f in self.feature_names_ if f != target]
             self.parents[target] = select_features(
                 values=self.shap_values[target],
                 feature_names=candidate_causes,
@@ -250,7 +251,7 @@ class ShapEstimator(BaseEstimator):
         pbar.refresh()
 
         G_shap_unoriented = nx.Graph()
-        for target in self.all_feature_names_:
+        for target in self.feature_names_:
             for parent in self.parents[target]:
                 # Add edges ONLY between nodes where SHAP recognizes both directions
                 if self.reciprocity:
@@ -309,10 +310,10 @@ class ShapEstimator(BaseEstimator):
         pd.DataFrame
             A dataframe containing the discrepancies for all features and all targets.
         """
-        self.discrepancies = pd.DataFrame(columns=self.all_feature_names_)
+        self.discrepancies = pd.DataFrame(columns=self.feature_names_)
         self.shap_discrepancies = dict()
         for target_name in tqdm(
-                self.all_feature_names_,
+                self.feature_names_,
                 **tqdm_params("Computing Shap discrepancies", self.prog_bar,
                               silent=self.silent)):
 
@@ -320,7 +321,7 @@ class ShapEstimator(BaseEstimator):
             y = X[target_name].values
 
             feature_names = [
-                f for f in self.all_feature_names_ if f != target_name]
+                f for f in self.feature_names_ if f != target_name]
 
             self.discrepancies.loc[target_name] = 0
             self.shap_discrepancies[target_name] = dict()
@@ -432,7 +433,7 @@ class ShapEstimator(BaseEstimator):
         else:
             increase_upper_tolerance = False
 
-        for target in self.all_feature_names_:
+        for target in self.feature_names_:
             target_mean = np.mean(self.discrepancies.loc[target].values)
             # Experimental
             if increase_upper_tolerance:
@@ -441,7 +442,7 @@ class ShapEstimator(BaseEstimator):
                 tolerance = 0.0
 
             # Iterate over the features and check if the edge should be reversed.
-            for feature in self.all_feature_names_:
+            for feature in self.feature_names_:
                 # If the edge is already reversed, skip it.
                 if (target, feature) in edges_reversed or \
                         feature == target or \
@@ -604,7 +605,7 @@ class ShapEstimator(BaseEstimator):
             fig, ax = plt.subplots(1, 1, figsize=figsize_)
 
         feature_inds = self.feature_order[target_name][:max_features_to_display]
-        feature_names = [f for f in self.all_feature_names_ if f != target_name]
+        feature_names = [f for f in self.feature_names_ if f != target_name]
         selected_features = [parent for parent in self.parents[target_name]]
 
         y_pos = np.arange(len(feature_inds))
@@ -624,7 +625,7 @@ class ShapEstimator(BaseEstimator):
         mpl.rcParams['figure.dpi'] = kwargs.get('dpi', 75)
         figsize_ = kwargs.get('figsize', (10, 16))
         feature_names = [
-            f for f in self.all_feature_names_ if f != target_name]
+            f for f in self.feature_names_ if f != target_name]
         fig, ax = plt.subplots(len(feature_names), 4, figsize=figsize_)
 
         for i, parent_name in enumerate(feature_names):
@@ -695,6 +696,21 @@ class ShapEstimator(BaseEstimator):
         for ax_idx in range(4):
             _remove_ticks_and_box(ax[ax_idx])
 
+    def plot_shap_values_distribution(self, **kwargs):
+        # Plot two subplots: one with probability density of "all_mean_shap_values"
+        # and another with the cumulative density of "all_shap_values"
+        figsize = kwargs.get('figsize', (7, 5))
+        fig, ax = plt.subplots(1, 2, figsize=figsize)
+        ax[0].set_title("Probability density")
+        ax[1].set_title("Cumulative density")
+        ax[0].set_xlabel("SHAP value")
+        ax[1].set_xlabel("SHAP value")
+        ax[0].set_ylabel("Probability")
+        ax[1].set_ylabel("Cumulative probability")
+        sns.histplot(data=self.all_mean_shap_values.flatten(), ax=ax[0], kde=True)
+        sns.ecdfplot(data=self.all_mean_shap_values.flatten(), ax=ax[1])
+        plt.tight_layout()
+        plt.show()
 
 if __name__ == "__main__":
     np.set_printoptions(precision=4, linewidth=150)

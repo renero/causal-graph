@@ -178,17 +178,20 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.dpi = dpi
         self.pdf_filename = pdf_filename
 
+        self._set_attributes_from_kwargs(self.model_type, kwargs)
+
+        self._fit_desc = "Running Causal Discovery pipeline"
+        os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+
+    def _set_attributes_from_kwargs(self, object_attribute, kwargs):
         # Check if any of the arguments required by Regressor (model_type) are
         # present in the kwargs. If so, take them as a property of the class.
-        arguments = inspect.signature(self.model_type.__init__).parameters
+        arguments = inspect.signature(object_attribute.__init__).parameters
         constructor_parameters = {arg: arguments[arg].default for arg in arguments.keys()}
         constructor_parameters.pop('self', None)
         for param in constructor_parameters.keys():
             if param in kwargs:
                 setattr(self, param, kwargs[param])
-
-        self._fit_desc = "Running Causal Discovery pipeline"
-        os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
     def _more_tags(self):
         return {
@@ -312,7 +315,7 @@ class Rex(BaseEstimator, ClassifierMixin):
 
     def plot_shap_values(self, **kwargs):
         assert self.is_fitted_, "Model not fitted yet"
-        plot_args = [(target_name) for target_name in self.shaps.all_feature_names_]
+        plot_args = [(target_name) for target_name in self.feature_names_]
         return subplots(self.shaps._plot_shap_summary, *plot_args, **kwargs);
 
 
@@ -386,7 +389,7 @@ def main2():
     print(rex)
     rex.fit(data)
     pred_graph = rex.predict(data)
-    print(evaluate_graph(ref_graph, rex.G_shap, rex.shaps.all_feature_names_))
+    print(evaluate_graph(ref_graph, rex.G_shap, rex.shaps.feature_names_))
 
 
 if __name__ == "__main__":
