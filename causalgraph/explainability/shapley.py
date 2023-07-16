@@ -58,10 +58,11 @@ class ShapEstimator(BaseEstimator):
 
     def __init__(
             self,
-            explainer = shap.Explainer,
+            explainer=shap.Explainer,
             models: BaseEstimator = None,
             method: str = 'cluster',
             sensitivity: float = 1.0,
+            mean_shap_percentile: float = 0.8,
             tolerance: float = None,
             descending: bool = False,
             iters: int = 20,
@@ -77,6 +78,7 @@ class ShapEstimator(BaseEstimator):
         self.models = models
         self.method = method
         self.sensitivity = sensitivity
+        self.mean_shap_percentile = mean_shap_percentile
         self.tolerance = tolerance
         self.descending = descending
         self.iters = iters
@@ -110,7 +112,8 @@ class ShapEstimator(BaseEstimator):
             elif isinstance(getattr(self, attr), pd.DataFrame):
                 ret += f"{attr:25} DataFrame {getattr(self, attr).shape}\n"
             elif isinstance(getattr(self, attr), dict):
-                keys_list = [f"{k}:{type(getattr(self, attr)[k])}" for k in getattr(self, attr).keys()]
+                keys_list = [
+                    f"{k}:{type(getattr(self, attr)[k])}" for k in getattr(self, attr).keys()]
                 ret += f"{attr:25} dict {keys_list}\n"
             else:
                 ret += f"{attr:25} {getattr(self, attr)}\n"
@@ -132,8 +135,9 @@ class ShapEstimator(BaseEstimator):
 
         pbar = tqdm(total=len(self.feature_names_),
                     **tqdm_params(self._fit_desc, self.prog_bar, silent=self.silent))
-        
-        self.X_train, self.X_test = train_test_split(X, test_size=0.2, random_state=42)
+
+        self.X_train, self.X_test = train_test_split(
+            X, test_size=0.2, random_state=42)
 
         for target_name in self.feature_names_:
             pbar.update(1)
@@ -148,19 +152,25 @@ class ShapEstimator(BaseEstimator):
             X_test = self.X_test.drop(target_name, axis=1).values
             if X_test.shape[0] > 200:
                 X_test = shap.sample(X_test, 200)
-                print(f"Reduced X_test to {X_test.shape[0]} samples") if self.verbose else None
+                print(
+                    f"Reduced X_test to {X_test.shape[0]} samples") if self.verbose else None
 
             # Run the selected SHAP explainer
             if self.explainer == shap.KernelExplainer:
-                self.shap_explainer[target_name] = self.explainer(model.predict, X_train)
-                self.shap_values[target_name] = self.shap_explainer[target_name].shap_values(X_test)[0]
+                self.shap_explainer[target_name] = self.explainer(
+                    model.predict, X_train)
+                self.shap_values[target_name] = self.shap_explainer[target_name].shap_values(X_test)[
+                    0]
             elif self.explainer == shap.GradientExplainer:
                 X_train_tensor = torch.from_numpy(X_train).float()
                 X_test_tensor = torch.from_numpy(X_test).float()
-                self.shap_explainer[target_name] = self.explainer(model, X_train_tensor)
-                self.shap_values[target_name] = self.shap_explainer[target_name](X_test_tensor).values
+                self.shap_explainer[target_name] = self.explainer(
+                    model, X_train_tensor)
+                self.shap_values[target_name] = self.shap_explainer[target_name](
+                    X_test_tensor).values
             else:
-                self.shap_explainer[target_name] = self.explainer(model.predict, X_train)
+                self.shap_explainer[target_name] = self.explainer(
+                    model.predict, X_train)
                 explanation = self.shap_explainer[target_name](X_test)
                 self.shap_values[target_name] = explanation.values
 
@@ -174,13 +184,17 @@ class ShapEstimator(BaseEstimator):
                 np.sum(np.abs(self.shap_values[target_name]), axis=0))
             self.shap_mean_values[target_name] = np.abs(
                 self.shap_values[target_name]).mean(0)
-            self.all_mean_shap_values.append(self.shap_mean_values[target_name])
+            self.all_mean_shap_values.append(
+                self.shap_mean_values[target_name])
 
             pbar.refresh()
 
         pbar.close()
 
         self.all_mean_shap_values = np.array(self.all_mean_shap_values)
+        self.mean_shap_threshold = np.quantile(
+            self.all_mean_shap_values, self.mean_shap_percentile)
+
         self.is_fitted_ = True
         return self
 
@@ -216,7 +230,7 @@ class ShapEstimator(BaseEstimator):
             X_test = X_test.cuda()
 
         return X_train, X_test
-    
+
     def predict(self, X):
         """
         Builds a causal graph from the shap values using a selection mechanism based
@@ -229,7 +243,7 @@ class ShapEstimator(BaseEstimator):
                     **tqdm_params("Building graph from SHAPs", self.prog_bar,
                                   silent=self.silent))
 
-        self._compute_discrepancies(self.X_test) # (X)
+        self._compute_discrepancies(self.X_test)  # (X)
 
         pbar.update(1)
         pbar.refresh()
@@ -618,6 +632,10 @@ class ShapEstimator(BaseEstimator):
         ax.set_title(
             target_name + " $\leftarrow$ " +
             (','.join(selected_features) if selected_features else 'ø'))
+        if self.mean_shap_threshold > 0.0 and \
+            self.mean_shap_threshold < np.max(self.shap_mean_values[target_name]):
+            ax.axvline(x=self.mean_shap_threshold, color='red', linestyle='--', 
+                       linewidth=0.5)
         fig = ax.figure if fig is None else fig
         return fig
 
@@ -664,27 +682,33 @@ class ShapEstimator(BaseEstimator):
         ax[0].set_title(f'$m_s$:{math.atan(b1_s)*K:.1f}°; $m_y$:{math.atan(b1_y)*K:.1f}°',
                         fontsize=11)
         ax[0].set_xlabel(parent_name)
-        ax[0].set_ylabel(f"$$ \mathrm{{{target_name}}} / \phi_{{{target_name}}} $$")
-
+        ax[0].set_ylabel(
+            f"$$ \mathrm{{{target_name}}} / \phi_{{{target_name}}} $$")
 
         # Represent distributions
         pd.DataFrame(s).plot(kind='density', ax=ax[1], label="shap")
         pd.DataFrame(y).plot(kind='density', ax=ax[1], label="parent")
         ax[1].legend().set_visible(False)
         ax[1].set_ylabel('')
-        ax[1].set_xlabel(f"$$ \mathrm{{{target_name}}} /  \phi_{{{target_name}}} $$")
+        ax[1].set_xlabel(
+            f"$$ \mathrm{{{target_name}}} /  \phi_{{{target_name}}} $$")
         ax[1].set_title(f'KS({r.ks_pvalue:.2g}) - {r.ks_result}', fontsize=11)
 
         # Represent fitted vs. residuals
         s_resid = r.shap_model.get_influence().resid_studentized_internal
         y_resid = r.parent_model.get_influence().resid_studentized_internal
         scaler = StandardScaler()
-        s_fitted_scaled = scaler.fit_transform(r.shap_model.fittedvalues.reshape(-1, 1))
-        y_fitted_scaled = scaler.fit_transform(r.parent_model.fittedvalues.reshape(-1, 1))
+        s_fitted_scaled = scaler.fit_transform(
+            r.shap_model.fittedvalues.reshape(-1, 1))
+        y_fitted_scaled = scaler.fit_transform(
+            r.parent_model.fittedvalues.reshape(-1, 1))
         ax[2].scatter(s_fitted_scaled, s_resid, alpha=0.5, marker='.')
-        ax[2].scatter(y_fitted_scaled, y_resid, alpha=0.5, marker='.', color='tab:orange')
-        ax[2].set_title(f"Parent {parent_label}; Shap {shap_label}", fontsize=10)
-        ax[2].set_xlabel(f"$$ \mathrm{{{target_name}}} /  \phi_{{{target_name}}} $$")
+        ax[2].scatter(y_fitted_scaled, y_resid, alpha=0.5,
+                      marker='.', color='tab:orange')
+        ax[2].set_title(
+            f"Parent {parent_label}; Shap {shap_label}", fontsize=10)
+        ax[2].set_xlabel(
+            f"$$ \mathrm{{{target_name}}} /  \phi_{{{target_name}}} $$")
         ax[2].set_ylabel(f"$$ \epsilon_{{{target_name}}} / \epsilon_\phi $$")
 
         # Represent target vs. SHAP values
@@ -707,10 +731,12 @@ class ShapEstimator(BaseEstimator):
         ax[1].set_xlabel("SHAP value")
         ax[0].set_ylabel("Probability")
         ax[1].set_ylabel("Cumulative probability")
-        sns.histplot(data=self.all_mean_shap_values.flatten(), ax=ax[0], kde=True)
+        sns.histplot(data=self.all_mean_shap_values.flatten(),
+                     ax=ax[0], kde=True)
         sns.ecdfplot(data=self.all_mean_shap_values.flatten(), ax=ax[1])
         plt.tight_layout()
         plt.show()
+
 
 if __name__ == "__main__":
     np.set_printoptions(precision=4, linewidth=150)
@@ -724,6 +750,7 @@ if __name__ == "__main__":
     # rex = Rex(prog_bar=False, verbose=True).fit(data, ref_graph)
     rex.prog_bar = False
     rex.verbose = True
-    rex.shaps = ShapEstimator(models=rex.regressor, explainer=shap.KernelExplainer)
+    rex.shaps = ShapEstimator(models=rex.regressor,
+                              explainer=shap.KernelExplainer)
     rex.shaps.fit(data)
     rex.shaps.predict(data)
