@@ -25,6 +25,7 @@ from causalgraph.independence.graph_independence import GraphIndependence
 from causalgraph.metrics.compare_graphs import evaluate_graph
 from causalgraph.models.dnn import NNRegressor
 from causalgraph.explainability.hierarchies import Hierarchies
+from models.gbt import GBTRegressor
 
 
 class Rex(BaseEstimator, ClassifierMixin):
@@ -230,11 +231,11 @@ class Rex(BaseEstimator, ClassifierMixin):
                             silent=self.silent)
         steps = [
             ('regressor', self.model_type),
-            ('regressor.fit'),
+            'regressor.fit',
             ('shaps', ShapEstimator, {'models': 'regressor'}),
-            ('shaps.fit'),
+            'shaps.fit',
             ('hierarchies', Hierarchies),
-            ('hierarchies.fit')
+            'hierarchies.fit'
         ]
         pipeline.run(steps, self._fit_desc)
 
@@ -380,11 +381,11 @@ def main2():
     scaler = StandardScaler()
     data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)
 
-    rex = Rex(model_type=GradientBoostingRegressor, explainer=shap.Explainer, 
+    rex = Rex(model_type=GBTRegressor, explainer=shap.Explainer, 
               num_epochs=1, hidden_dim=[10],
             early_stop=False, learning_rate=0.002, batch_size=64, dropout=0.2)
     print(rex)
-    rex.fit(data, ref_graph)
+    rex.fit(data)
     pred_graph = rex.predict(data)
     print(evaluate_graph(ref_graph, rex.G_shap, rex.shaps.all_feature_names_))
 

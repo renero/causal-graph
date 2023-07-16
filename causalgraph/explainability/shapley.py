@@ -140,8 +140,11 @@ class ShapEstimator(BaseEstimator):
             pbar.update(1)
 
             # Get the model and the data (tensor form)
-            model = self.models.regressor[target_name].model
-            model = model.cuda() if self.on_gpu else model.cpu()
+            if hasattr(self.models.regressor[target_name], "model"):
+                model = self.models.regressor[target_name].model
+                model = model.cuda() if self.on_gpu else model.cpu()
+            else:
+                model = self.models.regressor[target_name]
             X_train = self.X_train.drop(target_name, axis=1).values
             X_test = self.X_test.drop(target_name, axis=1).values
             if X_test.shape[0] > 200:
@@ -510,6 +513,7 @@ class ShapEstimator(BaseEstimator):
         suspicious. We found these suspicious values empirically in the polymoial case.
         """
         D = discrepancies.values
+        D = np.nan_to_num(D)
         det = np.linalg.det(D)
         norm = np.linalg.norm(D)
         cond = np.linalg.cond(D)

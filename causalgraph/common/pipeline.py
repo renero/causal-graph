@@ -304,11 +304,19 @@ class Pipeline:
         for step_name in steps:
             print(f"Running step {step_name}") if self.verbose else None
 
+            # Get the method to be called, the parameters that the
+            # method accepts and the arguments to be passed to the method. 
+            # The variable name is the name to be given to the result of the call.
             vble_name, step_call, step_parameters, step_arguments = \
                 self._get_step_components(step_name)
             
+            # Given the parameters that the method accepts and the arguments
+            # passed for the method, build the parameters to be passed to the
+            # method, using default values or values from the host object.
             step_parameters = self._build_params(step_parameters, step_arguments)
             return_value = self.run_step(step_call, step_parameters)
+
+            # If return value needs to be stored in a variable, do it.
             if vble_name is not None:
                 setattr(self.host, vble_name, return_value)
                 # Check if the new attribute created is an object and if so, 
