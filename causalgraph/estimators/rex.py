@@ -46,18 +46,21 @@ class Rex(BaseEstimator, ClassifierMixin):
     >>> estimator.fit(X, y)
     TemplateEstimator()
     """
+    """
+            method: str = 'cluster',
+            sensitivity: float = 1.0,
+            tolerance: float = None,
+            descending: bool = False,
+            iters: int = 20,
+            reciprocity: False = False,
+            min_impact: float = 1e-06,
+            on_gpu: bool = False,
+"""
 
     def __init__(
             self,
             model_type: BaseEstimator = NNRegressor,
             explainer=shap.Explainer,
-            sensitivity=1.0,
-            descending=False,
-            tolerance=0.04,
-            shap_selection: str = 'cluster',
-            iters=10,
-            reciprocal=False,
-            min_impact=1e-06,
             corr_method: str = 'spearman',
             corr_alpha: float = 0.6,
             corr_clusters: int = 15,
@@ -87,20 +90,6 @@ class Rex(BaseEstimator, ClassifierMixin):
             model_type (BaseEstimator): The type of model to use. Either NNRegressor 
                 or SKLearn GradientBoostingRegressor.
             explainer (shap.Explainer): The explainer to use for the shap values.
-            sensitivity (float): The sensitivity of the Knee algorithm. Default is 1.0.
-            descending (bool): Whether to determine the cutoff for the most
-                influencing shap values starting from the higher one. Default is False.
-            tolerance (float): The tolerance for the causal graph. Default is None.
-                which implies that is automatically determined.
-            shape_selection (str): The method to use for the shap value selection.
-                Default is "abrupt", but it can also be 'linear' or 'knee'.
-            iters (int): The number of iterations for getting the correct
-                orientation for every edge. Default is 10.
-            reciprocal (bool): Whether to force reciprocal feature selection to assign
-                an edge between two features. Default is False.
-            min_impact (float): The minimum impact of all features to be selected.
-                If all features have an impact below this value, then none of them
-                will be selected. Default is 1e-06.
             corr_method (str): The method to use for the correlation.
                 Default is "spearman", but it can also be 'pearson', 'kendall or 'mic'.
             corr_alpha (float): The alpha value for the correlation. Default is 0.6.
@@ -147,13 +136,6 @@ class Rex(BaseEstimator, ClassifierMixin):
         """
         self.model_type = model_type
         self.explainer = explainer
-        self.min_impact = min_impact
-        self.sensitivity = sensitivity
-        self.descending = descending
-        self.tolerance = tolerance
-        self.shap_selection = shap_selection
-        self.iters = iters
-        self.reciprocal = reciprocal
         self.corr_method = corr_method
         self.corr_alpha = corr_alpha
         self.corr_clusters = corr_clusters
@@ -178,12 +160,13 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.dpi = dpi
         self.pdf_filename = pdf_filename
 
-        self._set_attributes_from_kwargs(self.model_type, kwargs)
+        self._get_param_values_from_kwargs(self.model_type, kwargs)
+        self._get_param_values_from_kwargs(ShapEstimator, kwargs)
 
         self._fit_desc = "Running Causal Discovery pipeline"
         os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
-    def _set_attributes_from_kwargs(self, object_attribute, kwargs):
+    def _get_param_values_from_kwargs(self, object_attribute, kwargs):
         # Check if any of the arguments required by Regressor (model_type) are
         # present in the kwargs. If so, take them as a property of the class.
         arguments = inspect.signature(object_attribute.__init__).parameters
