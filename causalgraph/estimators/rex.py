@@ -62,6 +62,7 @@ class Rex(BaseEstimator, ClassifierMixin):
             increase_tolerance: float = 0.0,
             condlen: int = 1,
             condsize: int = 0,
+            mean_pi_percentile: float = 0.8,
             verbose: bool = False,
             prog_bar=True,
             silent: bool = False,
@@ -137,6 +138,8 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.increase_tolerance = increase_tolerance
         self.condlen = condlen
         self.condsize = condsize
+        self.mean_pi_percentile = mean_pi_percentile
+        self.mean_pi_threshold = 0.0
         self.prog_bar = prog_bar
         self.verbose = verbose
         self.silent = silent
@@ -261,12 +264,16 @@ class Rex(BaseEstimator, ClassifierMixin):
     def _compute_pi(self):
         assert self.is_fitted_, "Model must be fitted before computing permutation importance"
         self.pi = {}
+        self.all_pi = []
         for target in self.feature_names_:
             clf = self.models.regressor[target]
             X = self.X.drop(columns=[target])
             y = self.X[target]
             self.pi[target] = permutation_importance(clf, X, y, n_repeats=10, 
                                                      random_state=self.random_state_)
+            self.all_pi.append(self.pi[target]['importances_mean'])
+        self.all_pi = np.array(self.all_pi).flatten()
+        self.mean_pi_threshold = np.quantile(self.all_pi, self.mean_pi_percentile)
 
     def __repr__(self):
         forbidden_attrs = ['fit', 'predict', 'score', 'get_params', 'set_params']
@@ -313,17 +320,21 @@ class Rex(BaseEstimator, ClassifierMixin):
         fig = None
         if ax is None:
             fig, ax = plt.subplots(1, 1, figsize=figsize_)
-        feature_names = self.X.drop(columns=[target]).columns
-        # clf = self.models.regressor[target]
-        # X = self.X.drop(columns=[target])
-        # y = self.X[target]
-        # self.pi[target] = permutation_importance(clf, X, y, n_repeats=10, random_state=0)
-        sorted_idx = self.pi[target].importances_mean.argsort()
-        ax.barh(feature_names, self.pi[target].importances_mean[sorted_idx], 
-                xerr=self.pi[target].importances_std[sorted_idx], align='center', alpha=0.5)
 
+        feature_names = self.X.drop(columns=[target]).columns
+        sorted_idx = self.pi[target].importances_mean.argsort()
+        ax.barh(feature_names[sorted_idx], self.pi[target].importances_mean[sorted_idx], 
+                xerr=self.pi[target].importances_std[sorted_idx], 
+                align='center', alpha=0.5)
+        
+        if self.mean_pi_threshold > 0.0 and \
+            self.mean_pi_threshold < np.max(self.pi[target].importances_mean):
+            ax.axvline(x=self.mean_pi_threshold, color='red', linestyle='--', 
+                       linewidth=0.5)
+            
         ax.set_title(f"Perm.Imp. {target}")
         fig = ax.figure if fig is None else fig
+
         return fig
 
 def main():

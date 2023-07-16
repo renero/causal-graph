@@ -192,7 +192,7 @@ class ShapEstimator(BaseEstimator):
 
         pbar.close()
 
-        self.all_mean_shap_values = np.array(self.all_mean_shap_values)
+        self.all_mean_shap_values = np.array(self.all_mean_shap_values).flatten()
         self.mean_shap_threshold = np.quantile(
             self.all_mean_shap_values, self.mean_shap_percentile)
 
