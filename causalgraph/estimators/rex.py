@@ -214,8 +214,8 @@ class Rex(BaseEstimator, ClassifierMixin):
             'hierarchies.fit'
         ]
         pipeline.run(steps, self._fit_desc)
-
         self.is_fitted_ = True
+        self._compute_pi()
         return self
 
     def predict(self, X):
@@ -257,6 +257,16 @@ class Rex(BaseEstimator, ClassifierMixin):
 
     def score(self, X, y):
         return np.random.randint(self.n_features_in_**2)
+
+    def _compute_pi(self):
+        assert self.is_fitted_, "Model must be fitted before computing permutation importance"
+        self.pi = {}
+        for target in self.feature_names_:
+            clf = self.models.regressor[target]
+            X = self.X.drop(columns=[target])
+            y = self.X[target]
+            self.pi[target] = permutation_importance(clf, X, y, n_repeats=10, 
+                                                     random_state=self.random_state_)
 
     def __repr__(self):
         forbidden_attrs = ['fit', 'predict', 'score', 'get_params', 'set_params']
@@ -303,14 +313,14 @@ class Rex(BaseEstimator, ClassifierMixin):
         fig = None
         if ax is None:
             fig, ax = plt.subplots(1, 1, figsize=figsize_)
-
-        clf = self.models.regressor[target]
-        X = self.X.drop(columns=[target])
-        y = self.X[target]
-        result = permutation_importance(clf, X, y, n_repeats=10, random_state=0)
-        sorted_idx = result.importances_mean.argsort()
-        ax.barh(X.columns[sorted_idx], result.importances_mean[sorted_idx], 
-                xerr=result.importances_std[sorted_idx], align='center', alpha=0.5)
+        feature_names = self.X.drop(columns=[target]).columns
+        # clf = self.models.regressor[target]
+        # X = self.X.drop(columns=[target])
+        # y = self.X[target]
+        # self.pi[target] = permutation_importance(clf, X, y, n_repeats=10, random_state=0)
+        sorted_idx = self.pi[target].importances_mean.argsort()
+        ax.barh(feature_names, self.pi[target].importances_mean[sorted_idx], 
+                xerr=self.pi[target].importances_std[sorted_idx], align='center', alpha=0.5)
 
         ax.set_title(f"Perm.Imp. {target}")
         fig = ax.figure if fig is None else fig

@@ -9,11 +9,11 @@ from typing import Any, Callable, Dict, List, Tuple
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
+import seaborn as sns
 from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.figure import Figure
 from matplotlib.ticker import FormatStrFormatter, MultipleLocator
 from pydot import Dot
-
 
 # Defaults for the graphs plotted
 formatting_kwargs = {"node_size": 1000,
@@ -342,3 +342,21 @@ def dag2dot(
     dot_object.del_node('"\\n"')
 
     return dot_object
+
+
+def plot_values_distribution(values, **kwargs):
+    # Plot two subplots: one with probability density of "all_mean_shap_values"
+    # and another with the cumulative density of "all_shap_values"
+    figsize = kwargs.get('figsize', (7, 5))
+    _, ax = plt.subplots(1, 2, figsize=figsize)
+    ax[0].set_title("Probability density")
+    ax[1].set_title("Cumulative density")
+    ax[0].set_xlabel("Mean SHAP values")
+    ax[1].set_xlabel("Mean SHAP values")
+    ax[0].set_ylabel("Probability")
+    ax[1].set_ylabel("Cumulative probability")
+    sns.histplot(data=values, ax=ax[0], kde=True)
+    sns.ecdfplot(data=values, ax=ax[1]) 
+    plt.tight_layout()
+    plt.show()
+

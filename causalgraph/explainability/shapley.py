@@ -721,23 +721,6 @@ class ShapEstimator(BaseEstimator):
         for ax_idx in range(4):
             _remove_ticks_and_box(ax[ax_idx])
 
-    def plot_shap_values_distribution(self, **kwargs):
-        # Plot two subplots: one with probability density of "all_mean_shap_values"
-        # and another with the cumulative density of "all_shap_values"
-        figsize = kwargs.get('figsize', (7, 5))
-        fig, ax = plt.subplots(1, 2, figsize=figsize)
-        ax[0].set_title("Probability density")
-        ax[1].set_title("Cumulative density")
-        ax[0].set_xlabel("Mean SHAP values")
-        ax[1].set_xlabel("Mean SHAP values")
-        ax[0].set_ylabel("Probability")
-        ax[1].set_ylabel("Cumulative probability")
-        sns.histplot(data=self.all_mean_shap_values.flatten(),
-                     ax=ax[0], kde=True)
-        sns.ecdfplot(data=self.all_mean_shap_values.flatten(), ax=ax[1])
-        plt.tight_layout()
-        plt.show()
-
 
 if __name__ == "__main__":
     np.set_printoptions(precision=4, linewidth=150)
