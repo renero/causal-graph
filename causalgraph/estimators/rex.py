@@ -13,7 +13,6 @@ import shap
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.utils.validation import (check_array, check_is_fitted,
                                       check_random_state)
-from sklearn.ensemble import GradientBoostingRegressor
 
 from causalgraph.common import GRAY, GREEN, RESET
 from causalgraph.common.pipeline import Pipeline
@@ -23,9 +22,8 @@ from causalgraph.common.utils import (graph_from_dot_file, load_experiment,
 from causalgraph.explainability.shapley import ShapEstimator
 from causalgraph.independence.graph_independence import GraphIndependence
 from causalgraph.metrics.compare_graphs import evaluate_graph
-from causalgraph.models.dnn import NNRegressor
 from causalgraph.explainability.hierarchies import Hierarchies
-from models.gbt import GBTRegressor
+from causalgraph.models import NNRegressor, GBTRegressor
 
 
 class Rex(BaseEstimator, ClassifierMixin):
@@ -366,7 +364,8 @@ def main2():
     import numpy as np
     import pandas as pd
     from causalgraph.common.utils import graph_from_dot_file
-    from causalgraph.estimators.rex import Rex
+    from causalgraph.estimators import Rex
+    from causalgraph.models import GBTRegressor, NNRegressor
     from causalgraph.metrics.compare_graphs import evaluate_graph
     from sklearn.preprocessing import StandardScaler
 
