@@ -3,9 +3,8 @@ import types
 import warnings
 from copy import copy
 from pathlib import Path
-from typing import Any, List, Tuple, Union
+from typing import Tuple, Union
 import inspect
-from matplotlib import pyplot as plt
 
 import networkx as nx
 import numpy as np
@@ -14,7 +13,6 @@ import shap
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.utils.validation import (check_array, check_is_fitted,
                                       check_random_state)
-from sklearn.inspection import permutation_importance
 
 from causalgraph.common import GRAY, GREEN, RESET
 from causalgraph.common.pipeline import Pipeline
@@ -26,6 +24,7 @@ from causalgraph.independence.graph_independence import GraphIndependence
 from causalgraph.metrics.compare_graphs import evaluate_graph
 from causalgraph.explainability.hierarchies import Hierarchies
 from causalgraph.models import NNRegressor, GBTRegressor
+from causalgraph.explainability import PermutationImportance
 
 
 class Rex(BaseEstimator, ClassifierMixin):
@@ -211,14 +210,15 @@ class Rex(BaseEstimator, ClassifierMixin):
         steps = [
             ('models', self.model_type),
             'models.fit',
+            ('pi', PermutationImportance, {'regressors': 'models'}),
+            ('pi.fit_predict', {'X': self.X}),
             ('shaps', ShapEstimator, {'models': 'models'}),
             'shaps.fit',
             ('hierarchies', Hierarchies),
-            'hierarchies.fit'
+            'hierarchies.fit',
         ]
         pipeline.run(steps, self._fit_desc)
         self.is_fitted_ = True
-        self._compute_pi()
         return self
 
     def predict(self, X):
@@ -261,20 +261,6 @@ class Rex(BaseEstimator, ClassifierMixin):
     def score(self, X, y):
         return np.random.randint(self.n_features_in_**2)
 
-    def _compute_pi(self):
-        assert self.is_fitted_, "Model must be fitted before computing permutation importance"
-        self.pi = {}
-        self.all_pi = []
-        for target in self.feature_names_:
-            clf = self.models.regressor[target]
-            X = self.X.drop(columns=[target])
-            y = self.X[target]
-            self.pi[target] = permutation_importance(clf, X, y, n_repeats=10, 
-                                                     random_state=self.random_state_)
-            self.all_pi.append(self.pi[target]['importances_mean'])
-        self.all_pi = np.array(self.all_pi).flatten()
-        self.mean_pi_threshold = np.quantile(self.all_pi, self.mean_pi_percentile)
-
     def __repr__(self):
         forbidden_attrs = ['fit', 'predict', 'score', 'get_params', 'set_params']
         ret = f"{GREEN}REX object attributes{RESET}\n"
@@ -310,32 +296,6 @@ class Rex(BaseEstimator, ClassifierMixin):
         plot_args = [(target_name) for target_name in self.feature_names_]
         return subplots(self.shaps._plot_shap_summary, *plot_args, **kwargs);
 
-    def plot_permutation_importance(self, **kwargs):
-        assert self.is_fitted_, "Model not fitted yet"
-        plot_args = [(target_name) for target_name in self.feature_names_]
-        return subplots(self._plot_perm_imp, *plot_args, **kwargs);
-
-    def _plot_perm_imp(self, target, ax, **kwargs):
-        figsize_ = kwargs.get('figsize', (6, 3))
-        fig = None
-        if ax is None:
-            fig, ax = plt.subplots(1, 1, figsize=figsize_)
-
-        feature_names = self.X.drop(columns=[target]).columns
-        sorted_idx = self.pi[target].importances_mean.argsort()
-        ax.barh(feature_names[sorted_idx], self.pi[target].importances_mean[sorted_idx], 
-                xerr=self.pi[target].importances_std[sorted_idx], 
-                align='center', alpha=0.5)
-        
-        if self.mean_pi_threshold > 0.0 and \
-            self.mean_pi_threshold < np.max(self.pi[target].importances_mean):
-            ax.axvline(x=self.mean_pi_threshold, color='red', linestyle='--', 
-                       linewidth=0.5)
-            
-        ax.set_title(f"Perm.Imp. {target}")
-        fig = ax.figure if fig is None else fig
-
-        return fig
 
 def main():
     np.set_printoptions(precision=4, linewidth=150)

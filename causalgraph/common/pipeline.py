@@ -6,6 +6,9 @@ Pipeline class to define and run several execution steps.
 """
 import inspect
 import types
+import typing
+import pandas as pd
+import numpy as np
 from typing import Any, Dict, List, Union
 
 from tqdm.auto import tqdm
@@ -19,6 +22,7 @@ class Host:
     def __init__(self, param1, param2):
         self.param1 = param1
         self.param2 = param2
+        self.X = pd.DataFrame(np.random.randint(0,100,size=(100, 4)), columns=list('ABCD'))
 
     def host_method(self):
         # print(f"  Into the method {self.host_method.__name__}")
@@ -63,12 +67,15 @@ def m1(message="default_message"):
 def m2(what):
     return (f"m2_return_value={what}")
 
+def m3(what):
+    return (f"m3 dataframe argument shape={what.shape}")
+
 
 what = "(argument for m1 and m2)"
 
 
 # TODO: Eliminate the need to pass the host object to the pipeline
-# TODO: COnsider the case when parameters are not specified and do not exist, but
+# TODO: Consider the case when parameters are not specified and do not exist, but
 #       the method does not need them because they are optional.
 class Pipeline:
     """
@@ -257,6 +264,10 @@ class Pipeline:
                 # Two possibilities here: either the parameter is a normal value, 
                 # in which case we simply take it, or is the name of an object created
                 # in a previous step, in which case we take the object.
+                # But first, check if the parameter is hashable.
+                if not isinstance(method_arguments[parameter], typing.Hashable):
+                    params[parameter] = method_arguments[parameter]
+                    continue
                 if method_arguments[parameter] in self.objects_.keys():
                     params[parameter] = self.objects_[method_arguments[parameter]]
                 else:
@@ -415,9 +426,10 @@ if __name__ == "__main__":
 
     steps = [
         ('myobject1', SampleClass),
-        ('method_with_object', {'obj': 'myobject1'})
+        ('method_with_object', {'obj': 'myobject1'}),
         ('r1', 'm1'),
         ('r2', 'm2', {'what': 'new_what_value'}),
+        ('r3', 'm2', {'what': host.X}),
         ('myobject2', SampleClass, {'param2': True}),
         ('myobject2.fit'),
         'myobject2.method',

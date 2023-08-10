@@ -212,8 +212,8 @@ def plot_dags(
 
         # Gt = _format_graph(Gt, Gt, inv_color="red", wrong_color="black")
         # G  = _format_graph(G, Gt, inv_color="red", wrong_color="gray")
-        Gt = _format_graph(Gt, G, inv_color="lightgreen", wrong_color="black")
-        G = _format_graph(G, Gt, inv_color="orange", wrong_color="gray")
+        Gt = _format_graph(Gt, G, inv_color="lightgreen", wrong_color="lightgreen")
+        G = _format_graph(G, Gt, inv_color="orange", wrong_color="red")
     else:
         G = _format_graph(G)
 
