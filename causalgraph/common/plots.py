@@ -14,6 +14,8 @@ from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.figure import Figure
 from matplotlib.ticker import FormatStrFormatter, MultipleLocator
 from pydot import Dot
+import pydotplus
+
 
 # Defaults for the graphs plotted
 formatting_kwargs = {"node_size": 1000,
@@ -26,7 +28,7 @@ formatting_kwargs = {"node_size": 1000,
                      }
 
 
-def setup_plot(**kwargs): #tex=True, font="serif", dpi=75, font_size=10):
+def setup_plot(**kwargs):  # tex=True, font="serif", dpi=75, font_size=10):
     """Customize figure settings.
 
     Args:
@@ -209,7 +211,7 @@ def plot_dags(
             G.add_node(missing)
 
         # Gt = _format_graph(Gt, Gt, inv_color="red", wrong_color="black")
-        # G = _format_graph(G, Gt, inv_color="red", wrong_color="gray")
+        # G  = _format_graph(G, Gt, inv_color="red", wrong_color="gray")
         Gt = _format_graph(Gt, G, inv_color="lightgreen", wrong_color="black")
         G = _format_graph(G, Gt, inv_color="orange", wrong_color="gray")
     else:
@@ -238,6 +240,50 @@ def plot_dags(
         _draw_graph_subplot(G, layout=ref_layout, title=names[0], ax=ax_graph,
                             **formatting_kwargs)
         plt.show()
+
+
+# plot_dag: Plot a single DAG without formatting edges.
+def plot_dag(
+        dag: nx.DiGraph,
+        figsize: Tuple[int, int] = (5, 5),
+        dpi: int = 75,
+        save_to_pdf: str = None,
+        **kwargs):
+    """
+    Plot a DAG.
+
+    Parameters:
+    -----------
+    dag: The DAG to plot.
+    figsize: The size of the figure.
+    **kwargs: Additional arguments to format the graphs:
+        - "node_size": 500
+        - "node_color": 'white'
+        - "edgecolors": "black"
+        - "font_family": "monospace"
+        - "horizontalalignment": "center"
+        - "verticalalignment": "center_baseline"
+        - "with_labels": True
+    """
+    # Overwrite formatting_kwargs with kwargs if they are provided
+    formatting_kwargs.update(kwargs)
+
+    G = nx.DiGraph()
+    G.add_edges_from(dag.edges())
+    G = _format_graph(G)
+    ref_layout = nx.drawing.nx_agraph.graphviz_layout(G, prog="dot")
+
+    setup_plot(dpi=dpi)
+    f, ax = plt.subplots(figsize=figsize)
+    if save_to_pdf is not None:
+        with PdfPages(save_to_pdf) as pdf:
+            _draw_graph_subplot(G, layout=ref_layout,
+                                title=None, ax=ax, **formatting_kwargs)
+            pdf.savefig(f, bbox_inches='tight', pad_inches=0)
+            plt.close()
+    else:
+        _draw_graph_subplot(G, layout=ref_layout, title=None,
+                            ax=ax, **formatting_kwargs)
 
 
 def _format_graph(
@@ -356,7 +402,6 @@ def plot_values_distribution(values, **kwargs):
     ax[0].set_ylabel("Probability")
     ax[1].set_ylabel("Cumulative probability")
     sns.histplot(data=values, ax=ax[0], kde=True)
-    sns.ecdfplot(data=values, ax=ax[1]) 
+    sns.ecdfplot(data=values, ax=ax[1])
     plt.tight_layout()
     plt.show()
-

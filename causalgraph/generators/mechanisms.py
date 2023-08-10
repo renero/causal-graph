@@ -10,10 +10,22 @@ from sklearn.metrics.pairwise import euclidean_distances
 from sklearn.gaussian_process import GaussianProcessRegressor
 
 
+def gmm_cause(n, k=4, p1=2, p2=2, verbose=False):
+    g = GMM(k)
+    g.means_ = p1 * np.random.randn(k, 1)
+    g.covars_ = np.power(abs(p2 * np.random.randn(k, 1) + 1), 2)
+    g.weights_ = abs(np.random.rand(k, 1))
+    g.weights_ = g.weights_ / sum(g.weights_)
+
+    if(verbose):
+        print(f"  GMM cause initialized with {k} components and {n} points")
+    return np.random.uniform(-1, 1, n)
+
+
 class LinearMechanism(object):
     """Linear mechanism, where Effect = alpha*Cause + Noise."""
 
-    def __init__(self, ncauses, points, d=4, noise_coeff=.7):
+    def __init__(self, ncauses, points, d=4, noise_coeff=.7, verbose=False):
         """Init the mechanism."""
         super(LinearMechanism, self).__init__()
         self.n_causes = ncauses
@@ -27,7 +39,7 @@ class LinearMechanism(object):
         self.noise = np.random.randn(points, 1)
         self.d = d
 
-    def __call__(self, causes):
+    def __call__(self, causes, verbose=False):
         """Run the mechanism."""
         # Additive only, for now
         effect = np.zeros((self.points, 1))
@@ -39,9 +51,79 @@ class LinearMechanism(object):
         return effect
 
 
+class Polynomial_Mechanism(object):
+
+    def __init__(self, ncauses, points, d=2, noise_coeff=.7, verbose=False):
+        """Init the mechanism."""
+        super(Polynomial_Mechanism, self).__init__()
+        self.n_causes = ncauses
+        self.points = points
+        self.d = d
+        self.polycause = []
+        self.verbose = verbose
+
+        for c in range(ncauses):
+            self.coefflist = []
+            for j in range(self.d + 1):
+                self.coefflist.append(random.random())
+            self.polycause.append(self.coefflist)
+
+        self.ber = bernoulli.rvs(0.5)
+        self.noise = 0.1*np.random.randn(points, 1)
+        if self.verbose:
+            print(f"Polynomial Mechanism Initialized w {ncauses} causes + {points} p")
+
+
+    def mechanism(self, x, par):
+        list_coeff = self.polycause[par]
+        result = np.zeros((self.points, 1))
+        for i in range(self.points):
+            for j in range(self.d+1):
+                result[i, 0] += list_coeff[j]*np.power(x[i], j)
+            # XXX
+            # ARGH!!!!!!!!!!!!!!!
+            # result[i, 0] = min(result[i, 0], 1)
+            # result[i, 0] = max(result[i, 0], -1)
+
+        if self.verbose:
+            print(f"    Coeffs: ", end="", sep="")
+            for j in range(self.d+1):
+                print(f"{list_coeff[j]:.2f}, ", end="", sep="")
+            print("")
+            print(f"    {par}th cause = ", end="", sep="")
+            for j in range(self.d+1):
+                print(f"{list_coeff[j]:.2f}*x^{j} + ", end="", sep="")
+            print(f"noise")
+        return result
+
+    def __call__(self, causes, verbose=False):
+        """Run the mechanism."""
+        if verbose:
+            print("  Polynomial Mechanism Called")
+        effect = np.zeros((self.points, 1))
+        # Compute each cause's contribution
+        for par in range(causes.shape[1]):
+            effect[:, 0] = effect[:, 0] + self.mechanism(causes[:, par], par)[:, 0]
+
+        # I remove the multiplicative noise since it destroys the effect
+        # if(self.ber > 0 and causes.shape[1] > 0):
+        #     effect[:, 0] = effect[:, 0] * self.noise[:, 0]
+        #     if verbose:
+        #         print("    Noise **multiplied** to effect")
+        # else:
+        effect[:, 0] = effect[:, 0] + self.noise[:, 0]
+        if verbose:
+            print(f"    Noise added: [", end="")
+            for i in range(self.noise.shape[0]):
+                print(f"{self.noise[i, 0]:.2f}, ", end="")
+            print("]")
+
+        return effect
+
+
 class SigmoidAM_Mechanism(object):
 
-    def __init__(self, ncauses, points, d=4, noise_coeff=.7):
+    def __init__(self, ncauses, points, d=4, noise_coeff=.7, verbose=False):
         """Init the mechanism."""
         super(SigmoidAM_Mechanism, self).__init__()
         self.n_causes = ncauses
@@ -62,7 +144,7 @@ class SigmoidAM_Mechanism(object):
 
         return result
 
-    def __call__(self, causes):
+    def __call__(self, causes, verbose=False):
         """Run the mechanism."""
         # Additive only
         effect = np.zeros((self.points, 1))
@@ -77,7 +159,7 @@ class SigmoidAM_Mechanism(object):
 
 class SigmoidMix_Mechanism(object):
 
-    def __init__(self, ncauses, points, d=4, noise_coeff=.7):
+    def __init__(self, ncauses, points, d=4, noise_coeff=.7, verbose=False):
         """Init the mechanism."""
         super(SigmoidMix_Mechanism, self).__init__()
         self.n_causes = ncauses
@@ -103,58 +185,12 @@ class SigmoidMix_Mechanism(object):
 
         return result
 
-    def __call__(self, causes):
+    def __call__(self, causes, verbose=False):
         """Run the mechanism."""
         effect = np.zeros((self.points, 1))
         # Compute each cause's contribution
 
         effect[:, 0] = self.mechanism(causes)[:, 0]
-        return effect
-
-
-class Polynomial_Mechanism(object):
-
-    def __init__(self, ncauses, points, d=2, noise_coeff=.7):
-        """Init the mechanism."""
-        super(Polynomial_Mechanism, self).__init__()
-        self.n_causes = ncauses
-        self.points = points
-        self.d = d
-        self.polycause = []
-
-        for c in range(ncauses):
-            self.coefflist = []
-            for j in range(self.d + 1):
-                self.coefflist.append(random.random())
-            self.polycause.append(self.coefflist)
-
-        self.ber = bernoulli.rvs(0.5)
-        self.noise = 0.1*np.random.randn(points, 1)
-
-    def mechanism(self, x, par):
-
-        list_coeff = self.polycause[par]
-        result = np.zeros((self.points, 1))
-        for i in range(self.points):
-            for j in range(self.d+1):
-                result[i, 0] += list_coeff[j]*np.power(x[i], j)
-            result[i, 0] = min(result[i, 0], 1)
-            result[i, 0] = max(result[i, 0], -1)
-
-        return result
-
-    def __call__(self, causes):
-        """Run the mechanism."""
-        effect = np.zeros((self.points, 1))
-        # Compute each cause's contribution
-        for par in range(causes.shape[1]):
-            effect[:, 0] = effect[:, 0] + self.mechanism(causes[:, par], par)[:, 0]
-
-        if(self.ber > 0 and causes.shape[1] > 0):
-            effect[:, 0] = effect[:, 0] * self.noise[:, 0]
-        else:
-            effect[:, 0] = effect[:, 0] + self.noise[:, 0]
-
         return effect
 
 
@@ -165,7 +201,7 @@ def computeGaussKernel(x):
 
 class GaussianProcessAdd_Mechanism(object):
 
-    def __init__(self, ncauses, points):
+    def __init__(self, ncauses, points, verbose=False):
         """Init the mechanism."""
         super(GaussianProcessAdd_Mechanism, self).__init__()
         self.n_causes = ncauses
@@ -195,7 +231,7 @@ class GaussianProcessAdd_Mechanism(object):
 
         return y
 
-    def __call__(self, causes):
+    def __call__(self, causes, verbose=False):
         """Run the mechanism."""
         # Additive only
         effect = np.zeros((self.points, 1))
@@ -210,7 +246,7 @@ class GaussianProcessAdd_Mechanism(object):
 
 class GaussianProcessMix_Mechanism(object):
 
-    def __init__(self, ncauses, points):
+    def __init__(self, ncauses, points, verbose=False):
         """Init the mechanism."""
         super(GaussianProcessMix_Mechanism, self).__init__()
         self.n_causes = ncauses
@@ -238,7 +274,7 @@ class GaussianProcessMix_Mechanism(object):
 
         return y
 
-    def __call__(self, causes):
+    def __call__(self, causes, verbose=False):
         """Run the mechanism."""
         effect = np.zeros((self.points, 1))
         # Compute each cause's contribution
@@ -249,15 +285,6 @@ class GaussianProcessMix_Mechanism(object):
             effect[:, 0] = self.mechanism(self.noise)
 
         return effect
-
-
-def gmm_cause(n, k=4, p1=2, p2=2):
-    g = GMM(k)
-    g.means_ = p1 * np.random.randn(k, 1)
-    g.covars_ = np.power(abs(p2 * np.random.randn(k, 1) + 1), 2)
-    g.weights_ = abs(np.random.rand(k, 1))
-    g.weights_ = g.weights_ / sum(g.weights_)
-    return np.random.uniform(-1, 1, n)
 
 
 def gaussian_cause(n):
