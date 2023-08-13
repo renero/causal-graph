@@ -1,5 +1,5 @@
 from sklearn.ensemble import GradientBoostingRegressor
-from tqdm.auto import tqdm
+from tqdm import tqdm
 
 from causalgraph.common import tqdm_params
 

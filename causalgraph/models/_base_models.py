@@ -26,6 +26,8 @@ ONEOVERSQRT2PI = 1.0 / math.sqrt(2 * math.pi)
 
 
 class MLP(pl.LightningModule):
+    
+    device = 'mps' if torch.backends.mps.is_available() else 'cpu'
 
     class Block(nn.Module):
         """The main building block of `MLP`."""
@@ -39,13 +41,14 @@ class MLP(pl.LightningModule):
         def forward(self, x: Tensor) -> Tensor:
             return self.dropout(self.activation(self.linear(x)))
 
-    def __init__(self,
-                 input_size,
-                 layers_dimensions,
-                 batch_size,
-                 lr,
-                 loss,
-                 dropout):
+    def __init__(
+            self,
+            input_size,
+            layers_dimensions,
+            batch_size,
+            lr,
+            loss,
+            dropout):
         super(MLP, self).__init__()
         # Log args to Tensorboard.
         self.save_hyperparameters()
@@ -56,7 +59,7 @@ class MLP(pl.LightningModule):
         self.learning_rate = lr
         self.dropout = dropout
         self.hidden_layers = len(layers_dimensions)
-
+        
         if loss == "mse":
             self.loss_fn = nn.MSELoss()
         elif loss == "mae":
@@ -80,11 +83,11 @@ class MLP(pl.LightningModule):
                 for i, (d, dropout) in enumerate(zip(layers_dimensions, dropouts))
             ]
         )
-        self.head = nn.Linear(layers_dimensions[-1] if layers_dimensions else input_size, 1)
+        self.head = nn.Linear(
+            layers_dimensions[-1] if layers_dimensions else input_size, 1)
 
     def forward(self, x):
-        this_device = 'cuda:0' if self.on_gpu else 'cpu'
-        noise = torch.randn(x.shape[0], 1, device=this_device)
+        noise = torch.randn(x.shape[0], 1, device="cpu").to(self.device)
         X = torch.cat([x, noise], dim=1)
         y = self.blocks(X)
         y = self.head(y)
@@ -107,22 +110,21 @@ class MLP(pl.LightningModule):
         yhat = self(x)
         loss = self.loss_fn(yhat, y)
         self.log("val_loss", loss, on_step=False, on_epoch=True)
-        return loss # xxx check out
+        return loss
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
         return optimizer
-    
-    # To allow compatibility with SHAP Explainers different from DeepExplainer and
-    # GradientExplainer. Taken from: 
+
+    #  To allow compatibility with SHAP Explainers different from DeepExplainer and
+    # GradientExplainer. Taken from:
     # https://jamesmccaffrey.wordpress.com/2022/10/11/an-example-of-using-the-shap-library-for-a-pytorch-model/
     def predict(self, x):
         # x is numpy not tensor, return is numpy
-        xx = torch.tensor(x, dtype=torch.float32).to('cpu')
+        xx = torch.tensor(x, dtype=torch.float32, device=self.device)
         with torch.no_grad():
             probs = torch.exp(self.forward(xx))
         return probs.numpy()
-
 
 
 class DFF(pl.LightningModule):
@@ -155,7 +157,7 @@ class DFF(pl.LightningModule):
             raise ValueError("Unknown loss function.")
 
     def forward(self, x):
-        this_device = 'cuda:0' if self.on_gpu else 'cpu'
+        this_device = 'mps' if self.on_gpu else 'cpu'
         noise = torch.randn(x.shape[0], 1, device=this_device)
         X = torch.cat([x, noise], dim=1)
         y = self.approximate(X)
@@ -230,7 +232,8 @@ class MDN(pl.LightningModule):
 
         self.mdn = nn.Sequential(nn.Linear(input_size, hidden_size), nn.Tanh())
         self.pi = nn.Linear(hidden_size, num_gaussians)
-        self.sigma = nn.Sequential(nn.Linear(hidden_size, num_gaussians), nn.ELU())
+        self.sigma = nn.Sequential(
+            nn.Linear(hidden_size, num_gaussians), nn.ELU())
         self.mu = nn.Linear(hidden_size, num_gaussians)
 
     def configure_optimizers(self):
@@ -268,11 +271,10 @@ class MDN(pl.LightningModule):
         return loss
 
     def forward(self, x):
-        this_device = 'cuda:0' if self.on_gpu else 'cpu'
+        this_device = 'mps' if self.on_gpu else 'cpu'
         noise = torch.randn(x.shape[0], 1, device=this_device)
-        X = torch.cat([x, noise], dim=1)
+        X = torch.cat([x.to_device(this_device), noise], dim=1)
         z_h = self.mdn(X)
-        # z_h = self.mdn(x)
         pi = softmax(self.pi(z_h), -1)
         sigma = torch.exp(self.sigma(z_h))
         mu = self.mu(z_h)

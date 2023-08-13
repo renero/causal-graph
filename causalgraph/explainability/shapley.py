@@ -24,7 +24,7 @@ from sklearn.discriminant_analysis import StandardScaler
 from sklearn.isotonic import spearmanr
 from sklearn.model_selection import train_test_split
 from sklearn.utils.validation import check_is_fitted
-from tqdm.auto import tqdm
+from tqdm import tqdm
 
 from causalgraph.common import *
 from causalgraph.common.utils import graph_from_dot_file, load_experiment
@@ -55,6 +55,9 @@ class ShapDiscrepancy:
 class ShapEstimator(BaseEstimator):
     """
     """
+    
+    device = "mps" if torch.backends.mps.is_available() else "cpu"
+
 
     def __init__(
             self,
@@ -165,10 +168,11 @@ class ShapEstimator(BaseEstimator):
             elif self.explainer == shap.GradientExplainer:
                 X_train_tensor = torch.from_numpy(X_train).float()
                 X_test_tensor = torch.from_numpy(X_test).float()
+                
                 self.shap_explainer[target_name] = self.explainer(
-                    model, X_train_tensor)
+                    model.to(self.device), X_train_tensor.to(self.device))
                 self.shap_values[target_name] = self.shap_explainer[target_name](
-                    X_test_tensor).values
+                    X_test_tensor.to(self.device)).values
             else:
                 self.shap_explainer[target_name] = self.explainer(
                     model.predict, X_train)

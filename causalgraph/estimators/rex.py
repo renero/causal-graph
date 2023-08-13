@@ -210,10 +210,10 @@ class Rex(BaseEstimator, ClassifierMixin):
         steps = [
             ('models', self.model_type),
             'models.fit',
-            ('pi', PermutationImportance, {'regressors': 'models'}),
-            ('pi.fit_predict', {'X': self.X}),
             ('shaps', ShapEstimator, {'models': 'models'}),
             'shaps.fit',
+            ('pi', PermutationImportance, {'regressors': 'models'}),
+            ('pi.fit_predict', {'X': self.X}),
             ('hierarchies', Hierarchies),
             'hierarchies.fit',
         ]

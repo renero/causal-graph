@@ -11,5 +11,10 @@
     "python.envFile": "${workspaceFolder}/.env",
     "python.testing.pytestArgs": [
         "causalgraph/tests"
-    ]}
+    ],
+    "[python]": {
+        "editor.defaultFormatter": "ms-python.autopep8"
+    },
+    "python.formatting.provider": "none"
+}
 

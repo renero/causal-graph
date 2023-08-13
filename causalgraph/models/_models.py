@@ -25,6 +25,7 @@ torch_log = logging.getLogger("pytorch-lightning")
 torch_log.propagate = False
 torch_log.setLevel(logging.ERROR)
 
+
 class BaseModel(object):
 
     model = None
@@ -62,8 +63,9 @@ class BaseModel(object):
         self.min_delta = min_delta
 
         # setting device on GPU if available, else CPU
-        self.gpu_available = torch.cuda.is_available()
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.gpu_available = torch.backends.mps.is_available()
+        device = "mps" if self.gpu_available else "cpu"
+        self.device = torch.device(device)
 
         logging.getLogger("pytorch_lightning").propagate = False
         logging.getLogger("pytorch_lightning").setLevel(logging.ERROR)
@@ -101,9 +103,10 @@ class BaseModel(object):
     ):
         self.callbacks = []
         if early_stop:
-            earlyStopping = EarlyStopping(monitor="val_loss",
-                                          min_delta=min_delta,
-                                          patience=patience)
+            earlyStopping = EarlyStopping(
+                monitor="val_loss",
+                min_delta=min_delta,
+                patience=patience)
             self.callbacks.append(earlyStopping)
         if prog_bar:
             class MeterlessProgressBar(TQDMProgressBar):
@@ -135,11 +138,12 @@ class BaseModel(object):
         reminder = val_split_size % self.batch_size
         val_split_size = int(val_split_size - reminder)
         train_split_size = int(self.n_rows - val_split_size)
-        train_df, test_df = train_test_split(self.dataframe,
-                                             train_size=train_split_size,
-                                             test_size=val_split_size,
-                                             shuffle=True,
-                                             random_state=1234)
+        train_df, test_df = train_test_split(
+            self.dataframe,
+            train_size=train_split_size,
+            test_size=val_split_size,
+            shuffle=True,
+            random_state=1234)
         self.train_loader = DataLoader(
             ColumnsDataset(self.target, train_df),
             batch_size=self.batch_size,
@@ -237,17 +241,17 @@ class MLPModel(BaseModel):
 if __name__ == "__main__":
     data = pd.read_csv("~/phd/data/generated_linear_10.csv")
     mlp = MLPModel(
-        target='V0', 
+        target='V0',
         input_size=data.shape[1],
         hidden_dim=[64, 128, 64],
-        learning_rate=0.05, 
-        batch_size=32, 
-        loss_fn="mse", 
+        learning_rate=0.05,
+        batch_size=32,
+        loss_fn="mse",
         dropout=0.05,
-        num_epochs=200, 
-        dataframe=data, 
-        test_size=0.1, 
-        devices="auto", 
+        num_epochs=200,
+        dataframe=data,
+        test_size=0.1,
+        devices="auto",
         seed=1234,
         early_stop=False)
     mlp.train()

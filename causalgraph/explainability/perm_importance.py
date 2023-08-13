@@ -16,6 +16,8 @@ class PermutationImportance(BaseEstimator):
     the vanilla version of the algorithm to run over models trained with PyTorch.
     """
 
+    device = "mps" if torch.backends.mps.is_available() else "cpu"
+
     def __init__(
             self,
             models: dict,
@@ -43,7 +45,7 @@ class PermutationImportance(BaseEstimator):
             return self._fit_pytorch()
         else:
             return self._fit_sklearn(X)
-        
+
     def _fit_sklearn(self, X):
         self.pi = {}
         self.all_pi = []
@@ -52,21 +54,23 @@ class PermutationImportance(BaseEstimator):
             regressor = self.regressors[target]
             X = self.X.drop(columns=[target])
             y = self.X[target]
-            self.pi[target] = permutation_importance(regressor, X, y, n_repeats=10, 
-                                                     random_state=self.random_state)
+            self.pi[target] = permutation_importance(
+                regressor, X, y, n_repeats=10,
+                random_state=self.random_state)
             self.all_pi.append(self.pi[target]['importances_mean'])
         self.all_pi = np.array(self.all_pi).flatten()
-        self.mean_pi_threshold = np.quantile(self.all_pi, self.mean_pi_percentile)
+        self.mean_pi_threshold = np.quantile(
+            self.all_pi, self.mean_pi_percentile)
         self.is_fitted_ = True
 
         return self
-    
+
     def _fit_pytorch(self):
         self.base_loss = dict()
         self.base_std = dict()
         for feature in self.feature_names_:
             regressor = self.regressors[feature]
-            model = regressor.model
+            model = regressor.model.to(self.device)
 
             self.base_loss[feature], self.base_std[feature] = self._compute_loss(
                 model, regressor.train_loader)
@@ -104,17 +108,21 @@ class PermutationImportance(BaseEstimator):
                     self.regressor.train_loader,
                     repeats=self.n_repeats,
                     shuffle=shuffle_col)
-                perm_importance = perm_loss / (self.base_loss[target] * self.n_repeats)
+                perm_importance = perm_loss / \
+                    (self.base_loss[target] * self.n_repeats)
                 perm_std = perm_std / (self.base_loss[target] * self.n_repeats)
                 self.pi[target]['importances_mean'].append(perm_importance)
                 self.pi[target]['importances_std'].append(perm_std)
 
-            self.pi[target]['importances_mean'] = np.array(self.pi[target]['importances_mean'])
-            self.pi[target]['importances_std'] = np.array(self.pi[target]['importances_std'])
+            self.pi[target]['importances_mean'] = np.array(
+                self.pi[target]['importances_mean'])
+            self.pi[target]['importances_std'] = np.array(
+                self.pi[target]['importances_std'])
             self.all_pi.append(self.pi[target]['importances_mean'])
 
         self.all_pi = np.array(self.all_pi).flatten()
-        self.mean_pi_threshold = np.quantile(self.all_pi, self.mean_pi_percentile)
+        self.mean_pi_threshold = np.quantile(
+            self.all_pi, self.mean_pi_percentile)
 
         return self.pi
 
@@ -124,11 +132,11 @@ class PermutationImportance(BaseEstimator):
             return self._fit_predict_pytorch()
         else:
             return self._fit_predict_sklearn(X)
-        
+
     def _fit_predict_pytorch(self):
         self._fit_pytorch()
         return self._predict_pytorch()
-    
+
     def _fit_predict_sklearn(self, X):
         self._fit_sklearn(X)
         return self.pi
@@ -164,6 +172,8 @@ class PermutationImportance(BaseEstimator):
             # Loop over all batches in train loader
             for _, (X, y) in enumerate(dataloader):
                 # Shuffle data if specified
+                X = X.to(self.device)
+                y = y.to(self.device)
                 if shuffle > 0:
                     X = self._shuffle_2Dtensor_column(X, shuffle)
                 # compute MSE loss for each batch
@@ -197,7 +207,7 @@ class PermutationImportance(BaseEstimator):
         assert column < tensor.shape[1], "Column index out of bounds"
         assert len(tensor.shape) == 2, "Tensor must be 2D"
         num_rows, num_columns = tensor.shape
-        idx = torch.randperm(tensor.shape[0])
+        idx = torch.randperm(tensor.shape[0], device=self.device)
         column_reshuffled = torch.reshape(tensor[idx, column], (num_rows, 1))
         if column == 0:
             return torch.cat((column_reshuffled, tensor[:, 1:]), 1)
@@ -207,7 +217,7 @@ class PermutationImportance(BaseEstimator):
     def plot(self, **kwargs):
         assert self.is_fitted_, "Model not fitted yet"
         plot_args = [(target_name) for target_name in self.feature_names_]
-        return subplots(self._plot_perm_imp, *plot_args, **kwargs);
+        return subplots(self._plot_perm_imp, *plot_args, **kwargs)
 
     def _plot_perm_imp(self, target, ax, **kwargs):
         feature_names = [f for f in self.feature_names_ if f != target]
@@ -218,15 +228,15 @@ class PermutationImportance(BaseEstimator):
 
         sorted_idx = self.pi[target]['importances_mean'].argsort()
         ax.barh(np.array(feature_names)[sorted_idx.astype(int)],
-                self.pi[target]['importances_mean'][sorted_idx], 
-                xerr=self.pi[target]['importances_std'][sorted_idx], 
+                self.pi[target]['importances_mean'][sorted_idx],
+                xerr=self.pi[target]['importances_std'][sorted_idx],
                 align='center', alpha=0.5)
-        
+
         if self.mean_pi_threshold > 0.0 and \
-            self.mean_pi_threshold < np.max(self.pi[target]['importances_mean']):
-            ax.axvline(x=self.mean_pi_threshold, color='red', linestyle='--', 
-                       linewidth=0.5)
-            
+                self.mean_pi_threshold < np.max(self.pi[target]['importances_mean']):
+            ax.axvline(
+                x=self.mean_pi_threshold, color='red', linestyle='--', linewidth=0.5)
+
         ax.set_title(f"Perm.Imp. {target}")
         fig = ax.figure if fig is None else fig
 

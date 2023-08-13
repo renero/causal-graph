@@ -5,7 +5,7 @@ import pandas as pd
 
 from itertools import combinations
 from minepy import MINE, pstats
-from tqdm.auto import tqdm
+from tqdm import tqdm
 
 
 

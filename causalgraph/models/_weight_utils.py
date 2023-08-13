@@ -10,7 +10,7 @@ import seaborn as sns
 import shap
 from sklearn.cluster import DBSCAN
 from sklearn.preprocessing import StandardScaler
-from tqdm.auto import tqdm
+from tqdm import tqdm
 
 from causalgraph.common.utils import graph_from_dictionary
 from causalgraph.common import tqdm_params

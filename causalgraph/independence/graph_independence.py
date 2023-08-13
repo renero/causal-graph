@@ -13,7 +13,7 @@ import pygam
 from collections import defaultdict
 from pandas import DataFrame
 from hyppo.independence import Hsic
-from tqdm.auto import tqdm
+from tqdm import tqdm
 
 from causalgraph.common import tqdm_params
 

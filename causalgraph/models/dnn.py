@@ -7,7 +7,7 @@ import pandas as pd
 import torch
 from sklearn.base import BaseEstimator
 from sklearn.utils.validation import check_array, check_is_fitted
-from tqdm.auto import tqdm
+from tqdm import tqdm
 
 from causalgraph.common import GRAY, GREEN, RESET, tqdm_params
 from causalgraph.models._models import MLPModel

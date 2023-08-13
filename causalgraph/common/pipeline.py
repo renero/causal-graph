@@ -11,7 +11,7 @@ import pandas as pd
 import numpy as np
 from typing import Any, Dict, List, Union
 
-from tqdm.auto import tqdm
+from tqdm import tqdm
 
 from causalgraph.common import tqdm_params
 
