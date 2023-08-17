@@ -14,6 +14,7 @@ from typing import Dict, List, Tuple, Union
 import networkx as nx
 import pydot as pydot
 import pydotplus
+import torch
 
 
 AnyGraph = Union[nx.Graph, nx.DiGraph]
@@ -152,3 +153,31 @@ def graph_from_dictionary(d: Dict[str, List[Union[str, Tuple[str, float]]]]) -> 
                 for parent in parents:
                     g.add_edge(parent, node)
     return g
+
+
+def select_device(force: str = None) -> str:
+    """
+    Selects the device to be used for training. If force is not None, then
+    the device is forced to be the one specified. If force is None, then
+    the device is selected based on the availability of GPUs. If no GPUs are
+    available, then the CPU is selected.
+
+    Args:
+        force (str): If not None, then the device is forced to be the one
+            specified. If None, then the device is selected based on the
+            availability of GPUs. If no GPUs are available, then the CPU is
+            selected.
+
+    Returns:
+        (str) The device to be used for training.
+    """
+    if force is not None:
+        device = force
+    else:
+        if torch.cuda.is_available() and torch.backends.cuda.is_built():
+            device = "cuda"
+        elif torch.backends.mps.is_available() and torch.backends.mps.is_built():
+            device = "mps"
+        else:
+            device = "cpu"
+    return device

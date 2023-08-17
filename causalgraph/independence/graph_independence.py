@@ -13,12 +13,14 @@ import pygam
 from collections import defaultdict
 from pandas import DataFrame
 from hyppo.independence import Hsic
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from causalgraph.common import tqdm_params
 
 # TODO: Change the way this objects are called. Use a fit method instead of
 # passing the data to the constructor.
+
+
 class GraphIndependence(object):
 
     def __init__(self, base_graph, condlen: int = 1,
@@ -69,7 +71,8 @@ class GraphIndependence(object):
         for p in itertools.permutations(self.feature_names, 2):
             self.sepset[p] = ()
         edge = list(self.base_graph.edges)
-        contains_data = len(self.base_graph.get_edge_data(edge[0][0], edge[0][1])) != 0
+        contains_data = len(self.base_graph.get_edge_data(
+            edge[0][0], edge[0][1])) != 0
         self.G_skl = nx.DiGraph()
         self.G_skl.add_edges_from(self.base_graph.edges(data=contains_data))
         # check if all column names in experiment.data correspond to nodes in G_skl.
@@ -78,16 +81,17 @@ class GraphIndependence(object):
             if col not in self.G_skl.nodes():
                 self.G_skl.add_node(col)
 
-        pbar = tqdm(total=len(self.feature_names), 
+        pbar = tqdm(total=len(self.feature_names),
                     **tqdm_params(self._fit_desc, self.prog_bar, silent=self.silent_))
         for feature_name in self.feature_names:
             pbar.refresh()
-            self._remove_independent_edges(feature_name, self.condlen, self.condsize)
+            self._remove_independent_edges(
+                feature_name, self.condlen, self.condsize)
             pbar.update(1)
         pbar.close()
 
         return self
-    
+
     def predict(self):
         return self.G_skl
 

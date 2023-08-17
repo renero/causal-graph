@@ -1,21 +1,20 @@
-import pytorch_lightning as pl
-import torch
+import logging
 import math
+
 import numpy as np
 import pytorch_lightning as pl
-
-from torch import nn
-from torch import Tensor
-from torch import Tensor
+import torch
+from torch import Tensor, nn
 from torch.autograd import Variable
-from torch.nn.functional import softmax
 from torch.distributions import Categorical
+from torch.nn.functional import softmax
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
+from causalgraph.common import utils
+
 from ._loss import MMDLoss
 
-import logging
 logging.getLogger('pytorch_lightning').setLevel(logging.ERROR)
 torch_log = logging.getLogger("pytorch_lightning")
 torch_log.propagate = False
@@ -26,8 +25,8 @@ ONEOVERSQRT2PI = 1.0 / math.sqrt(2 * math.pi)
 
 
 class MLP(pl.LightningModule):
-    
-    device = 'mps' if torch.backends.mps.is_available() else 'cpu'
+
+    device = utils.select_device("cpu")
 
     class Block(nn.Module):
         """The main building block of `MLP`."""
@@ -59,7 +58,7 @@ class MLP(pl.LightningModule):
         self.learning_rate = lr
         self.dropout = dropout
         self.hidden_layers = len(layers_dimensions)
-        
+
         if loss == "mse":
             self.loss_fn = nn.MSELoss()
         elif loss == "mae":
@@ -157,8 +156,8 @@ class DFF(pl.LightningModule):
             raise ValueError("Unknown loss function.")
 
     def forward(self, x):
-        this_device = 'mps' if self.on_gpu else 'cpu'
-        noise = torch.randn(x.shape[0], 1, device=this_device)
+        # this_device = 'mps' if self.on_gpu else 'cpu'
+        noise = torch.randn(x.shape[0], 1, device=self.device)
         X = torch.cat([x, noise], dim=1)
         y = self.approximate(X)
         return y
@@ -271,8 +270,8 @@ class MDN(pl.LightningModule):
         return loss
 
     def forward(self, x):
-        this_device = 'mps' if self.on_gpu else 'cpu'
-        noise = torch.randn(x.shape[0], 1, device=this_device)
+        # this_device = 'mps' if self.on_gpu else 'cpu'
+        noise = torch.randn(x.shape[0], 1, device=self.device)
         X = torch.cat([x.to_device(this_device), noise], dim=1)
         z_h = self.mdn(X)
         pi = softmax(self.pi(z_h), -1)

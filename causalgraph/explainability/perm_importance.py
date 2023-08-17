@@ -7,6 +7,7 @@ import torch
 
 from causalgraph.models._models import MLPModel
 from causalgraph.common.plots import subplots
+from causalgraph.common import utils
 
 
 class PermutationImportance(BaseEstimator):
@@ -16,7 +17,7 @@ class PermutationImportance(BaseEstimator):
     the vanilla version of the algorithm to run over models trained with PyTorch.
     """
 
-    device = "mps" if torch.backends.mps.is_available() else "cpu"
+    device = utils.select_device("cpu")
 
     def __init__(
             self,

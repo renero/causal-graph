@@ -1,23 +1,22 @@
+import logging
 import random
+import warnings
 from types import UnionType
 from typing import List, Union
+
 import numpy as np
 import pandas as pd
 import pytorch_lightning as pl
 import torch
-import warnings
-import logging
-
 from pytorch_lightning import Trainer
-from pytorch_lightning.callbacks import TQDMProgressBar, EarlyStopping
+from pytorch_lightning.callbacks import EarlyStopping, TQDMProgressBar
 from pytorch_lightning.loggers import TensorBoardLogger
 from sklearn.model_selection import train_test_split
-# from sklearn.preprocessing import StandardScaler
 from torch.utils.data import DataLoader
 
+from causalgraph.common import utils
 from ._base_models import MLP
 from ._columnar import ColumnsDataset
-
 
 warnings.filterwarnings("ignore", ".*does not have many workers.*")
 logging.getLogger('pytorch-lightning').setLevel(logging.ERROR)
@@ -38,6 +37,9 @@ class BaseModel(object):
     train_loader = None
     val_loader = None
     n_rows = 0
+
+    # device = torch.device(utils.select_device("cpu"))
+    device = utils.select_device("cpu")
 
     def __init__(
         self,
@@ -61,11 +63,6 @@ class BaseModel(object):
         self.early_stop = early_stop
         self.patience = patience
         self.min_delta = min_delta
-
-        # setting device on GPU if available, else CPU
-        self.gpu_available = torch.backends.mps.is_available()
-        device = "mps" if self.gpu_available else "cpu"
-        self.device = torch.device(device)
 
         logging.getLogger("pytorch_lightning").propagate = False
         logging.getLogger("pytorch_lightning").setLevel(logging.ERROR)
@@ -184,7 +181,7 @@ class MLPModel(BaseModel):
         num_epochs: int,
         dataframe: pd.DataFrame,
         test_size: float,
-        devices: Union[int, str],
+        device: Union[int, str],
         seed: int,
         early_stop: bool = True,
         patience: int = 10,
@@ -209,7 +206,6 @@ class MLPModel(BaseModel):
         self.loss_fn = loss_fn
         self.dropout = dropout
         self.num_epochs = num_epochs
-        self.devices = devices
         self.override_extras(**kwargs)
 
         self.model = MLP(
@@ -224,10 +220,7 @@ class MLPModel(BaseModel):
             max_epochs=self.num_epochs,
             logger=self.logger,
             callbacks=self.callbacks,
-            # auto_select_gpus=True,
-            devices=self.devices,
-            # accelerator="gpu" if self.gpu_available else "cpu",
-            accelerator="auto",
+            accelerator=self.device,
             **self.extra_trainer_args)
 
     def train(self):
@@ -251,7 +244,7 @@ if __name__ == "__main__":
         num_epochs=200,
         dataframe=data,
         test_size=0.1,
-        devices="auto",
+        device="auto",
         seed=1234,
         early_stop=False)
     mlp.train()

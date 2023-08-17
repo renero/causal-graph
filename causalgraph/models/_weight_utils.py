@@ -10,7 +10,7 @@ import seaborn as sns
 import shap
 from sklearn.cluster import DBSCAN
 from sklearn.preprocessing import StandardScaler
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from causalgraph.common.utils import graph_from_dictionary
 from causalgraph.common import tqdm_params
@@ -351,10 +351,10 @@ def infer_causal_relationships(
         silent=False
 ):
     shap_values = dict()
-    pbar = tqdm(total=len(feature_names), 
+    pbar = tqdm(total=len(feature_names),
                 **tqdm_params("Computing SHAPLEY values", prog_bar, silent=silent))
-                # desc="Computing SHAPLEY values",
-                # disable=not prog_bar, position=1, leave=False)
+    # desc="Computing SHAPLEY values",
+    # disable=not prog_bar, position=1, leave=False)
     for target_name in feature_names:
         pbar.update(1)
         model = trained_models[target_name]

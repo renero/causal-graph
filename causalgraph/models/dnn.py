@@ -7,14 +7,13 @@ import pandas as pd
 import torch
 from sklearn.base import BaseEstimator
 from sklearn.utils.validation import check_array, check_is_fitted
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from causalgraph.common import GRAY, GREEN, RESET, tqdm_params
 from causalgraph.models._models import MLPModel
 
 # import sys
 # sys.path.append("../dnn")
-
 
 
 warnings.filterwarnings("ignore")
@@ -34,7 +33,7 @@ class NNRegressor(BaseEstimator):
             batch_size: int = 45,
             num_epochs: int = 50,
             loss_fn: str = 'mse',
-            devices: Union[int, str] = "auto",
+            device: Union[int, str] = "auto",
             test_size: float = 0.1,
             early_stop: bool = True,
             patience: int = 10,
@@ -59,7 +58,8 @@ class NNRegressor(BaseEstimator):
             batch_size (int): The batch size for the optimizer.
             num_epochs (int): The number of epochs for the optimizer.
             loss_fn (str): The loss function to use. Default is "mmd".
-            gpus (int): The number of GPUs to use. Default is 0.
+            device (str): The device to use. Either "cpu", "cuda", or "mps". Default
+                is "auto".
             test_size (float): The proportion of the data to use for testing. Default
                 is 0.1.
             seed (int): The seed for the random number generator. Default is 1234.
@@ -79,7 +79,7 @@ class NNRegressor(BaseEstimator):
         self.batch_size = batch_size
         self.num_epochs = num_epochs
         self.loss_fn = loss_fn
-        self.devices = devices
+        self.device = device
         self.test_size = test_size
         self.early_stop = early_stop
         self.patience = patience
@@ -113,9 +113,9 @@ class NNRegressor(BaseEstimator):
         self.feature_names = list(X.columns)
         self.regressor = dict()
 
-        pbar_in = tqdm(total=len(self.feature_names),
-                       **tqdm_params(self._fit_desc, self.prog_bar, 
-                                     silent=self.silent))
+        pbar_in = tqdm(
+            total=len(self.feature_names),
+            **tqdm_params(self._fit_desc, self.prog_bar, silent=self.silent))
 
         for target in self.feature_names:
             pbar_in.refresh()
@@ -130,7 +130,7 @@ class NNRegressor(BaseEstimator):
                 num_epochs=self.num_epochs,
                 dataframe=X,
                 test_size=self.test_size,
-                devices=self.devices,
+                device=self.device,
                 seed=self.random_state,
                 early_stop=self.early_stop,
                 patience=self.patience,
@@ -194,7 +194,8 @@ class NNRegressor(BaseEstimator):
         return X, y
 
     def __repr__(self):
-        forbidden_attrs = ['fit', 'predict', 'score', 'get_params', 'set_params']
+        forbidden_attrs = [
+            'fit', 'predict', 'score', 'get_params', 'set_params']
         ret = f"{GREEN}REX object attributes{RESET}\n"
         ret += f"{GRAY}{'-'*80}{RESET}\n"
         for attr in dir(self):

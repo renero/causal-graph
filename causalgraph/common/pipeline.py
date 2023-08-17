@@ -11,7 +11,7 @@ import pandas as pd
 import numpy as np
 from typing import Any, Dict, List, Union
 
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from causalgraph.common import tqdm_params
 
@@ -22,7 +22,8 @@ class Host:
     def __init__(self, param1, param2):
         self.param1 = param1
         self.param2 = param2
-        self.X = pd.DataFrame(np.random.randint(0,100,size=(100, 4)), columns=list('ABCD'))
+        self.X = pd.DataFrame(np.random.randint(
+            0, 100, size=(100, 4)), columns=list('ABCD'))
 
     def host_method(self):
         # print(f"  Into the method {self.host_method.__name__}")
@@ -67,6 +68,7 @@ def m1(message="default_message"):
 def m2(what):
     return (f"m2_return_value={what}")
 
+
 def m3(what):
     return (f"m3 dataframe argument shape={what.shape}")
 
@@ -95,10 +97,10 @@ class Pipeline:
     >>>     def __init__(self, param1, param2):
     >>>         self.param1 = param1
     >>>         self.param2 = param2
-     
+
     >>> def my_method(param1, param2):
     >>>     return f"{param1}, {param2}"
-     
+
     >>> host = Host(param1='Hello', param2='world')
     >>> pipeline = Pipeline(host, verbose=True, prog_bar=False)
     >>> steps = [
@@ -106,7 +108,7 @@ class Pipeline:
     >>>     ('result1', 'my_method'),
     >>>     ('result2', 'my_method', {'param2': 'there!'})
     >>> ]
-    
+
     >>> pipeline.run(steps)
     >>> print(host.result1)
     >>> print(host.result2)
@@ -115,9 +117,9 @@ class Pipeline:
     """
 
     def __init__(
-            self, 
-            host: type, 
-            prog_bar: bool = True, 
+            self,
+            host: type,
+            prog_bar: bool = True,
             verbose: bool = False,
             silent: bool = False):
         """
@@ -132,7 +134,7 @@ class Pipeline:
         self.silent = silent
         self.objects_ = {'host': self.host}
 
-        # When passing a class to the pipeline, the pipeline will call the 
+        # When passing a class to the pipeline, the pipeline will call the
         # default method specified by _default_object_method, and will pass
         # the parameters specified by _default_method_params.
         self._default_object_method = None
@@ -175,7 +177,8 @@ class Pipeline:
         # Check if step_name is a method within Host, a method or a function in globals
         method = self._get_callable_method(step_call)
         arguments = inspect.signature(method).parameters
-        step_parameters = {arg: arguments[arg].default for arg in arguments.keys()}
+        step_parameters = {
+            arg: arguments[arg].default for arg in arguments.keys()}
 
         # If step_parameters has 'self' as first key, remove it.
         if 'self' in step_parameters.keys():
@@ -227,7 +230,7 @@ class Pipeline:
         else:
             raise ValueError(
                 f"Parameter {step_call} not found in host object or globals")
-                
+
         return method
 
     def _get_params(self, method, param_names) -> List[Any]:
@@ -255,13 +258,13 @@ class Pipeline:
                 param = arg
             params.append(param)
         return params
-    
+
     def _build_params(self, method_parameters, method_arguments) -> dict:
         params = {}
         for parameter, default_value in method_parameters.items():
             # If the parameter is in method_arguments, use the value from method_arguments.
             if parameter in method_arguments:
-                # Two possibilities here: either the parameter is a normal value, 
+                # Two possibilities here: either the parameter is a normal value,
                 # in which case we simply take it, or is the name of an object created
                 # in a previous step, in which case we take the object.
                 # But first, check if the parameter is hashable.
@@ -269,7 +272,8 @@ class Pipeline:
                     params[parameter] = method_arguments[parameter]
                     continue
                 if method_arguments[parameter] in self.objects_.keys():
-                    params[parameter] = self.objects_[method_arguments[parameter]]
+                    params[parameter] = self.objects_[
+                        method_arguments[parameter]]
                 else:
                     params[parameter] = method_arguments[parameter]
                 continue
@@ -286,7 +290,7 @@ class Pipeline:
                 raise ValueError(
                     f"Parameter \'{parameter}\' not found in host object or globals")
         return params
-    
+
     def run(self, steps: list, desc: str = "Running pipeline"):
         """
         Run the pipeline.
@@ -306,7 +310,7 @@ class Pipeline:
             function or class. Each parameter must be a string corresponding to
             an attribute of the host object or a value.
         """
-        self._pbar = tqdm(total=len(steps), 
+        self._pbar = tqdm(total=len(steps),
                           **tqdm_params(desc, self.prog_bar, leave=False, position=0,
                                         silent=self.silent))
         self._pbar.update(0)
@@ -316,26 +320,28 @@ class Pipeline:
             print(f"Running step {step_name}") if self.verbose else None
 
             # Get the method to be called, the parameters that the
-            # method accepts and the arguments to be passed to the method. 
+            # method accepts and the arguments to be passed to the method.
             # The variable name is the name to be given to the result of the call.
             vble_name, step_call, step_parameters, step_arguments = \
                 self._get_step_components(step_name)
-            
+
             # Given the parameters that the method accepts and the arguments
-            # passed for the method, build the parameters to be passed to the
+            #  passed for the method, build the parameters to be passed to the
             # method, using default values or values from the host object.
-            step_parameters = self._build_params(step_parameters, step_arguments)
+            step_parameters = self._build_params(
+                step_parameters, step_arguments)
             return_value = self.run_step(step_call, step_parameters)
 
             # If return value needs to be stored in a variable, do it.
             if vble_name is not None:
                 setattr(self.host, vble_name, return_value)
-                # Check if the new attribute created is an object and if so, 
+                # Check if the new attribute created is an object and if so,
                 # add it to the list of objects.
                 if type(return_value) is not type:
                     self.objects_[vble_name] = return_value
-                print(f"      New attribute: <{vble_name}>") if self.verbose else None
-                
+                print(
+                    f"      New attribute: <{vble_name}>") if self.verbose else None
+
             print("-"*80) if self.verbose else None
             self._pbar_update(1)
 

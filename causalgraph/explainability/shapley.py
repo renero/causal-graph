@@ -24,9 +24,10 @@ from sklearn.discriminant_analysis import StandardScaler
 from sklearn.isotonic import spearmanr
 from sklearn.model_selection import train_test_split
 from sklearn.utils.validation import check_is_fitted
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from causalgraph.common import *
+from causalgraph.common import utils
 from causalgraph.common.utils import graph_from_dot_file, load_experiment
 from causalgraph.independence.edge_orientation import get_edge_orientation
 from causalgraph.independence.feature_selection import select_features
@@ -55,9 +56,8 @@ class ShapDiscrepancy:
 class ShapEstimator(BaseEstimator):
     """
     """
-    
-    device = "mps" if torch.backends.mps.is_available() else "cpu"
 
+    device = utils.select_device("cpu")
 
     def __init__(
             self,
@@ -168,7 +168,7 @@ class ShapEstimator(BaseEstimator):
             elif self.explainer == shap.GradientExplainer:
                 X_train_tensor = torch.from_numpy(X_train).float()
                 X_test_tensor = torch.from_numpy(X_test).float()
-                
+
                 self.shap_explainer[target_name] = self.explainer(
                     model.to(self.device), X_train_tensor.to(self.device))
                 self.shap_values[target_name] = self.shap_explainer[target_name](
@@ -196,7 +196,8 @@ class ShapEstimator(BaseEstimator):
 
         pbar.close()
 
-        self.all_mean_shap_values = np.array(self.all_mean_shap_values).flatten()
+        self.all_mean_shap_values = np.array(
+            self.all_mean_shap_values).flatten()
         self.mean_shap_threshold = np.quantile(
             self.all_mean_shap_values, self.mean_shap_percentile)
 
@@ -638,8 +639,8 @@ class ShapEstimator(BaseEstimator):
             target_name + " $\leftarrow$ " +
             (','.join(selected_features) if selected_features else 'ø'))
         if self.mean_shap_threshold > 0.0 and \
-            self.mean_shap_threshold < np.max(self.shap_mean_values[target_name]):
-            ax.axvline(x=self.mean_shap_threshold, color='red', linestyle='--', 
+                self.mean_shap_threshold < np.max(self.shap_mean_values[target_name]):
+            ax.axvline(x=self.mean_shap_threshold, color='red', linestyle='--',
                        linewidth=0.5)
         fig = ax.figure if fig is None else fig
         return fig

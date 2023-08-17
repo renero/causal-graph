@@ -1,5 +1,5 @@
 from sklearn.ensemble import GradientBoostingRegressor
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from causalgraph.common import tqdm_params
 
@@ -31,7 +31,7 @@ class GBTRegressor(GradientBoostingRegressor):
             ccp_alpha=0.0,
             silent=False,
             prog_bar=True):
-        
+
         self.loss = loss
         self.learning_rate = learning_rate
         self.n_estimators = n_estimators
