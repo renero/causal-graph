@@ -74,7 +74,7 @@ class Rex(BaseEstimator, ClassifierMixin):
             shap_fsize: Tuple[int, int] = (10, 10),
             dpi: int = 75,
             pdf_filename: str = None,
-            random_state=1234, 
+            random_state=1234,
             **kwargs):
         """
         Arguments:
@@ -164,7 +164,8 @@ class Rex(BaseEstimator, ClassifierMixin):
         # Check if any of the arguments required by Regressor (model_type) are
         # present in the kwargs. If so, take them as a property of the class.
         arguments = inspect.signature(object_attribute.__init__).parameters
-        constructor_parameters = {arg: arguments[arg].default for arg in arguments.keys()}
+        constructor_parameters = {
+            arg: arguments[arg].default for arg in arguments.keys()}
         constructor_parameters.pop('self', None)
         for param in constructor_parameters.keys():
             if param in kwargs:
@@ -205,7 +206,7 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.X = copy(X)
         self.y = copy(y) if y is not None else None
 
-        pipeline = Pipeline(self, prog_bar=self.prog_bar, verbose=self.verbose,
+        pipeline = Pipeline(host=self, prog_bar=self.prog_bar, verbose=self.verbose,
                             silent=self.silent)
         steps = [
             ('models', self.model_type),
@@ -238,10 +239,11 @@ class Rex(BaseEstimator, ClassifierMixin):
         X = check_array(X)
 
         # Create a new pipeline for the prediction stages.
-        prediction = Pipeline(self, prog_bar=self.prog_bar, verbose=self.verbose)
-        
+        prediction = Pipeline(
+            self, prog_bar=self.prog_bar, verbose=self.verbose)
+
         # Overwrite values for prog_bar and verbosity with current pipeline
-        # values, in case predict is called from a loaded experiment
+        #  values, in case predict is called from a loaded experiment
         self.shaps.prog_bar = self.prog_bar
         self.shaps.verbose = self.verbose
 
@@ -262,7 +264,8 @@ class Rex(BaseEstimator, ClassifierMixin):
         return np.random.randint(self.n_features_in_**2)
 
     def __repr__(self):
-        forbidden_attrs = ['fit', 'predict', 'score', 'get_params', 'set_params']
+        forbidden_attrs = [
+            'fit', 'predict', 'score', 'get_params', 'set_params']
         ret = f"{GREEN}REX object attributes{RESET}\n"
         ret += f"{GRAY}{'-'*80}{RESET}\n"
         for attr in dir(self):
@@ -284,7 +287,7 @@ class Rex(BaseEstimator, ClassifierMixin):
 
         return ret
 
-    def plot_shap_discrepancies(self, target_name:str, **kwargs):
+    def plot_shap_discrepancies(self, target_name: str, **kwargs):
         assert self.is_fitted_, "Model not fitted yet"
         # X = self.X.drop(target_name, axis=1)
         # y = self.X[target_name].values
@@ -294,7 +297,7 @@ class Rex(BaseEstimator, ClassifierMixin):
     def plot_shap_values(self, **kwargs):
         assert self.is_fitted_, "Model not fitted yet"
         plot_args = [(target_name) for target_name in self.feature_names_]
-        return subplots(self.shaps._plot_shap_summary, *plot_args, **kwargs);
+        return subplots(self.shaps._plot_shap_summary, *plot_args, **kwargs)
 
 
 def main():
@@ -313,26 +316,27 @@ def main():
     if load:
         rex = load_experiment('rex', output_path)
     else:
-        rex = Rex(explainer=shap.Explainer, num_epochs=100, hidden_dim=[10],
-                  early_stop=False, learning_rate=0.002, batch_size=64, dropout=0.05)
+        rex = Rex(
+            explainer=shap.Explainer, num_epochs=100, hidden_dim=[10],
+            early_stop=False, learning_rate=0.002, batch_size=64, dropout=0.05)
         rex.fit(data, ref_graph)
 
     rex.prog_bar = True
     rex.verbose = False
     pred_graph = rex.predict(data)
 
-    metric = evaluate_graph(ref_graph, pred_graph, rex.shaps.all_feature_names_)
+    metric = evaluate_graph(ref_graph, pred_graph,
+                            rex.shaps.all_feature_names_)
     print(metric)
 
     rex.plot_shap_discrepancies('V6')
 
     # Plot the SHAP values for each regression
     plot_args = [(target_name) for target_name in rex.shaps.all_feature_names_]
-    subplots(rex.shaps._plot_shap_summary, *plot_args, dpi=75);
+    subplots(rex.shaps._plot_shap_summary, *plot_args, dpi=75)
 
     # Plot the predicted graph
     plot_dags(pred_graph, ref_graph)
-
 
     if save:
         save_experiment('rex', "/Users/renero/phd/output/REX", rex)
@@ -361,9 +365,10 @@ def main2():
     scaler = StandardScaler()
     data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)
 
-    rex = Rex(model_type=GBTRegressor, explainer=shap.Explainer, 
-              num_epochs=1, hidden_dim=[10],
-            early_stop=False, learning_rate=0.002, batch_size=64, dropout=0.2)
+    rex = Rex(
+        model_type=GBTRegressor, explainer=shap.Explainer,
+        num_epochs=1, hidden_dim=[10], early_stop=False, learning_rate=0.002,
+        batch_size=64, dropout=0.2)
     print(rex)
     rex.fit(data)
     pred_graph = rex.predict(data)

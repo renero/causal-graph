@@ -15,7 +15,7 @@ from typing import List, Union
 
 def default(x, default_x, kwargs=None, condition=None):
     if condition is None:
-        condition = lambda x: x is None
+        def condition(x): return x is None
     if kwargs is not None:
         if isinstance(kwargs, dict):
             return default_x(**kwargs) if condition(x) else x
@@ -84,7 +84,8 @@ def get_mmd_quadratic(xx, yy, zz, scale, weights=None):
     if is_joint_mmd:
         xx_prod, yy_prod, zz_prod = 1, 1, 1
         for i in range(len(xx)):
-            curr_weights = default(weights, get_default_kernel_weights(scale[i]))
+            curr_weights = default(
+                weights, get_default_kernel_weights(scale[i]))
             xx_prod *= _mmd_quadratic(xx[i], scale[i], curr_weights)
             yy_prod *= _mmd_quadratic(yy[i], scale[i], curr_weights)
             zz_prod *= _mmd_quadratic(zz[i], scale[i], curr_weights)
@@ -104,6 +105,10 @@ def get_mmd_quadratic(xx, yy, zz, scale, weights=None):
 
 def _mmd_linear(x, i, j, scale, weights):
     return torch.sum(torch.exp(x[i, j] * scale) * weights, dim=0)
+
+
+def extra_repr(cls, attr_names, delimiter="\n"):
+    return delimiter.join([f"{a}={str(getattr(cls, a))}" for a in attr_names])
 
 
 def _mmd_linear_helper(xx, yy, zz, scale, weights):
@@ -134,7 +139,8 @@ def get_mmd_linear(xx, yy, zz, scale, weights=None):
     if is_joint_mmd:
         product_list = [1, 1, 1, 1]
         for i in range(len(xx)):
-            curr_kernels = _mmd_linear_helper(xx[i], yy[i], zz[i], scale[i], weights)
+            curr_kernels = _mmd_linear_helper(
+                xx[i], yy[i], zz[i], scale[i], weights)
             product_list = [a * b for a, b in zip(product_list, curr_kernels)]
         loss1, loss2, loss3, loss4 = [torch.sum(a) for a in product_list]
     else:
@@ -146,6 +152,87 @@ def get_mmd_linear(xx, yy, zz, scale, weights=None):
     return torch.sum(loss) / float(B // 2)
 
 
+def check_batch_sizes(s, t, mmd_type):
+    if mmd_type == "quadratic":
+        return
+    is_list = isinstance(s, (list, tuple))
+    if (is_list and any(s[i].shape != t[i].shape for i in range(len(s)))) or (
+        not is_list and s.shape != t.shape
+    ):
+        raise ValueError(
+            "For mmd_type 'linear', source and target must have the same batch size."
+        )
+
+
+def is_none(x):
+    return x is None
+
+
+def default(x, default_x, kwargs=None, condition=None):
+    if condition is None:
+        condition = is_none
+    if kwargs is not None:
+        if isinstance(kwargs, dict):
+            return default_x(**kwargs) if condition(x) else x
+        if isinstance(kwargs, list):
+            return default_x(*kwargs) if condition(x) else x
+    return default_x if condition(x) else x
+
+
+def get_median_of_medians(x, dist_func):
+    medians = []
+
+    def fn(mat, *_):
+        with torch.no_grad():
+            medians.append(torch.median(mat))
+
+    dist_func.iter_fn = fn
+    dist_func(x, x)
+    return torch.median(torch.stack(medians))
+
+
+def mask_out_self(sim_mat, start_idx, return_mask=False):
+    num_rows, num_cols = sim_mat.shape
+    mask = torch.ones(num_rows, num_cols, dtype=torch.bool)
+    rows = torch.arange(num_rows)
+    cols = rows + start_idx
+    mask[rows, cols] = False
+    sim_mat = sim_mat[mask].view(num_rows, num_cols - 1)
+    if return_mask:
+        return sim_mat, mask
+    return sim_mat
+
+
+def _mmd_quadratic_batched(rsum, scale, weights, query_is_ref):
+    def fn(mat, s, *_):
+        if query_is_ref:
+            mat = mask_out_self(mat, s)
+        rsum[0] += torch.sum(_mmd_quadratic(mat, scale, weights))
+
+    return fn
+
+
+def get_mmd_quadratic_batched(x, y, dist_func, kernel_scales, bandwidth, weights=None):
+    if torch.is_tensor(kernel_scales):
+        kernel_scales = pml_cf.to_device(kernel_scales, x, dtype=x.dtype)
+    if bandwidth is None:
+        bandwidth = get_median_of_medians(x, dist_func)
+    scale = -kernel_scales / bandwidth
+    weights = default(weights, get_default_kernel_weights(scale))
+
+    sums = []
+    for s, t in [(x, x), (y, y), (x, y)]:
+        rsum = [0]
+        query_is_ref = s is t
+        dist_func.iter_fn = _mmd_quadratic_batched(
+            rsum, scale, weights, query_is_ref)
+        dist_func(s, t)
+        denom = (len(s) * (len(s) - 1)) if query_is_ref else (len(s) * len(t))
+        sums.append(torch.sum(rsum[0]) / denom)
+
+    return sums[0] + sums[1] - 2 * sums[2]
+
+
 class MMDLoss(torch.nn.Module):
     """
     Implementation of
@@ -155,7 +242,11 @@ class MMDLoss(torch.nn.Module):
     """
 
     def __init__(
-        self, kernel_scales: Union[float, torch.Tensor] = 1, mmd_type: str = "linear"
+        self,
+        kernel_scales: Union[float, torch.Tensor] = 1,
+        mmd_type: str = "linear",
+        dist_func=None,
+        bandwidth=None,
     ):
         """
         Arguments:
@@ -165,7 +256,10 @@ class MMDLoss(torch.nn.Module):
         """
         super().__init__()
         self.kernel_scales = kernel_scales
-        self.dist_func = LpDistance(normalize_embeddings=False, p=2, power=2)
+        self.dist_func = default(
+            dist_func, LpDistance(normalize_embeddings=False, p=2, power=2)
+        )
+        self.bandwidth = bandwidth
         self.mmd_type = mmd_type
         if mmd_type == "linear":
             self.mmd_func = get_mmd_linear
@@ -187,10 +281,13 @@ class MMDLoss(torch.nn.Module):
         Returns:
             MMD if the inputs are tensors, and Joint MMD (JMMD) if the inputs are lists of tensors.
         """
-        xx, yy, zz, scale = get_mmd_dist_mats(x, y, self.dist_func)
+        check_batch_sizes(x, y, self.mmd_type)
+        xx, yy, zz, scale = get_mmd_dist_mats(
+            x, y, self.dist_func, self.bandwidth)
         if torch.is_tensor(self.kernel_scales):
             s = scale[0] if isinstance(scale, (list, tuple)) else scale
-            self.kernel_scales = pml_cf.to_device(self.kernel_scales, s, dtype=s.dtype)
+            self.kernel_scales = pml_cf.to_device(
+                self.kernel_scales, s, dtype=s.dtype)
 
         if isinstance(scale, (list, tuple)):
             for i in range(len(scale)):
@@ -199,3 +296,52 @@ class MMDLoss(torch.nn.Module):
             scale = scale * self.kernel_scales
 
         return self.mmd_func(xx, yy, zz, scale)
+
+    def extra_repr(self):
+        """"""
+        return extra_repr(self, ["mmd_type", "kernel_scales"])
+
+
+class BatchedDistance(torch.nn.Module):
+    def __init__(self, distance, iter_fn=None, batch_size=32):
+        super().__init__()
+        self.distance = distance
+        self.iter_fn = iter_fn
+        self.batch_size = batch_size
+
+    def forward(self, query_emb, ref_emb=None):
+        ref_emb = ref_emb if ref_emb is not None else query_emb
+        n = query_emb.shape[0]
+        for s in range(0, n, self.batch_size):
+            e = s + self.batch_size
+            L = query_emb[s:e]
+            mat = self.distance(L, ref_emb)
+            self.iter_fn(mat, s, e)
+
+    def __getattr__(self, name):
+        try:
+            return super().__getattr__(name)
+        except AttributeError:
+            return getattr(self.distance, name)
+
+
+class MMDBatchedLoss(MMDLoss):
+    def __init__(self, batch_size=1024, **kwargs):
+        super().__init__(**kwargs)
+        if self.mmd_type != "quadratic":
+            raise ValueError("mmd_type must be 'quadratic'")
+        self.mmd_func = get_mmd_quadratic_batched
+        self.dist_func = BatchedDistance(self.dist_func, batch_size=batch_size)
+
+    def forward(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+        """
+        Arguments:
+            x: features from one domain.
+            y: features from the other domain.
+        Returns:
+            MMD
+        """
+        if isinstance(x, (list, tuple)) or isinstance(y, (list, tuple)):
+            raise TypeError("List of features not yet supported")
+        check_batch_sizes(x, y, self.mmd_type)
+        return self.mmd_func(x, y, self.dist_func, self.kernel_scales, self.bandwidth)
