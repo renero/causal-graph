@@ -5,9 +5,11 @@ from sklearn.base import BaseEstimator
 from sklearn.inspection import permutation_importance
 import torch
 
+from tqdm.auto import tqdm
+
 from causalgraph.models._models import MLPModel
 from causalgraph.common.plots import subplots
-from causalgraph.common import utils
+from causalgraph.common import tqdm_params, utils
 
 
 class PermutationImportance(BaseEstimator):
@@ -25,7 +27,7 @@ class PermutationImportance(BaseEstimator):
             n_repeats: int = 10,
             mean_pi_percentile: float = 0.8,
             random_state: int = 42,
-            progbar=True,
+            prog_bar=True,
             verbose=False,
             silent=False):
         super().__init__()
@@ -33,12 +35,15 @@ class PermutationImportance(BaseEstimator):
         self.n_repeats = n_repeats
         self.mean_pi_percentile = mean_pi_percentile
         self.random_state = random_state
-        self.progbar = progbar
+        self.prog_bar = prog_bar
         self.verbose = verbose
         self.silent = silent
         self.feature_names_ = list(self.regressors.keys())
 
         self.is_fitted_ = False
+
+        self._fit_desc = f"Running Perm.Importance"
+        self._pred_desc = "Predicting w perm. imp."
 
     def fit(self, X, y=None):
         first_key = self.feature_names_[0]
@@ -48,10 +53,15 @@ class PermutationImportance(BaseEstimator):
             return self._fit_sklearn(X)
 
     def _fit_sklearn(self, X):
+        pbar = tqdm(
+            total=len(self.feature_names_),
+            **tqdm_params(self._fit_desc, self.prog_bar, silent=self.silent))
+
         self.pi = {}
         self.all_pi = []
         self.X = X.copy()
         for target in self.feature_names_:
+            pbar.refresh()
             regressor = self.regressors[target]
             X = self.X.drop(columns=[target])
             y = self.X[target]
@@ -59,6 +69,8 @@ class PermutationImportance(BaseEstimator):
                 regressor, X, y, n_repeats=10,
                 random_state=self.random_state)
             self.all_pi.append(self.pi[target]['importances_mean'])
+            pbar.update(1)
+        pbar.close()
         self.all_pi = np.array(self.all_pi).flatten()
         self.mean_pi_threshold = np.quantile(
             self.all_pi, self.mean_pi_percentile)
@@ -67,9 +79,14 @@ class PermutationImportance(BaseEstimator):
         return self
 
     def _fit_pytorch(self):
+        pbar = tqdm(
+            total=len(self.feature_names_),
+            **tqdm_params(self._fit_desc, self.prog_bar, silent=self.silent))
+
         self.base_loss = dict()
         self.base_std = dict()
         for feature in self.feature_names_:
+            pbar.refresh()
             regressor = self.regressors[feature]
             model = regressor.model.to(self.device)
 
@@ -79,6 +96,8 @@ class PermutationImportance(BaseEstimator):
                 print(
                     f"""Base loss: {self.base_loss[feature]:.4f} 
                     +/- {self.base_std[feature]:.4f}""")
+            pbar.update(1)
+        pbar.close()
         self.is_fitted_ = True
 
         return self
@@ -91,10 +110,15 @@ class PermutationImportance(BaseEstimator):
             return self.pi
 
     def _predict_pytorch(self):
+        pbar = tqdm(
+            total=len(self.feature_names_),
+            **tqdm_params(self._fit_desc, self.prog_bar, silent=self.silent))
+
         self.all_pi = []
         self.pi = dict()
         num_vars = len(self.feature_names_)
         for target in self.feature_names_:
+            pbar.refresh()
             self.regressor = self.regressors[target]
             self.model = self.regressor.model
 
@@ -114,12 +138,15 @@ class PermutationImportance(BaseEstimator):
                 perm_std = perm_std / (self.base_loss[target] * self.n_repeats)
                 self.pi[target]['importances_mean'].append(perm_importance)
                 self.pi[target]['importances_std'].append(perm_std)
+            pbar.update(1)
 
             self.pi[target]['importances_mean'] = np.array(
                 self.pi[target]['importances_mean'])
             self.pi[target]['importances_std'] = np.array(
                 self.pi[target]['importances_std'])
             self.all_pi.append(self.pi[target]['importances_mean'])
+
+        pbar.close()
 
         self.all_pi = np.array(self.all_pi).flatten()
         self.mean_pi_threshold = np.quantile(

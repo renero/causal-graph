@@ -96,8 +96,8 @@ class ShapEstimator(BaseEstimator):
         self._pred_desc = "Building graph skeleton"
 
     def __repr__(self):
-        forbidden_attrs = ['fit', 'predict',
-                           'score', 'get_params', 'set_params']
+        forbidden_attrs = [
+            'fit', 'predict', 'score', 'get_params', 'set_params']
         ret = f"{GREEN}SHAP object attributes{RESET}\n"
         ret += f"{GRAY}{'-'*80}{RESET}\n"
         for attr in dir(self):
@@ -143,7 +143,7 @@ class ShapEstimator(BaseEstimator):
             X, test_size=0.2, random_state=42)
 
         for target_name in self.feature_names_:
-            pbar.update(1)
+            pbar.refresh()
 
             # Get the model and the data (tensor form)
             if hasattr(self.models.regressor[target_name], "model"):
@@ -192,7 +192,7 @@ class ShapEstimator(BaseEstimator):
             self.all_mean_shap_values.append(
                 self.shap_mean_values[target_name])
 
-            pbar.refresh()
+            pbar.update(1)
 
         pbar.close()
 
