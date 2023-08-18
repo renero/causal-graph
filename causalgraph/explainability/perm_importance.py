@@ -194,7 +194,8 @@ class PermutationImportance(BaseEstimator):
 
                 if self.verbose:
                     print(
-                        f"Perm.imp.: {self.pi[target]['importances_mean'][-1]:.6f}", end="")
+                        f"Perm.imp.: {self.pi[target]['importances_mean'][-1]:.6f} ",
+                        end="")
                     print(f"+/- {self.pi[target]['importances_std'][-1]:.6f}")
 
             pbar.update(1)
@@ -386,6 +387,8 @@ if __name__ == "__main__":
 
     #  Run the permutation importance algorithm
     pi = PermutationImportance(
-        rex.models, n_repeats=10, prog_bar=False, verbose=False)
+        rex.models, n_repeats=10, prog_bar=False, verbose=True)
     pi.fit(data)
     pi.predict()
+    pi.plot(fig_size=(7, 5))
+    plt.show()
