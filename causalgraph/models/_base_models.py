@@ -13,7 +13,7 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 from causalgraph.common import utils
 
-from ._loss import MMDBatchedLoss, MMDLoss
+from ._loss import MMDLoss
 
 logging.getLogger('pytorch_lightning').setLevel(logging.ERROR)
 torch_log = logging.getLogger("pytorch_lightning")
@@ -64,9 +64,7 @@ class MLP(pl.LightningModule):
         elif loss == "mae":
             self.loss_fn = nn.L1Loss()
         elif loss == "mmd":
-            # self.loss_fn = MMDLoss(mmd_type="quadratic")
-            self.loss_fn = MMDBatchedLoss(
-                batch_size=self.batch_size, mmd_type="quadratic")
+            self.loss_fn = MMDLoss()  # mmd_type="quadratic")
         else:
             raise ValueError("Unknown loss function.")
 
