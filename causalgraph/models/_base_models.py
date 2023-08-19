@@ -31,10 +31,10 @@ class MLP(pl.LightningModule):
     class Block(nn.Module):
         """The main building block of `MLP`."""
 
-        def __init__(self, d_in: int, d_out: int, bias: bool, dropout: float) -> None:
+        def __init__(self, d_in: int, d_out: int, activation, bias: bool, dropout: float):
             super().__init__()
             self.linear = nn.Linear(d_in, d_out, bias)
-            self.activation = nn.ReLU()
+            self.activation = activation
             self.dropout = nn.Dropout(dropout)
 
         def forward(self, x: Tensor) -> Tensor:
@@ -44,6 +44,7 @@ class MLP(pl.LightningModule):
             self,
             input_size,
             layers_dimensions,
+            activation,
             batch_size,
             lr,
             loss,
@@ -54,6 +55,7 @@ class MLP(pl.LightningModule):
 
         # Net params
         self.input_size = input_size
+        self.activation = activation
         self.batch_size = batch_size
         self.learning_rate = lr
         self.dropout = dropout
@@ -71,11 +73,12 @@ class MLP(pl.LightningModule):
         if isinstance(self.dropout, float):
             dropouts = [self.dropout] * len(layers_dimensions)
         assert len(layers_dimensions) == len(dropouts)
-        self.blocks = nn.Sequential(
+        self.net = nn.Sequential(
             *[
                 MLP.Block(
                     d_in=layers_dimensions[i - 1] if i else self.input_size,
                     d_out=d,
+                    activation=self.activation,
                     bias=True,
                     dropout=dropout,
                 )
@@ -85,10 +88,19 @@ class MLP(pl.LightningModule):
         self.head = nn.Linear(
             layers_dimensions[-1] if layers_dimensions else input_size, 1)
 
+        if isinstance(self.activation, nn.SELU):
+            for param in self.net.parameters():
+                # biases zero
+                if len(param.shape) == 1:
+                    nn.init.constant_(param, 0)
+                else:
+                    nn.init.kaiming_normal_(
+                        param, mode='fan_in', nonlinearity='linear')
+
     def forward(self, x):
         noise = torch.randn(x.shape[0], 1, device="cpu").to(self.device)
         X = torch.cat([x, noise], dim=1)
-        y = self.blocks(X)
+        y = self.net(X)
         y = self.head(y)
         return y
 

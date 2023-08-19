@@ -5,6 +5,7 @@ from typing import List, Union
 import numpy as np
 import pandas as pd
 import torch
+import torch.nn as nn
 from sklearn.base import BaseEstimator
 from sklearn.utils.validation import check_array, check_is_fitted
 from tqdm.auto import tqdm
@@ -28,6 +29,7 @@ class NNRegressor(BaseEstimator):
     def __init__(
             self,
             hidden_dim: Union[int, List[int]] = [36, 12],
+            activation: nn.Module = nn.ReLU(),
             learning_rate: float = 0.0035,
             dropout: float = 0.065,
             batch_size: int = 45,
@@ -74,6 +76,7 @@ class NNRegressor(BaseEstimator):
                 variables as the key.
         """
         self.hidden_dim = hidden_dim
+        self.activation = activation
         self.learning_rate = learning_rate
         self.dropout = dropout
         self.batch_size = batch_size
@@ -122,6 +125,7 @@ class NNRegressor(BaseEstimator):
             self.regressor[target] = MLPModel(
                 target=target,
                 input_size=self.n_features_in_,
+                activation=self.activation,
                 hidden_dim=self.hidden_dim,
                 learning_rate=self.learning_rate,
                 batch_size=self.batch_size,
@@ -218,17 +222,18 @@ if __name__ == "__main__":
 
     warnings.filterwarnings("ignore", category=UserWarning)
 
-    dataset_name = 'rex_generated_polynomial_1'
+    dataset_name = 'rex_generated_polynew_10'
     data = pd.read_csv(f"~/phd/data/RC3/{dataset_name}.csv")
 
     nn = NNRegressor(
         hidden_dim=[10, 5],
+        activation=nn.SELU(),
         learning_rate=0.2,
         dropout=0.05,
         batch_size=32,
         num_epochs=50,
         loss_fn="mse",
-        devices="auto",
+        device="cpu",
         test_size=0.1,
         early_stop=False,
         patience=10,

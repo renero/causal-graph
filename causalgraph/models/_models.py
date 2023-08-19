@@ -1,13 +1,13 @@
 import logging
 import random
 import warnings
-from types import UnionType
 from typing import List, Union
 
 import numpy as np
 import pandas as pd
 import pytorch_lightning as pl
 import torch
+import torch.nn as nn
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import EarlyStopping, TQDMProgressBar
 from pytorch_lightning.loggers import TensorBoardLogger
@@ -117,10 +117,6 @@ class BaseModel(object):
             self.callbacks.append(bar)
 
     def init_data(self):
-        # self.scaler = StandardScaler()
-        # df_scaled = pd.DataFrame(self.scaler.fit_transform(self.dataframe),
-        #                          columns=self.dataframe.columns)
-
         self.all_columns = list(self.dataframe)
         self.columns = list(self.dataframe)
         self.columns.remove(self.target)
@@ -174,6 +170,7 @@ class MLPModel(BaseModel):
         target: str,
         input_size: int,
         hidden_dim: List[int],
+        activation: nn.Module,
         learning_rate: float,
         batch_size: int,
         loss_fn: str,
@@ -201,6 +198,7 @@ class MLPModel(BaseModel):
 
         self.input_size = input_size
         self.hidden_dim = hidden_dim
+        self.activation = activation
         self.learning_rate = learning_rate
         self.batch_size = batch_size
         self.loss_fn = loss_fn
@@ -211,6 +209,7 @@ class MLPModel(BaseModel):
         self.model = MLP(
             self.input_size,
             self.hidden_dim,
+            self.activation,
             self.batch_size,
             self.learning_rate,
             self.loss_fn,

@@ -245,9 +245,10 @@ class ShapEstimator(BaseEstimator):
         # X_array = check_array(X)
         check_is_fitted(self, 'is_fitted_')
 
-        pbar = tqdm(total=4,
-                    **tqdm_params("Building graph from SHAPs", self.prog_bar,
-                                  silent=self.silent))
+        pbar = tqdm(
+            total=4, **tqdm_params(
+                "Building graph from SHAPs", self.prog_bar, silent=self.silent))
+        pbar.refresh()
 
         self._compute_discrepancies(self.X_test)  # (X)
 
@@ -298,7 +299,6 @@ class ShapEstimator(BaseEstimator):
                 # G_shap.add_edge(v, u)
 
         pbar.update(1)
-        pbar.refresh()
         pbar.close()
 
         return G_shap
