@@ -4,28 +4,27 @@
 # (C) J. Renero, 2022, 2023
 #
 
-from typing import Any, Callable, Dict, List, Tuple
+from typing import Any, Callable
 
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 import seaborn as sns
-from matplotlib.backends.backend_pdf import PdfPages
-from matplotlib.figure import Figure
-from matplotlib.ticker import FormatStrFormatter, MultipleLocator
+from matplotlib.ticker import MultipleLocator
 from pydot import Dot
 import pydotplus
 
 
 # Defaults for the graphs plotted
-formatting_kwargs = {"node_size": 1000,
-                     "node_color": "white",
-                     "edgecolors": "black",
-                     "font_family": "monospace",
-                     "horizontalalignment": "center",
-                     "verticalalignment": "center_baseline",
-                     "with_labels": True
-                     }
+formatting_kwargs = {
+    "node_size": 1000,
+    "node_color": "white",
+    "edgecolors": "black",
+    "font_family": "monospace",
+    "horizontalalignment": "center",
+    "verticalalignment": "center_baseline",
+    "with_labels": True
+}
 
 
 def setup_plot(**kwargs):  # tex=True, font="serif", dpi=75, font_size=10):
@@ -170,120 +169,6 @@ def subplots(
         fig.suptitle(title)
     plt.tight_layout()
     plt.show()
-
-
-def plot_dags(
-        dag: nx.DiGraph,
-        reference: nx.DiGraph = None,
-        names: List[str] = ["REX Prediction", "Ground truth"],
-        figsize: Tuple[int, int] = (10, 5),
-        dpi: int = 75,
-        save_to_pdf: str = None,
-        **kwargs):
-    """
-    Compare two graphs using dot.
-
-    Parameters:
-    -----------
-    reference: The reference DAG.
-    dag: The DAG to compare.
-    names: The names of the reference graph and the dag.
-    figsize: The size of the figure.
-    **kwargs: Additional arguments to format the graphs:
-        - "node_size": 500
-        - "node_color": 'white'
-        - "edgecolors": "black"
-        - "font_family": "monospace"
-        - "horizontalalignment": "center"
-        - "verticalalignment": "center_baseline"
-        - "with_labels": True
-    """
-    ncols = 1 if reference is None else 2
-
-    # Overwrite formatting_kwargs with kwargs if they are provided
-    formatting_kwargs.update(kwargs)
-
-    G = nx.DiGraph()
-    G.add_edges_from(dag.edges())
-    if reference:
-        Gt = _cleanup_graph(reference.copy())
-        for missing in set(list(Gt.nodes)) - set(list(G.nodes)):
-            G.add_node(missing)
-
-        # Gt = _format_graph(Gt, Gt, inv_color="red", wrong_color="black")
-        # G  = _format_graph(G, Gt, inv_color="red", wrong_color="gray")
-        Gt = _format_graph(Gt, G, inv_color="lightgreen", wrong_color="lightgreen")
-        G = _format_graph(G, Gt, inv_color="orange", wrong_color="red")
-    else:
-        G = _format_graph(G)
-
-    ref_layout = None
-    setup_plot(dpi=dpi)
-    f, ax = plt.subplots(ncols=ncols, figsize=figsize)
-    ax_graph = ax[1] if reference else ax
-    if save_to_pdf is not None:
-        with PdfPages(save_to_pdf) as pdf:
-            if reference:
-                ref_layout = nx.drawing.nx_agraph.graphviz_layout(
-                    Gt, prog="dot")
-                _draw_graph_subplot(Gt, layout=ref_layout, title=None, ax=ax[0],
-                                    **formatting_kwargs)
-            _draw_graph_subplot(G, layout=ref_layout, title=None, ax=ax_graph,
-                                **formatting_kwargs)
-            pdf.savefig(f, bbox_inches='tight', pad_inches=0)
-            plt.close()
-    else:
-        if reference:
-            ref_layout = nx.drawing.nx_agraph.graphviz_layout(Gt, prog="dot")
-            _draw_graph_subplot(Gt, layout=ref_layout, title=names[1], ax=ax[0],
-                                **formatting_kwargs)
-        _draw_graph_subplot(G, layout=ref_layout, title=names[0], ax=ax_graph,
-                            **formatting_kwargs)
-        plt.show()
-
-
-# plot_dag: Plot a single DAG without formatting edges.
-def plot_dag(
-        dag: nx.DiGraph,
-        figsize: Tuple[int, int] = (5, 5),
-        dpi: int = 75,
-        save_to_pdf: str = None,
-        **kwargs):
-    """
-    Plot a DAG.
-
-    Parameters:
-    -----------
-    dag: The DAG to plot.
-    figsize: The size of the figure.
-    **kwargs: Additional arguments to format the graphs:
-        - "node_size": 500
-        - "node_color": 'white'
-        - "edgecolors": "black"
-        - "font_family": "monospace"
-        - "horizontalalignment": "center"
-        - "verticalalignment": "center_baseline"
-        - "with_labels": True
-    """
-    # Overwrite formatting_kwargs with kwargs if they are provided
-    formatting_kwargs.update(kwargs)
-
-    G = nx.DiGraph()
-    G.add_edges_from(dag.edges())
-    G = _format_graph(G)
-    ref_layout = nx.drawing.nx_agraph.graphviz_layout(G, prog="dot")
-
-    setup_plot(dpi=dpi)
-    f, ax = plt.subplots(figsize=figsize)
-    if save_to_pdf is not None:
-        with PdfPages(save_to_pdf) as pdf:
-            _draw_graph_subplot(G, layout=ref_layout,
-                                title=None, ax=ax, **formatting_kwargs)
-            pdf.savefig(f, bbox_inches='tight', pad_inches=0)
-            plt.close()
-    else:
-        _draw_graph_subplot(G, layout=ref_layout, title=None,
-                            ax=ax, **formatting_kwargs)
 
 
 def _format_graph(

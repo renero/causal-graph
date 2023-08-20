@@ -1,30 +1,39 @@
+#
+# Main class for the REX estimator.
+#
+# (C) J. Renero, 2022, 2023
+#
+
+import inspect
 import os
 import types
 import warnings
 from copy import copy
 from pathlib import Path
-from typing import Tuple, Union
-import inspect
+from typing import List, Tuple, Union
 
+import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 import pandas as pd
 import shap
+from matplotlib.backends.backend_pdf import PdfPages
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.utils.validation import (check_array, check_is_fitted,
                                       check_random_state)
 
 from causalgraph.common import GRAY, GREEN, RESET
 from causalgraph.common.pipeline import Pipeline
-from causalgraph.common.plots import plot_dags, subplots
+from causalgraph.common.plots import (_cleanup_graph, _draw_graph_subplot,
+                                      _format_graph, formatting_kwargs,
+                                      setup_plot, subplots)
 from causalgraph.common.utils import (graph_from_dot_file, load_experiment,
                                       save_experiment)
-from causalgraph.explainability.shapley import ShapEstimator
+from causalgraph.explainability import (
+    Hierarchies, PermutationImportance, ShapEstimator)
 from causalgraph.independence.graph_independence import GraphIndependence
 from causalgraph.metrics.compare_graphs import evaluate_graph
-from causalgraph.explainability.hierarchies import Hierarchies
-from causalgraph.models import NNRegressor, GBTRegressor
-from causalgraph.explainability import PermutationImportance
+from causalgraph.models import GBTRegressor, NNRegressor
 
 
 class Rex(BaseEstimator, ClassifierMixin):
@@ -287,6 +296,123 @@ class Rex(BaseEstimator, ClassifierMixin):
 
         return ret
 
+    def plot_dags(
+            self,
+            dag: nx.DiGraph,
+            reference: nx.DiGraph = None,
+            names: List[str] = ["REX Prediction", "Ground truth"],
+            figsize: Tuple[int, int] = (10, 5),
+            dpi: int = 75,
+            save_to_pdf: str = None,
+            **kwargs):
+        """
+        Compare two graphs using dot.
+
+        Parameters:
+        -----------
+        reference: The reference DAG.
+        dag: The DAG to compare.
+        names: The names of the reference graph and the dag.
+        figsize: The size of the figure.
+        **kwargs: Additional arguments to format the graphs:
+            - "node_size": 500
+            - "node_color": 'white'
+            - "edgecolors": "black"
+            - "font_family": "monospace"
+            - "horizontalalignment": "center"
+            - "verticalalignment": "center_baseline"
+            - "with_labels": True
+        """
+        ncols = 1 if reference is None else 2
+
+        # Overwrite formatting_kwargs with kwargs if they are provided
+        formatting_kwargs.update(kwargs)
+
+        G = nx.DiGraph()
+        G.add_edges_from(dag.edges())
+        if reference:
+            Gt = _cleanup_graph(reference.copy())
+            for missing in set(list(Gt.nodes)) - set(list(G.nodes)):
+                G.add_node(missing)
+
+            # Gt = _format_graph(Gt, Gt, inv_color="red", wrong_color="black")
+            # G  = _format_graph(G, Gt, inv_color="red", wrong_color="gray")
+            Gt = _format_graph(
+                Gt, G, inv_color="lightgreen", wrong_color="lightgreen")
+            G = _format_graph(G, Gt, inv_color="orange", wrong_color="red")
+        else:
+            G = _format_graph(G)
+
+        ref_layout = None
+        setup_plot(dpi=dpi)
+        f, ax = plt.subplots(ncols=ncols, figsize=figsize)
+        ax_graph = ax[1] if reference else ax
+        if save_to_pdf is not None:
+            with PdfPages(save_to_pdf) as pdf:
+                if reference:
+                    ref_layout = nx.drawing.nx_agraph.graphviz_layout(
+                        Gt, prog="dot")
+                    _draw_graph_subplot(Gt, layout=ref_layout, title=None, ax=ax[0],
+                                        **formatting_kwargs)
+                _draw_graph_subplot(G, layout=ref_layout, title=None, ax=ax_graph,
+                                    **formatting_kwargs)
+                pdf.savefig(f, bbox_inches='tight', pad_inches=0)
+                plt.close()
+        else:
+            if reference:
+                ref_layout = nx.drawing.nx_agraph.graphviz_layout(
+                    Gt, prog="dot")
+                _draw_graph_subplot(Gt, layout=ref_layout, title=names[1], ax=ax[0],
+                                    **formatting_kwargs)
+            _draw_graph_subplot(G, layout=ref_layout, title=names[0], ax=ax_graph,
+                                **formatting_kwargs)
+            plt.show()
+
+    # plot_dag: Plot a single DAG without formatting edges.
+
+    def plot_dag(
+            self,
+            dag: nx.DiGraph,
+            figsize: Tuple[int, int] = (5, 5),
+            dpi: int = 75,
+            save_to_pdf: str = None,
+            **kwargs):
+        """
+        Plot a DAG.
+
+        Parameters:
+        -----------
+        dag: The DAG to plot.
+        figsize: The size of the figure.
+        **kwargs: Additional arguments to format the graphs:
+            - "node_size": 500
+            - "node_color": 'white'
+            - "edgecolors": "black"
+            - "font_family": "monospace"
+            - "horizontalalignment": "center"
+            - "verticalalignment": "center_baseline"
+            - "with_labels": True
+        """
+        # Overwrite formatting_kwargs with kwargs if they are provided
+        formatting_kwargs.update(kwargs)
+
+        G = nx.DiGraph()
+        G.add_edges_from(dag.edges())
+        G = _format_graph(G)
+        ref_layout = nx.drawing.nx_agraph.graphviz_layout(G, prog="dot")
+
+        setup_plot(dpi=dpi)
+        f, ax = plt.subplots(figsize=figsize)
+        if save_to_pdf is not None:
+            with PdfPages(save_to_pdf) as pdf:
+                _draw_graph_subplot(G, layout=ref_layout,
+                                    title=None, ax=ax, **formatting_kwargs)
+                pdf.savefig(f, bbox_inches='tight', pad_inches=0)
+                plt.close()
+        else:
+            _draw_graph_subplot(G, layout=ref_layout, title=None,
+                                ax=ax, **formatting_kwargs)
+
     def plot_shap_discrepancies(self, target_name: str, **kwargs):
         assert self.is_fitted_, "Model not fitted yet"
         # X = self.X.drop(target_name, axis=1)
@@ -344,15 +470,16 @@ def main():
 
 def main2():
     import warnings
-    import shap
 
     import numpy as np
     import pandas as pd
+    import shap
+    from sklearn.preprocessing import StandardScaler
+
     from causalgraph.common.utils import graph_from_dot_file
     from causalgraph.estimators import Rex
-    from causalgraph.models import GBTRegressor, NNRegressor
     from causalgraph.metrics.compare_graphs import evaluate_graph
-    from sklearn.preprocessing import StandardScaler
+    from causalgraph.models import GBTRegressor, NNRegressor
 
     np.set_printoptions(precision=4, linewidth=150)
     warnings.filterwarnings('ignore')
