@@ -372,29 +372,34 @@ if __name__ == "__main__":
     data = pd.read_csv(f"~/phd/data/RC3/{dataset_name}.csv")
     scaler = StandardScaler()
     data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)
+
     # split data into train and test
     train_data = data.sample(frac=0.9, random_state=42)
     test_data = data.drop(train_data.index)
 
+    #  TUNE the hyperparameters first,
     nn = NNRegressor(prog_bar=True)
     nn.tune(train_data, test_data, study_name='test4', n_trials=25)
+
     print(f"Best params (min MSE:{nn.min_tunned_loss:.6f}):")
     for k, v in nn.best_params.items():
         print(f"+-> {k:<13s}: {v}")
 
-    # nn = NNRegressor(
-    #     hidden_dim=[75, 17],
-    #     activation='relu',
-    #     learning_rate=0.0046,
-    #     dropout=0.001,
-    #     batch_size=44,
-    #     num_epochs=40,
-    #     loss_fn="mse",
-    #     device="cpu",
-    #     test_size=0.1,
-    #     early_stop=False,
-    #     patience=10,
-    #     min_delta=0.001,
-    #     random_state=1234,
-    #     prog_bar=False)
-    # nn.fit(data)
+    # ...and fit the regressor with those found best parameters
+    nn = NNRegressor(
+        hidden_dim=[nn.best_params[f'n_units_l{i}']
+                    for i in nn.best_params['n_layers']],
+        activation=nn.best_params['activation'],
+        learning_rate=nn.best_params['learning_rate'],
+        dropout=nn.best_params['dropout'],
+        batch_size=nn.best_params['batch_size'],
+        num_epochs=nn.best_params['num_epochs'],
+        loss_fn="mse",
+        device="cpu",
+        test_size=0.1,
+        early_stop=False,
+        patience=10,
+        min_delta=0.001,
+        random_state=1234,
+        prog_bar=False)
+    nn.fit(data)
