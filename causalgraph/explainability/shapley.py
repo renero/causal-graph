@@ -638,10 +638,14 @@ class ShapEstimator(BaseEstimator):
         ax.set_title(
             target_name + " $\leftarrow$ " +
             (','.join(selected_features) if selected_features else 'ø'))
-        if self.mean_shap_threshold > 0.0 and \
-                self.mean_shap_threshold < np.max(self.shap_mean_values[target_name]):
-            ax.axvline(x=self.mean_shap_threshold, color='red', linestyle='--',
-                       linewidth=0.5)
+
+        xlims = ax.get_xlim()
+        if xlims[1] < self.mean_shap_threshold:
+            ax.set_xlim(right=self.mean_shap_threshold +
+                        ((xlims[1] - xlims[0]) / 20))
+        ax.axvline(x=self.mean_shap_threshold, color='red', linestyle='--',
+                   linewidth=0.5)
+
         fig = ax.figure if fig is None else fig
         return fig
 

@@ -223,7 +223,6 @@ class MLPModel(BaseModel):
             **self.extra_trainer_args)
 
     def train(self):
-        print(f"Calling trainer.fit(), on target {self.target}")
         self.trainer.fit(
             self.model,
             train_dataloaders=self.train_loader,

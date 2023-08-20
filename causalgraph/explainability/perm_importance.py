@@ -362,10 +362,12 @@ class PermutationImportance(BaseEstimator):
                 xerr=self.pi[target]['importances_std'][sorted_idx],
                 align='center', alpha=0.5)
 
-        if self.mean_pi_threshold > 0.0 and \
-                self.mean_pi_threshold < np.max(self.pi[target]['importances_mean']):
-            ax.axvline(
-                x=self.mean_pi_threshold, color='red', linestyle='--', linewidth=0.5)
+        xlims = ax.get_xlim()
+        if xlims[1] < self.mean_pi_threshold:
+            ax.set_xlim(right=self.mean_pi_threshold +
+                        ((xlims[1] - xlims[0])/20))
+        ax.axvline(
+            x=self.mean_pi_threshold, color='red', linestyle='--', linewidth=0.5)
 
         ax.set_title(f"Perm.Imp. {target}")
         fig = ax.figure if fig is None else fig
