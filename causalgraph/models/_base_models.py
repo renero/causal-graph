@@ -55,11 +55,18 @@ class MLP(pl.LightningModule):
 
         # Net params
         self.input_size = input_size
-        self.activation = activation
         self.batch_size = batch_size
         self.learning_rate = lr
         self.dropout = dropout
         self.hidden_layers = len(layers_dimensions)
+
+        if activation == "relu":
+            self.activation = nn.ReLU()
+        elif activation == "selu":
+            self.activation = nn.SELU()
+        else:
+            raise ValueError(
+                "Unknown activation function (only 'relu' or 'selu').")
 
         if loss == "mse":
             self.loss_fn = nn.MSELoss()

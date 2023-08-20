@@ -1,25 +1,24 @@
 import types
 import warnings
-from typing import List, Union
+from typing import List, Union, Tuple
 
 import numpy as np
+import optuna
 import pandas as pd
 import torch
 import torch.nn as nn
 from sklearn.base import BaseEstimator
+from sklearn.preprocessing import StandardScaler
 from sklearn.utils.validation import check_array, check_is_fitted
+from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 
 from causalgraph.common import GRAY, GREEN, RESET, tqdm_params
+from causalgraph.models._columnar import ColumnsDataset
 from causalgraph.models._models import MLPModel
-
-# import sys
-# sys.path.append("../dnn")
 
 
 warnings.filterwarnings("ignore")
-
-# TODO: Make this class to inherit from a generic class for all regressors
 
 
 class NNRegressor(BaseEstimator):
@@ -28,12 +27,12 @@ class NNRegressor(BaseEstimator):
 
     def __init__(
             self,
-            hidden_dim: Union[int, List[int]] = [36, 12],
-            activation: nn.Module = nn.ReLU(),
-            learning_rate: float = 0.0035,
-            dropout: float = 0.065,
-            batch_size: int = 45,
-            num_epochs: int = 50,
+            hidden_dim: Union[int, List[int]] = [75, 17],
+            activation: str = 'relu',
+            learning_rate: float = 0.0046,
+            dropout: float = 0.001,
+            batch_size: int = 44,
+            num_epochs: int = 40,
             loss_fn: str = 'mse',
             device: Union[int, str] = "auto",
             test_size: float = 0.1,
@@ -55,6 +54,8 @@ class NNRegressor(BaseEstimator):
             hidden_dim (int): The dimension(s) of the hidden layer(s). This value 
                 can be a single integer for DFF or an array with the dimension of 
                 each hidden layer for the MLP case.
+            activation (str): The activation function to use, either 'relu' or 'selu'.
+                Default is 'relu'.
             learning_rate (float): The learning rate for the optimizer.
             dropout (float): The dropout rate for the dropout layer.
             batch_size (int): The batch size for the optimizer.
@@ -216,28 +217,184 @@ class NNRegressor(BaseEstimator):
 
         return ret
 
+    def tune(
+            self,
+            training_data: pd.DataFrame,
+            test_data: pd.DataFrame,
+            study_name: str,
+            min_mse: float = 0.05,
+            storage: str = 'sqlite:///db.sqlite3',
+            load_if_exists: bool = True,
+            n_trials: int = 20):
+        """
+        Tune the hyperparameters of the model using Optuna.
+        """
+        class Objective:
+            """
+            A class to define the objective function for the hyperparameter optimization.
+            Some of the parameters for NNRegressor have been taken to default values to
+            reduce the number of hyperparameters to optimize.
+
+            Include this class in the hyperparameter optimization as follows:
+
+            >>> study = optuna.create_study(direction='minimize',
+            >>>                             study_name='study_name_here',
+            >>>                             storage='sqlite:///db.sqlite3',
+            >>>                             load_if_exists=True)
+            >>> study.optimize(Objective(train_data, test_data), n_trials=100)
+
+            The only dependency is you need to pass the train and test data to the class
+            constructor. Tha class will build the data loaders for them from the dataframes.
+            """
+
+            def __init__(self, train_data, test_data, device='cpu'):
+                self.train_data = train_data
+                self.test_data = test_data
+                self.device = device
+
+            def __call__(self, trial):
+                self.n_layers = trial.suggest_int('n_layers', 1, 5)
+                self.layers = []
+                for i in range(self.n_layers):
+                    self.layers.append(
+                        trial.suggest_int(f'n_units_l{i}', 1, 81))
+                self.activation = trial.suggest_categorical(
+                    'activation', ['relu', 'selu'])
+                self.learning_rate = trial.suggest_loguniform(
+                    'learning_rate', 1e-5, 1e-1)
+                self.dropout = trial.suggest_uniform('dropout', 0.0, 0.5)
+                self.batch_size = trial.suggest_int('batch_size', 1, 64)
+                self.num_epochs = trial.suggest_int('num_epochs', 10, 100)
+
+                self.models = NNRegressor(
+                    hidden_dim=self.layers,
+                    activation=self.activation,
+                    learning_rate=self.learning_rate,
+                    dropout=self.dropout,
+                    batch_size=self.batch_size,
+                    num_epochs=self.num_epochs,
+                    loss_fn='mse',
+                    device=self.device,
+                    random_state=42,
+                    verbose=False,
+                    prog_bar=True,
+                    silent=True)
+
+                self.models.fit(self.train_data)
+
+                # Now, measure the performance of the model with the test data.
+                mse = []
+                for target in list(self.train_data.columns):
+                    model = self.models.regressor[target].model
+                    loader = DataLoader(
+                        ColumnsDataset(target, self.test_data), batch_size=self.batch_size,
+                        shuffle=False)
+                    avg_loss, _, _ = self.compute_loss(model, loader)
+                    mse.append(avg_loss)
+                return np.median(mse)
+
+            def compute_loss(
+                    self,
+                    model: torch.nn.Module,
+                    dataloader: torch.utils.data.DataLoader,
+                    n_repeats: int = 10) -> Tuple[float, float, np.ndarray]:
+                """
+                Computes the average MSE loss for a given model and dataloader.
+
+                Parameters:
+                -----------
+                model: torch.nn.Module
+                    The model to compute the loss for.
+                dataloader: torch.utils.data.DataLoader
+                    The dataloader to use for computing the loss.
+                shuffle: int
+                    If > 0, the column of the input data to shuffle.
+
+                Returns:
+                --------
+                avg_loss: float
+                    The average MSE loss.
+                std_loss: float
+                    The standard deviation of the MSE loss.
+                losses: np.ndarray
+                    The MSE loss for each batch.
+                """
+                mse = np.array([])
+                num_batches = 0
+                for _ in range(n_repeats):
+                    loss = []
+                    for _, (X, y) in enumerate(dataloader):
+                        X = X.to(self.device)
+                        y = y.to(self.device)
+                        yhat = model.forward(X)
+                        loss.append(model.loss_fn(yhat, y).item())
+                        num_batches += 1
+                    if len(mse) == 0:
+                        mse = np.array(loss)
+                    else:
+                        mse = np.vstack((mse, [loss]))
+
+                return np.mean(mse), np.std(mse), mse
+
+        # Callback to stop the study if the MSE is below a threshold.
+        def callback(study: optuna.study.Study, trial: optuna.trial.FrozenTrial):
+            if trial.value < min_mse or study.best_value < min_mse:
+                study.stop()
+
+        if self.verbose is False:
+            optuna.logging.set_verbosity(optuna.logging.WARNING)
+
+        # Create and run the HPO study.
+        study = optuna.create_study(
+            direction='minimize', study_name=study_name, storage=storage,
+            load_if_exists=load_if_exists)
+        study.optimize(
+            Objective(training_data, test_data), n_trials=n_trials,
+            show_progress_bar=self.prog_bar, callbacks=[callback])
+
+        # Capture the best parameters and the minimum MSE obtained.
+        best_trials = sorted(study.best_trials, key=lambda x: x.values[0])
+        self.best_params = best_trials[0].params
+        self.min_tunned_loss = best_trials[0].values[0]
+
+        if self.verbose and not self.silent:
+            print(f"Best params (min MSE:{self.min_tunned_loss:.6f}):")
+            for k, v in self.best_params.items():
+                print(f"\t{k:<15s}: {v}")
+
+        return self.best_params
+
 
 if __name__ == "__main__":
-    import warnings
-
     warnings.filterwarnings("ignore", category=UserWarning)
 
     dataset_name = 'rex_generated_polynew_10'
     data = pd.read_csv(f"~/phd/data/RC3/{dataset_name}.csv")
+    scaler = StandardScaler()
+    data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)
+    # split data into train and test
+    train_data = data.sample(frac=0.9, random_state=42)
+    test_data = data.drop(train_data.index)
 
-    nn = NNRegressor(
-        hidden_dim=[10, 5],
-        activation=nn.SELU(),
-        learning_rate=0.2,
-        dropout=0.05,
-        batch_size=32,
-        num_epochs=50,
-        loss_fn="mse",
-        device="cpu",
-        test_size=0.1,
-        early_stop=False,
-        patience=10,
-        min_delta=0.001,
-        random_state=1234,
-        prog_bar=False)
-    nn.fit(data)
+    nn = NNRegressor(prog_bar=True)
+    nn.tune(train_data, test_data, study_name='test4', n_trials=25)
+    print(f"Best params (min MSE:{nn.min_tunned_loss:.6f}):")
+    for k, v in nn.best_params.items():
+        print(f"+-> {k:<13s}: {v}")
+
+    # nn = NNRegressor(
+    #     hidden_dim=[75, 17],
+    #     activation='relu',
+    #     learning_rate=0.0046,
+    #     dropout=0.001,
+    #     batch_size=44,
+    #     num_epochs=40,
+    #     loss_fn="mse",
+    #     device="cpu",
+    #     test_size=0.1,
+    #     early_stop=False,
+    #     patience=10,
+    #     min_delta=0.001,
+    #     random_state=1234,
+    #     prog_bar=False)
+    # nn.fit(data)
