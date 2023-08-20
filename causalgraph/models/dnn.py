@@ -23,6 +23,38 @@ warnings.filterwarnings("ignore")
 
 class NNRegressor(BaseEstimator):
     """
+    A class to train DFF networks for all variables in data. Each network will be trained to
+    predict one of the variables in the data, using the rest as predictors plus one
+    source of random noise.
+
+    Attributes:
+    -----------
+        hidden_dim (int): The dimension(s) of the hidden layer(s). This value
+            can be a single integer for DFF or an array with the dimension of
+            each hidden layer for the MLP case.
+        activation (str): The activation function to use, either 'relu' or 'selu'.
+            Default is 'relu'.
+        learning_rate (float): The learning rate for the optimizer.
+        dropout (float): The dropout rate for the dropout layer.
+        batch_size (int): The batch size for the optimizer.
+        num_epochs (int): The number of epochs for the optimizer.
+        loss_fn (str): The loss function to use. Default is "mmd".
+        device (str): The device to use. Either "cpu", "cuda", or "mps". Default
+            is "auto".
+        test_size (float): The proportion of the data to use for testing. Default
+            is 0.1.
+        seed (int): The seed for the random number generator. Default is 1234.
+        early_stop (bool): Whether to use early stopping. Default is True.
+        patience (int): The patience for early stopping. Default is 10.
+        min_delta (float): The minimum delta for early stopping. Default is 0.001.
+        prog_bar (bool): Whether to enable the progress bar. Default
+            is False.
+
+    Examples:
+    ---------
+    >>> nn = NNRegressor().fit(data)
+    >>> nn.predict(data)
+
     """
 
     def __init__(
@@ -36,12 +68,12 @@ class NNRegressor(BaseEstimator):
             loss_fn: str = 'mse',
             device: Union[int, str] = "auto",
             test_size: float = 0.1,
-            early_stop: bool = True,
+            early_stop: bool = False,
             patience: int = 10,
             min_delta: float = 0.001,
             random_state: int = 1234,
             verbose: bool = False,
-            prog_bar: bool = False,
+            prog_bar: bool = True,
             silent: bool = False):
         """
         Train DFF networks for all variables in data. Each network will be trained to
@@ -161,9 +193,29 @@ class NNRegressor(BaseEstimator):
         y : ndarray, shape (n_samples,)
             Returns an array of ones.
         """
+        assert X.shape[1] == self.n_features_in_, \
+            f"X has {X.shape[1]} features, expected {self.n_features_in_}"
+
         X = check_array(X, accept_sparse=True)
         check_is_fitted(self, 'is_fitted_')
-        return np.ones(X.shape[0], dtype=np.int64)
+
+        prediction = pd.DataFrame(columns=self.feature_names)
+        for target in list(self.X.columns):
+            # Creat a data loader for the target variable. The ColumnsDataset will
+            # return the target variable as the second element of the tuple, and
+            # will drop the target from the features.
+            loader = DataLoader(
+                ColumnsDataset(target, X), batch_size=self.batch_size,
+                shuffle=False)
+            model = self.models.regressor[target].model
+            preds = []
+            for (tensor_X, _) in loader:
+                tensor_X = tensor_X.to(self.device)
+                y_hat = model.forward(tensor_X)
+                preds.append(y_hat.detach().numpy().flatten())
+            prediction[target] = preds
+
+        return prediction.values
 
     def get_input_tensors(self, target_name: str):
         """
@@ -365,7 +417,7 @@ class NNRegressor(BaseEstimator):
         return self.best_params
 
 
-if __name__ == "__main__":
+def main(tune: bool = False):
     warnings.filterwarnings("ignore", category=UserWarning)
 
     dataset_name = 'rex_generated_polynew_10'
@@ -377,29 +429,29 @@ if __name__ == "__main__":
     train_data = data.sample(frac=0.9, random_state=42)
     test_data = data.drop(train_data.index)
 
-    #  TUNE the hyperparameters first,
-    nn = NNRegressor(prog_bar=True)
-    nn.tune(train_data, test_data, study_name='test4', n_trials=25)
+    if tune:
+        #  TUNE the hyperparameters first,
+        nn = NNRegressor(prog_bar=True)
+        nn.tune(train_data, test_data, study_name='test4', n_trials=25)
 
-    print(f"Best params (min MSE:{nn.min_tunned_loss:.6f}):")
-    for k, v in nn.best_params.items():
-        print(f"+-> {k:<13s}: {v}")
+        print(f"Best params (min MSE:{nn.min_tunned_loss:.6f}):")
+        for k, v in nn.best_params.items():
+            print(f"+-> {k:<13s}: {v}")
 
-    # ...and fit the regressor with those found best parameters
-    nn = NNRegressor(
-        hidden_dim=[nn.best_params[f'n_units_l{i}']
-                    for i in nn.best_params['n_layers']],
-        activation=nn.best_params['activation'],
-        learning_rate=nn.best_params['learning_rate'],
-        dropout=nn.best_params['dropout'],
-        batch_size=nn.best_params['batch_size'],
-        num_epochs=nn.best_params['num_epochs'],
-        loss_fn="mse",
-        device="cpu",
-        test_size=0.1,
-        early_stop=False,
-        patience=10,
-        min_delta=0.001,
-        random_state=1234,
-        prog_bar=False)
+        # ...and fit the regressor with those found best parameters
+        nn = NNRegressor(
+            hidden_dim=[nn.best_params[f'n_units_l{i}']
+                        for i in nn.best_params['n_layers']],
+            activation=nn.best_params['activation'],
+            learning_rate=nn.best_params['learning_rate'],
+            dropout=nn.best_params['dropout'],
+            batch_size=nn.best_params['batch_size'],
+            num_epochs=nn.best_params['num_epochs'])
+    else:
+        nn = NNRegressor()
+
     nn.fit(data)
+
+
+if __name__ == "__main__":
+    main(tune=False)

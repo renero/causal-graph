@@ -19,6 +19,7 @@ import pandas as pd
 import shap
 from matplotlib.backends.backend_pdf import PdfPages
 from sklearn.base import BaseEstimator, ClassifierMixin
+from sklearn.preprocessing import StandardScaler
 from sklearn.utils.validation import (check_array, check_is_fitted,
                                       check_random_state)
 
@@ -29,11 +30,15 @@ from causalgraph.common.plots import (_cleanup_graph, _draw_graph_subplot,
                                       setup_plot, subplots)
 from causalgraph.common.utils import (graph_from_dot_file, load_experiment,
                                       save_experiment)
-from causalgraph.explainability import (
-    Hierarchies, PermutationImportance, ShapEstimator)
+# from causalgraph.estimators import Rex
+from causalgraph.explainability import (Hierarchies, PermutationImportance,
+                                        ShapEstimator)
 from causalgraph.independence.graph_independence import GraphIndependence
 from causalgraph.metrics.compare_graphs import evaluate_graph
 from causalgraph.models import GBTRegressor, NNRegressor
+
+np.set_printoptions(precision=4, linewidth=120)
+warnings.filterwarnings('ignore')
 
 
 class Rex(BaseEstimator, ClassifierMixin):
@@ -368,8 +373,6 @@ class Rex(BaseEstimator, ClassifierMixin):
                                 **formatting_kwargs)
             plt.show()
 
-    # plot_dag: Plot a single DAG without formatting edges.
-
     def plot_dag(
             self,
             dag: nx.DiGraph,
@@ -378,7 +381,7 @@ class Rex(BaseEstimator, ClassifierMixin):
             save_to_pdf: str = None,
             **kwargs):
         """
-        Plot a DAG.
+        Plot a DAG without formatting edges.
 
         Parameters:
         -----------
@@ -427,9 +430,6 @@ class Rex(BaseEstimator, ClassifierMixin):
 
 
 def main():
-    np.set_printoptions(precision=4, linewidth=150)
-    warnings.filterwarnings('ignore')
-
     load = False
     save = False
     input_path = "/Users/renero/phd/data/RC3/"
@@ -462,41 +462,22 @@ def main():
     subplots(rex.shaps._plot_shap_summary, *plot_args, dpi=75)
 
     # Plot the predicted graph
-    plot_dags(pred_graph, ref_graph)
+    rex.plot_dags(pred_graph, ref_graph)
 
     if save:
         save_experiment('rex', "/Users/renero/phd/output/REX", rex)
 
 
-def main2():
-    import warnings
-
-    import numpy as np
-    import pandas as pd
-    import shap
-    from sklearn.preprocessing import StandardScaler
-
-    from causalgraph.common.utils import graph_from_dot_file
-    from causalgraph.estimators import Rex
-    from causalgraph.metrics.compare_graphs import evaluate_graph
-    from causalgraph.models import GBTRegressor, NNRegressor
-
-    np.set_printoptions(precision=4, linewidth=150)
-    warnings.filterwarnings('ignore')
-
-    path = "/Users/renero/phd/data/RC3/"
-    dataset_name = 'rex_generated_polynomial_1'
+def main2(path="/Users/renero/phd/data/RC3/",
+          dataset_name='rex_generated_polynew_10'):
 
     ref_graph = graph_from_dot_file(f"{path}{dataset_name}.dot")
     data = pd.read_csv(f"{path}{dataset_name}.csv")
     scaler = StandardScaler()
     data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)
 
-    rex = Rex(
-        model_type=GBTRegressor, explainer=shap.Explainer,
-        num_epochs=1, hidden_dim=[10], early_stop=False, learning_rate=0.002,
-        batch_size=64, dropout=0.2)
-    print(rex)
+    # rex = Rex(model_type=GBTRegressor, explainer=shap.Explainer)
+    rex = Rex(model_type=NNRegressor, explainer=shap.GradientExplainer)
     rex.fit(data)
     pred_graph = rex.predict(data)
     print(evaluate_graph(ref_graph, rex.G_shap, rex.shaps.feature_names_))
