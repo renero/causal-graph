@@ -279,6 +279,14 @@ class Rex(BaseEstimator, ClassifierMixin):
         return np.random.randint(self.n_features_in_**2)
 
     def knowledge(self, ref_graph: nx.DiGraph):
+        """
+        Returns a dataframe with the knowledge about each edge in the graph
+        The dataframe is obtained from the Knowledge class.
+
+        Parameters:
+        -----------
+            ref_graph (nx.DiGraph): The reference graph, or ground truth.
+        """
         K = Knowledge(self.shaps, ref_graph)
         self.learnings = K.data()
         return self.learnings
