@@ -279,8 +279,9 @@ class Rex(BaseEstimator, ClassifierMixin):
         return np.random.randint(self.n_features_in_**2)
 
     def knowledge(self, ref_graph: nx.DiGraph):
-        self.knowledge = Knowledge(self, ref_graph)
-        return self.knowledge()
+        K = Knowledge(self.shaps, ref_graph)
+        self.learnings = K.data()
+        return self.learnings
 
     def __repr__(self):
         forbidden_attrs = [
@@ -437,24 +438,51 @@ class Rex(BaseEstimator, ClassifierMixin):
 
 
 class Knowledge:
-    def __init__(self, rex: Rex, ref_graph: nx.DiGraph):
+    """
+    This class collects everything we know about each edge in the proposed graph
+    in terms of the following properties:
+
+    - origin: the origin node
+    - target: the target node
+    - ref_edge: whether the edge is in the reference graph
+    - correlation: the correlation between the individual SHAP values and the origin node
+    - KS_pval: the p-value of the Kolmogorov-Smirnov test between the origin and the target
+    - shap_edge: whether the edge is in the graph constructed after evaluating mean 
+        SHAP values.
+    - shap_skedastic_pval: the p-value of the skedastic test for the SHAP values
+    - parent_skedastic_pval: the p-value of the skedastic test for the parent values
+    - mean_shap: the mean of the SHAP values between the origin and the target
+    - slope_shap: the slope of the linear regression for target vs. SHAP values
+    - slope_target: the slope of the linear regression for the target vs. origin values
+
+    """
+
+    def __init__(self, shaps: ShapEstimator, ref_graph: nx.DiGraph):
+        """
+        Arguments:
+        ----------
+            shaps (ShapEstimator): The shap estimator.
+            ref_graph (nx.DiGraph): The reference graph, or ground truth.    
+        """
         self.K = 180.0 / math.pi
         self.columns = [
             'origin', 'target', 'linked', 'correlation', 'KS', 'selected',
             'shap_skedastic', 'parent_skedastic', 'mean_shap', 'slope_shap',
             'slope_target']
-        self.rex = rex
+        self.shaps = shaps
+        self.feature_names_ = shaps.feature_names_
         self.ref_graph = ref_graph
 
-    def __call__(self):
+    def data(self):
+        """Returns a dataframe with the knowledge about each edge in the graph"""
         rows = []
-        for origin in self.rex.feature_names_:
-            for target in self.rex.feature_names_:
+        for origin in self.feature_names_:
+            for target in self.feature_names_:
                 all_origins = [
-                    o for o in self.rex.feature_names_ if o != target]
+                    o for o in self.feature_names_ if o != target]
                 if origin != target:
                     origin_pos = all_origins.index(origin)
-                    sd = self.rex.shaps.shap_discrepancies[origin][target]
+                    sd = self.shaps.shap_discrepancies[origin][target]
                     b0_s, b1_s = sd.shap_model.params[0], sd.shap_model.params[1]
                     b0_y, b1_y = sd.parent_model.params[0], sd.parent_model.params[1]
                     shap_slope = math.atan(b1_s)*self.K
@@ -462,13 +490,13 @@ class Knowledge:
                     rows.append({
                         'origin': origin,
                         'target': target,
-                        'ref_edge': (origin, target) in self.ref_graph.edges(),
+                        'ref_edge': int((origin, target) in self.ref_graph.edges()),
                         'correlation': sd.shap_correlation,
                         'KS_pval': sd.ks_pvalue,
-                        'shap_edge': int(origin in self.rex.shaps.parents[target]),
+                        'shap_edge': int(origin in self.shaps.parents[target]),
                         'shap_skedastic_pval': sd.shap_p_value,
                         'parent_skedastic_pval': sd.parent_p_value,
-                        'mean_shap': self.rex.shaps.shap_mean_values[target][origin_pos],
+                        'mean_shap': self.shaps.shap_mean_values[target][origin_pos],
                         'slope_shap': shap_slope,
                         'slope_target': parent_slope
                     })
