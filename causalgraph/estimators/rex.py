@@ -5,6 +5,7 @@
 #
 
 import inspect
+import math
 import os
 import types
 import warnings
@@ -277,13 +278,19 @@ class Rex(BaseEstimator, ClassifierMixin):
     def score(self, X, y):
         return np.random.randint(self.n_features_in_**2)
 
+    def knowledge(self, ref_graph: nx.DiGraph):
+        self.knowledge = Knowledge(self, ref_graph)
+        return self.knowledge()
+
     def __repr__(self):
         forbidden_attrs = [
             'fit', 'predict', 'score', 'get_params', 'set_params']
         ret = f"{GREEN}REX object attributes{RESET}\n"
         ret += f"{GRAY}{'-'*80}{RESET}\n"
         for attr in dir(self):
-            if attr.startswith('_') or attr in forbidden_attrs or type(getattr(self, attr)) == types.MethodType:
+            if attr.startswith('_') or \
+                attr in forbidden_attrs or \
+                    type(getattr(self, attr)) == types.MethodType:
                 continue
             elif attr == "X" or attr == "y":
                 if isinstance(getattr(self, attr), pd.DataFrame):
@@ -427,6 +434,46 @@ class Rex(BaseEstimator, ClassifierMixin):
         assert self.is_fitted_, "Model not fitted yet"
         plot_args = [(target_name) for target_name in self.feature_names_]
         return subplots(self.shaps._plot_shap_summary, *plot_args, **kwargs)
+
+
+class Knowledge:
+    def __init__(self, rex: Rex, ref_graph: nx.DiGraph):
+        self.K = 180.0 / math.pi
+        self.columns = [
+            'origin', 'target', 'linked', 'correlation', 'KS', 'selected',
+            'shap_skedastic', 'parent_skedastic', 'mean_shap', 'slope_shap',
+            'slope_target']
+        self.rex = rex
+        self.ref_graph = ref_graph
+
+    def __call__(self):
+        rows = []
+        for origin in self.rex.feature_names_:
+            for target in self.rex.feature_names_:
+                all_origins = [
+                    o for o in self.rex.feature_names_ if o != target]
+                if origin != target:
+                    origin_pos = all_origins.index(origin)
+                    sd = self.rex.shaps.shap_discrepancies[origin][target]
+                    b0_s, b1_s = sd.shap_model.params[0], sd.shap_model.params[1]
+                    b0_y, b1_y = sd.parent_model.params[0], sd.parent_model.params[1]
+                    shap_slope = math.atan(b1_s)*self.K
+                    parent_slope = math.atan(b1_y)*self.K
+                    rows.append({
+                        'origin': origin,
+                        'target': target,
+                        'ref_edge': (origin, target) in self.ref_graph.edges(),
+                        'correlation': sd.shap_correlation,
+                        'KS_pval': sd.ks_pvalue,
+                        'shap_edge': int(origin in self.rex.shaps.parents[target]),
+                        'shap_skedastic_pval': sd.shap_p_value,
+                        'parent_skedastic_pval': sd.parent_p_value,
+                        'mean_shap': self.rex.shaps.shap_mean_values[target][origin_pos],
+                        'slope_shap': shap_slope,
+                        'slope_target': parent_slope
+                    })
+        self.results = pd.DataFrame.from_dict(rows)
+        return self.results
 
 
 def main():
