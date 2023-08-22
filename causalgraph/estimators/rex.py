@@ -311,7 +311,7 @@ class Rex(BaseEstimator, ClassifierMixin):
         -----------
             ref_graph (nx.DiGraph): The reference graph, or ground truth.
         """
-        K = Knowledge(self.shaps, ref_graph)
+        K = Knowledge(self, ref_graph)
         self.learnings = K.data()
         return self.learnings
 
@@ -489,7 +489,7 @@ class Knowledge:
 
     """
 
-    def __init__(self, shaps: ShapEstimator, ref_graph: nx.DiGraph):
+    def __init__(self, rex: Rex, ref_graph: nx.DiGraph):
         """
         Arguments:
         ----------
@@ -501,8 +501,9 @@ class Knowledge:
             'origin', 'target', 'linked', 'correlation', 'KS', 'selected',
             'shap_skedastic', 'parent_skedastic', 'mean_shap', 'slope_shap',
             'slope_target']
-        self.shaps = shaps
-        self.feature_names_ = shaps.feature_names_
+        self.shaps = rex.shaps
+        self.pi = rex.pi
+        self.feature_names_ = rex.feature_names_
         self.ref_graph = ref_graph
 
     def data(self):
@@ -512,9 +513,15 @@ class Knowledge:
             for target in self.feature_names_:
                 all_origins = [
                     o for o in self.feature_names_ if o != target]
+                all_targets = [
+                    t for t in self.feature_names_ if t != origin]
                 if origin != target:
                     origin_pos = all_origins.index(origin)
+                    target_pos = all_targets.index(target)
+
                     sd = self.shaps.shap_discrepancies[origin][target]
+                    pi = self.pi.pi[origin]['importances_mean'][target_pos]
+
                     b0_s, b1_s = sd.shap_model.params[0], sd.shap_model.params[1]
                     b0_y, b1_y = sd.parent_model.params[0], sd.parent_model.params[1]
                     shap_slope = math.atan(b1_s)*self.K
@@ -529,6 +536,7 @@ class Knowledge:
                         'shap_skedastic_pval': sd.shap_p_value,
                         'parent_skedastic_pval': sd.parent_p_value,
                         'mean_shap': self.shaps.shap_mean_values[target][origin_pos],
+                        'mean_pi': pi,
                         'slope_shap': shap_slope,
                         'slope_target': parent_slope
                     })
