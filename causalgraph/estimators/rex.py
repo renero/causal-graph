@@ -275,8 +275,32 @@ class Rex(BaseEstimator, ClassifierMixin):
 
         return self.G_final
 
-    def score(self, X, y):
-        return np.random.randint(self.n_features_in_**2)
+    def score(self, ref_graph: nx.DiGraph, predicted_graph: str = 'final'):
+        """
+        Obtains the score of the predicted graph against the reference graph.
+        The score contains different metrics, such as the precision, recall,
+        F1-score, SHD or SID.
+
+        Parameters:
+        -----------
+            ref_graph (nx.DiGraph): The reference graph, or ground truth.
+            predicted_graph (str): The name of the graph to use for the score.
+                Default is 'final', but other possible intermediate graphs are
+                'shap' and 'indep', for those stages of the pipeline corresponding
+                to the graph constructed by interpreting only the SHAP values and
+                the graph constructed after the FCI algorithm, respectively.
+        """
+        if predicted_graph == 'final':
+            pred_graph = self.G_final
+        elif predicted_graph == 'shap':
+            pred_graph = self.G_shap
+        elif predicted_graph == 'indep':
+            pred_graph = self.G_indep
+        else:
+            raise ValueError(
+                f"Predicted graph must be one of 'final', 'shap' or 'indep'.")
+
+        return evaluate_graph(ref_graph, pred_graph, self.feature_names_)
 
     def knowledge(self, ref_graph: nx.DiGraph):
         """
