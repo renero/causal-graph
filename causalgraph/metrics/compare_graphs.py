@@ -115,7 +115,7 @@ def _shallow_copy(G: AnyGraph):
     ----------
     G : AnyGraph
         The graph to copy.
-    
+
     Returns
     -------
     AnyGraph
@@ -213,7 +213,7 @@ def evaluate_graph(
     if len(predicted_graph.nodes()) < len(ground_truth.nodes()):
         # Determine what are the nodes missing in the predicted graph
         missing_nodes = list(set(ground_truth.nodes()) -
-                                set(predicted_graph.nodes()))
+                             set(predicted_graph.nodes()))
         # Create a copy of the predicted graph
         predicted_graph_copy = predicted_graph.copy()
         # Add the missing nodes to the predicted graph
@@ -221,7 +221,7 @@ def evaluate_graph(
         predicted_graph_array = nx.to_numpy_array(predicted_graph_copy)
     else:
         predicted_graph_array = nx.to_numpy_array(predicted_graph)
-    metrics["SID"] = SID(trueGraph=nx.to_numpy_array(ground_truth), 
+    metrics["SID"] = SID(trueGraph=nx.to_numpy_array(ground_truth),
                          estGraph=predicted_graph_array)
 
     return Metrics(metrics["Tp"], metrics["Tn"], metrics["Fn"], metrics["Fp"],
@@ -376,11 +376,13 @@ def _conf_mat(truth, est, feature_names):
 
 
 def _conf_mat_directed(truth, est, feature_names):
-
+    """
+    Computes the confusion matrix for two directed graphs.
+    """
     def is_arrow(G, u, v):
         if u not in G.nodes() or v not in G.nodes():
             return False
-        return G.has_edge(u, v) and not G.has_edge(v, u)
+        return G.has_edge(u, v)  # and not G.has_edge(v, u)
 
     num_elems = len(feature_names)
 

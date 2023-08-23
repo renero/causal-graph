@@ -275,7 +275,10 @@ class Rex(BaseEstimator, ClassifierMixin):
 
         return self.G_final
 
-    def score(self, ref_graph: nx.DiGraph, predicted_graph: str = 'final'):
+    def score(
+            self,
+            ref_graph: nx.DiGraph,
+            predicted_graph: Union[str, nx.DiGraph] = 'final'):
         """
         Obtains the score of the predicted graph against the reference graph.
         The score contains different metrics, such as the precision, recall,
@@ -290,15 +293,18 @@ class Rex(BaseEstimator, ClassifierMixin):
                 to the graph constructed by interpreting only the SHAP values and
                 the graph constructed after the FCI algorithm, respectively.
         """
-        if predicted_graph == 'final':
-            pred_graph = self.G_final
-        elif predicted_graph == 'shap':
-            pred_graph = self.G_shap
-        elif predicted_graph == 'indep':
-            pred_graph = self.G_indep
-        else:
-            raise ValueError(
-                f"Predicted graph must be one of 'final', 'shap' or 'indep'.")
+        if isinstance(predicted_graph, str):
+            if predicted_graph == 'final':
+                pred_graph = self.G_final
+            elif predicted_graph == 'shap':
+                pred_graph = self.G_shap
+            elif predicted_graph == 'indep':
+                pred_graph = self.G_indep
+            else:
+                raise ValueError(
+                    f"Predicted graph must be one of 'final', 'shap' or 'indep'.")
+        elif isinstance(predicted_graph, nx.DiGraph):
+            pred_graph = predicted_graph
 
         return evaluate_graph(ref_graph, pred_graph, self.feature_names_)
 
@@ -497,12 +503,9 @@ class Knowledge:
             ref_graph (nx.DiGraph): The reference graph, or ground truth.    
         """
         self.K = 180.0 / math.pi
-        self.columns = [
-            'origin', 'target', 'linked', 'correlation', 'KS', 'selected',
-            'shap_skedastic', 'parent_skedastic', 'mean_shap', 'slope_shap',
-            'slope_target']
         self.shaps = rex.shaps
         self.pi = rex.pi
+        self.hierarchies = rex.hierarchies
         self.feature_names_ = rex.feature_names_
         self.ref_graph = ref_graph
 
@@ -530,7 +533,8 @@ class Knowledge:
                         'origin': origin,
                         'target': target,
                         'ref_edge': int((origin, target) in self.ref_graph.edges()),
-                        'correlation': sd.shap_correlation,
+                        'correlation': self.hierarchies.correlations[origin][target],
+                        'shap_correlation': sd.shap_correlation,
                         'KS_pval': sd.ks_pvalue,
                         'shap_edge': int(origin in self.shaps.parents[target]),
                         'shap_skedastic_pval': sd.shap_p_value,
