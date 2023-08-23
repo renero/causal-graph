@@ -66,7 +66,7 @@ class NNRegressor(BaseEstimator):
             batch_size: int = 44,
             num_epochs: int = 40,
             loss_fn: str = 'mse',
-            device: Union[int, str] = "auto",
+            device: Union[int, str] = "cpu",
             test_size: float = 0.1,
             early_stop: bool = False,
             patience: int = 10,
@@ -196,18 +196,18 @@ class NNRegressor(BaseEstimator):
         assert X.shape[1] == self.n_features_in_, \
             f"X has {X.shape[1]} features, expected {self.n_features_in_}"
 
-        X = check_array(X, accept_sparse=True)
+        # X = check_array(X, accept_sparse=True)
         check_is_fitted(self, 'is_fitted_')
 
         prediction = pd.DataFrame(columns=self.feature_names)
-        for target in list(self.X.columns):
+        for target in self.feature_names:
             # Creat a data loader for the target variable. The ColumnsDataset will
             # return the target variable as the second element of the tuple, and
             # will drop the target from the features.
             loader = DataLoader(
                 ColumnsDataset(target, X), batch_size=self.batch_size,
                 shuffle=False)
-            model = self.models.regressor[target].model
+            model = self.regressor[target].model
             preds = []
             for (tensor_X, _) in loader:
                 tensor_X = tensor_X.to(self.device)
@@ -215,7 +215,32 @@ class NNRegressor(BaseEstimator):
                 preds.append(y_hat.detach().numpy().flatten())
             prediction[target] = preds
 
-        return prediction.values
+        # Concatenate the numpy array for all the batchs
+        np_preds = prediction.values
+        final_preds = []
+        if np_preds.shape[0] > 1:
+            for i in range(len(self.feature_names)):
+                final_preds.append(np.concatenate(np_preds[:, i], axis=0))
+        else:
+            final_preds = np_preds
+
+        if len(final_preds) == 0:
+            final_preds = np_preds
+
+        return np.array(final_preds)
+
+    def score(self, X):
+        """
+        Scores the model using the loss function.
+        """
+        y_hat = torch.Tensor(self.predict(X))
+        scoring = []
+        for i, target in enumerate(self.feature_names):
+            y_preds = torch.Tensor(y_hat[i])
+            y = torch.Tensor(X[target].values)
+            scoring.append(self.regressor[target].model.loss_fn(y_preds, y))
+
+        return np.array(scoring)
 
     def get_input_tensors(self, target_name: str):
         """

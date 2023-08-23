@@ -275,6 +275,27 @@ class Rex(BaseEstimator, ClassifierMixin):
 
         return self.G_final
 
+    def fit_predict(self, X, y=None):
+        """Fit the model according to the given training data and predict
+        the outcome of the treatment.
+
+        Parameters
+        ----------
+        X : {array-like, sparse matrix}, shape (n_samples, n_features)
+            Training vector, where n_samples is the number of samples and
+            n_features is the number of features.
+
+        y : array-like, shape (n_samples,)
+            Target vector relative to X.
+
+        Returns
+        -------
+        G_final : nx.DiGraph
+            The final graph, after the correction stage.
+        """
+        self.fit(X, y)
+        return self.predict(X)
+
     def score(
             self,
             ref_graph: nx.DiGraph,
