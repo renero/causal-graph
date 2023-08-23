@@ -256,7 +256,9 @@ class NNRegressor(BaseEstimator):
         ret = f"{GREEN}REX object attributes{RESET}\n"
         ret += f"{GRAY}{'-'*80}{RESET}\n"
         for attr in dir(self):
-            if attr.startswith('_') or attr in forbidden_attrs or type(getattr(self, attr)) == types.MethodType:
+            if attr.startswith('_') or \
+                attr in forbidden_attrs or \
+                    type(getattr(self, attr)) == types.MethodType:
                 continue
             elif attr == "X" or attr == "y":
                 if isinstance(getattr(self, attr), pd.DataFrame):
@@ -283,7 +285,7 @@ class NNRegressor(BaseEstimator):
         """
         class Objective:
             """
-            A class to define the objective function for the hyperparameter optimization.
+            A class to define the objective function for the hyperparameter optimization
             Some of the parameters for NNRegressor have been taken to default values to
             reduce the number of hyperparameters to optimize.
 
@@ -296,7 +298,8 @@ class NNRegressor(BaseEstimator):
             >>> study.optimize(Objective(train_data, test_data), n_trials=100)
 
             The only dependency is you need to pass the train and test data to the class
-            constructor. Tha class will build the data loaders for them from the dataframes.
+            constructor. Tha class will build the data loaders for them from the 
+            dataframes.
             """
 
             def __init__(self, train_data, test_data, device='cpu'):
@@ -339,7 +342,8 @@ class NNRegressor(BaseEstimator):
                 for target in list(self.train_data.columns):
                     model = self.models.regressor[target].model
                     loader = DataLoader(
-                        ColumnsDataset(target, self.test_data), batch_size=self.batch_size,
+                        ColumnsDataset(target, self.test_data),
+                        batch_size=self.batch_size,
                         shuffle=False)
                     avg_loss, _, _ = self.compute_loss(model, loader)
                     mse.append(avg_loss)

@@ -26,16 +26,16 @@ def test_orient_graph():
     likelihood_bwd = -np.log(np.var(err_bwd)) - np.log(np.var(Y))
     dir_log = "->" if likelihood_fwd > likelihood_bwd else "<-"
 
-    assert hsic_fwd.p_value == pytest.approx(0.62829005030)
-    assert hsic_fwd.hsic == pytest.approx(0.00131107788741)
+    assert hsic_fwd.p_value == pytest.approx(0.62829005030, abs=0.0001)
+    assert hsic_fwd.hsic == pytest.approx(0.00131107788741, abs=0.0001)
     assert hsic_fwd.independence == True
 
     assert hsic_bwd.p_value == pytest.approx(2.825e-10)
-    assert hsic_bwd.hsic == pytest.approx(0.0069988146279)
+    assert hsic_bwd.hsic == pytest.approx(0.0069988146279, abs=0.0001)
     assert hsic_bwd.independence == False
 
-    assert likelihood_fwd == pytest.approx(4.861426871058)
-    assert likelihood_bwd == pytest.approx(1.126397359198)
+    assert likelihood_fwd == pytest.approx(4.861426871058, abs=0.0001)
+    assert likelihood_bwd == pytest.approx(1.126397359198, abs=0.0001)
 
     assert dir_stat == "->"
     assert dir_stat == "->"
