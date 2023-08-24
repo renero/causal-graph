@@ -231,7 +231,8 @@ class NNRegressor(BaseEstimator):
 
     def score(self, X):
         """
-        Scores the model using the loss function.
+        Scores the model using the loss function. It returns the list of losses
+        for each target variable.
         """
         y_hat = torch.Tensor(self.predict(X))
         scoring = []
