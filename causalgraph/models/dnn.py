@@ -350,12 +350,12 @@ class NNRegressor(BaseEstimator):
                     self.layers.append(
                         trial.suggest_int(f'n_units_l{i}', 1, 81))
                 self.activation = trial.suggest_categorical(
-                    'activation', ['relu', 'selu'])
+                    'activation', ['relu', 'selu', 'linear'])
                 self.learning_rate = trial.suggest_loguniform(
                     'learning_rate', 1e-5, 1e-1)
                 self.dropout = trial.suggest_uniform('dropout', 0.0, 0.5)
-                self.batch_size = trial.suggest_int('batch_size', 1, 64)
-                self.num_epochs = trial.suggest_int('num_epochs', 10, 100)
+                self.batch_size = trial.suggest_int('batch_size', 8, 64)
+                self.num_epochs = trial.suggest_int('num_epochs', 10, 80)
 
                 self.models = NNRegressor(
                     hidden_dim=self.layers,

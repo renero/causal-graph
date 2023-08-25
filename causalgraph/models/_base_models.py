@@ -64,6 +64,12 @@ class MLP(pl.LightningModule):
             self.activation = nn.ReLU()
         elif activation == "selu":
             self.activation = nn.SELU()
+        elif activation == "tanh":
+            self.activation = nn.Tanh()
+        elif activation == "linear":
+            self.activation = nn.Identity()
+        elif activation == "sigmoid":
+            self.activation = nn.Sigmoid()
         else:
             raise ValueError(
                 "Unknown activation function (only 'relu' or 'selu').")
