@@ -144,6 +144,19 @@ class NNRegressor(BaseEstimator):
         self : object
             Returns self.
         """
+
+        # print what method called this function
+        # import inspect
+
+        # print(f"\nCalled with by {inspect.stack()[1][3]}")
+        # print(f"- hidden dim: {self.hidden_dim}")
+        # print(f"- activation: {self.activation}")
+        # print(f"- learning rate: {self.learning_rate}")
+        # print(f"- dropout: {self.dropout}")
+        # print(f"- batch size: {self.batch_size}")
+        # print(f"- num epochs: {self.num_epochs}")
+        # print("")
+
         # X, y = check_X_y(X, y)
         self.n_features_in_ = X.shape[1]
         self.feature_names = list(X.columns)
@@ -234,14 +247,19 @@ class NNRegressor(BaseEstimator):
         Scores the model using the loss function. It returns the list of losses
         for each target variable.
         """
+        assert X.shape[1] == self.n_features_in_, \
+            f"X has {X.shape[1]} features, expected {self.n_features_in_}"
+        check_is_fitted(self, 'is_fitted_')
+
         y_hat = torch.Tensor(self.predict(X))
-        scoring = []
+        scores = []
         for i, target in enumerate(self.feature_names):
             y_preds = torch.Tensor(y_hat[i])
             y = torch.Tensor(X[target].values)
-            scoring.append(self.regressor[target].model.loss_fn(y_preds, y))
+            scores.append(self.regressor[target].model.loss_fn(y_preds, y))
 
-        return np.array(scoring)
+        self.scoring = np.array(scores)
+        return self.scoring
 
     def get_input_tensors(self, target_name: str):
         """
@@ -301,7 +319,7 @@ class NNRegressor(BaseEstimator):
             self,
             training_data: pd.DataFrame,
             test_data: pd.DataFrame,
-            study_name: str,
+            study_name: str = None,
             min_mse: float = 0.05,
             storage: str = 'sqlite:///db.sqlite3',
             load_if_exists: bool = True,
@@ -334,7 +352,7 @@ class NNRegressor(BaseEstimator):
                 self.device = device
 
             def __call__(self, trial):
-                self.n_layers = trial.suggest_int('n_layers', 1, 5)
+                self.n_layers = trial.suggest_int('n_layers', 1, 4)
                 self.layers = []
                 for i in range(self.n_layers):
                     self.layers.append(
@@ -346,6 +364,15 @@ class NNRegressor(BaseEstimator):
                 self.dropout = trial.suggest_uniform('dropout', 0.0, 0.5)
                 self.batch_size = trial.suggest_int('batch_size', 1, 64)
                 self.num_epochs = trial.suggest_int('num_epochs', 10, 100)
+
+                # print(f"\nSuggesting hyperparameters for trial {trial.number}")
+                # print(f"- hidden dim: {self.layers}")
+                # print(f"- activation: {self.activation}")
+                # print(f"- learning rate: {self.learning_rate}")
+                # print(f"- dropout: {self.dropout}")
+                # print(f"- batch size: {self.batch_size}")
+                # print(f"- num epochs: {self.num_epochs}")
+                # print("")
 
                 self.models = NNRegressor(
                     hidden_dim=self.layers,
@@ -444,13 +471,55 @@ class NNRegressor(BaseEstimator):
             for k, v in self.best_params.items():
                 print(f"\t{k:<15s}: {v}")
 
-        return self.best_params
+        regressor_args = {
+            'hidden_dim': [self.best_params[f'n_units_l{i}']
+                           for i in range(self.best_params['n_layers'])],
+            'activation': self.best_params['activation'],
+            'learning_rate': self.best_params['learning_rate'],
+            'dropout': self.best_params['dropout'],
+            'batch_size': self.best_params['batch_size'],
+            'num_epochs': self.best_params['num_epochs']}
+
+        return regressor_args
+
+    def tune_fit(
+        self,
+            X: pd.DataFrame,
+            hpo_study_name: str = None,
+            hpo_min_mse: float = 0.05,
+            hpo_storage: str = 'sqlite:///db.sqlite3',
+            hpo_load_if_exists: bool = True,
+            hpo_n_trials: int = 20):
+        """
+        Tune the hyperparameters of the model using Optuna, and the fit the model
+        with the best parameters.
+        """
+        # split X into train and test
+        train_data = X.sample(frac=0.9, random_state=self.random_state)
+        test_data = X.drop(train_data.index)
+
+        # tune the model
+        regressor_args = self.tune(
+            train_data, test_data, n_trials=hpo_n_trials, study_name=hpo_study_name,
+            min_mse=hpo_min_mse, storage=hpo_storage, load_if_exists=hpo_load_if_exists)
+
+        # Set the object parameters to the best parameters found.
+        for k, v in regressor_args.items():
+            setattr(self, k, v)
+
+        # Fit the model with the best parameters.
+        self.fit(X)
+
+
+#
+# Main function
+#
 
 
 def main(tune: bool = False):
     warnings.filterwarnings("ignore", category=UserWarning)
 
-    dataset_name = 'rex_generated_polynew_10'
+    dataset_name = 'rex_generated_polynew_1_mini'
     data = pd.read_csv(f"~/phd/data/RC3/{dataset_name}.csv")
     scaler = StandardScaler()
     data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)
@@ -459,29 +528,9 @@ def main(tune: bool = False):
     train_data = data.sample(frac=0.9, random_state=42)
     test_data = data.drop(train_data.index)
 
-    if tune:
-        #  TUNE the hyperparameters first,
-        nn = NNRegressor(prog_bar=True)
-        nn.tune(train_data, test_data, study_name='test4', n_trials=25)
-
-        print(f"Best params (min MSE:{nn.min_tunned_loss:.6f}):")
-        for k, v in nn.best_params.items():
-            print(f"+-> {k:<13s}: {v}")
-
-        # ...and fit the regressor with those found best parameters
-        nn = NNRegressor(
-            hidden_dim=[nn.best_params[f'n_units_l{i}']
-                        for i in nn.best_params['n_layers']],
-            activation=nn.best_params['activation'],
-            learning_rate=nn.best_params['learning_rate'],
-            dropout=nn.best_params['dropout'],
-            batch_size=nn.best_params['batch_size'],
-            num_epochs=nn.best_params['num_epochs'])
-    else:
-        nn = NNRegressor()
-
-    nn.fit(data)
+    nn = NNRegressor()  # **regressor_args)
+    nn.tune_fit(data, hpo_n_trials=10) if tune else nn.fit(data)
 
 
 if __name__ == "__main__":
-    main(tune=False)
+    main(tune=True)

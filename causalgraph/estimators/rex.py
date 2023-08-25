@@ -67,6 +67,7 @@ class Rex(BaseEstimator, ClassifierMixin):
             self,
             model_type: BaseEstimator = NNRegressor,
             explainer=shap.Explainer,
+            tune_model: bool = False,
             corr_method: str = 'spearman',
             corr_alpha: float = 0.6,
             corr_clusters: int = 15,
@@ -80,12 +81,6 @@ class Rex(BaseEstimator, ClassifierMixin):
             verbose: bool = False,
             prog_bar=True,
             silent: bool = False,
-            do_plot_correlations: bool = False,
-            do_plot_shap: bool = False,
-            do_plot_discrepancies: bool = False,
-            do_compare_shap: bool = False,
-            do_compare_fci: bool = False,
-            do_compare_final: bool = False,
             shap_fsize: Tuple[int, int] = (10, 10),
             dpi: int = 75,
             pdf_filename: str = None,
@@ -97,6 +92,7 @@ class Rex(BaseEstimator, ClassifierMixin):
             model_type (BaseEstimator): The type of model to use. Either NNRegressor 
                 or SKLearn GradientBoostingRegressor.
             explainer (shap.Explainer): The explainer to use for the shap values.
+            tune_model (bool): Whether to tune the model for HPO. Default is False.
             corr_method (str): The method to use for the correlation.
                 Default is "spearman", but it can also be 'pearson', 'kendall or 'mic'.
             corr_alpha (float): The alpha value for the correlation. Default is 0.6.
@@ -124,17 +120,6 @@ class Rex(BaseEstimator, ClassifierMixin):
                 Default is 1234.
 
             Additional arguments:
-                do_plot_correlations: Whether to plot the correlations between the
-                    features. Default is True.
-                do_plot_shap: Whether to plot the shap values. Default is True.
-                do_plot_discrepancies: Whether to plot the discrepancies between the
-                    shap values as a matrix. Default is False.
-                do_compare_shap: Whether to plot the dot comparison between the
-                    causal graph and the shap graph. Default is True.
-                do_compare_fci: Whether to plot the dot comparison between the
-                    causal graph and the after-FCI graph. Default is True.
-                do_compare_final: Whether to plot the dot comparison between the
-                    causal graph and the final graph. Default is True.
                 shap_fsize: The size of the figure for the shap values.
                     Default is (5, 3).
                 dpi: The dpi for the figures. Default is 75.
@@ -143,6 +128,7 @@ class Rex(BaseEstimator, ClassifierMixin):
         """
         self.model_type = model_type
         self.explainer = explainer
+        self.tune_model = tune_model
         self.corr_method = corr_method
         self.corr_alpha = corr_alpha
         self.corr_clusters = corr_clusters
@@ -159,12 +145,6 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.silent = silent
         self.random_state = random_state
 
-        self.do_plot_correlations = do_plot_correlations
-        self.do_plot_shap = do_plot_shap
-        self.do_plot_discrepancies = do_plot_discrepancies
-        self.do_compare_shap = do_compare_shap
-        self.do_compare_fci = do_compare_fci
-        self.do_compare_final = do_compare_final
         self.shap_fsize = shap_fsize
         self.dpi = dpi
         self.pdf_filename = pdf_filename
@@ -178,13 +158,15 @@ class Rex(BaseEstimator, ClassifierMixin):
     def _get_param_values_from_kwargs(self, object_attribute, kwargs):
         # Check if any of the arguments required by Regressor (model_type) are
         # present in the kwargs. If so, take them as a property of the class.
-        arguments = inspect.signature(object_attribute.__init__).parameters
-        constructor_parameters = {
-            arg: arguments[arg].default for arg in arguments.keys()}
-        constructor_parameters.pop('self', None)
-        for param in constructor_parameters.keys():
-            if param in kwargs:
-                setattr(self, param, kwargs[param])
+        # arguments = inspect.signature(object_attribute.__init__).parameters
+        # constructor_parameters = {
+        #     arg: arguments[arg].default for arg in arguments.keys()}
+        # constructor_parameters.pop('self', None)
+        # for param in constructor_parameters.keys():
+        #     if param in kwargs:
+        #         setattr(self, param, kwargs[param])
+        for k, v in kwargs.items():
+            setattr(self, k, v)
 
     def _more_tags(self):
         return {
@@ -217,15 +199,20 @@ class Rex(BaseEstimator, ClassifierMixin):
         """
         self.random_state_ = check_random_state(self.random_state)
         self.n_features_in_ = X.shape[1]
-        self.feature_names_ = list(X.columns)
+        self.feature_names = list(X.columns)
         self.X = copy(X)
         self.y = copy(y) if y is not None else None
 
+        # If the model is to be tuned for HPO, then the step for fitting the regressors
+        # is different.
+        fit_step = 'models.tune_fit' if self.tune_model else 'models.fit'
+
+        # Create the pipeline for the training stages.
         pipeline = Pipeline(host=self, prog_bar=self.prog_bar, verbose=self.verbose,
                             silent=self.silent)
         steps = [
             ('models', self.model_type),
-            'models.fit',
+            fit_step,
             ('shaps', ShapEstimator, {'models': 'models'}),
             'shaps.fit',
             ('pi', PermutationImportance, {'regressors': 'models'}),
@@ -237,8 +224,9 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.is_fitted_ = True
         return self
 
-    def predict(self, X):
-        """A reference implementation of a predicting function.
+    def predict(self, X: pd.DataFrame, ref_graph: nx.DiGraph = None):
+        """
+        Predicts the causal graph from the given data.
 
         Parameters
         ----------
@@ -251,7 +239,6 @@ class Rex(BaseEstimator, ClassifierMixin):
             Returns an array of ones.
         """
         check_is_fitted(self, "is_fitted_")
-        X = check_array(X)
 
         # Create a new pipeline for the prediction stages.
         prediction = Pipeline(
@@ -273,28 +260,44 @@ class Rex(BaseEstimator, ClassifierMixin):
         if '\\n' in self.G_final.nodes:
             self.G_final.remove_node('\\n')
 
+        # Obtain the regression loss metric from each regressor trained to predict
+        # each of the variables.
+        self.models.score(X)
+
+        # If a reference graph is provided, compute the metrics for the predicted
+        # graph against the reference graph.
+        if ref_graph is not None:
+            self.knowledge(ref_graph)
+
         return self.G_final
 
-    def fit_predict(self, X, y=None):
-        """Fit the model according to the given training data and predict
+    def fit_predict(
+            self,
+            train: pd.DataFrame,
+            test: pd.DataFrame,
+            ref_graph: nx.DiGraph):
+        """
+        Fit the model according to the given training data and predict
         the outcome of the treatment.
 
         Parameters
         ----------
-        X : {array-like, sparse matrix}, shape (n_samples, n_features)
+        train : {array-like, sparse matrix}, shape (n_samples, n_features)
             Training vector, where n_samples is the number of samples and
             n_features is the number of features.
-
-        y : array-like, shape (n_samples,)
-            Target vector relative to X.
+        test : {array-like, sparse matrix}, shape (n_samples, n_features)
+            Test vector, where n_samples is the number of samples and
+            n_features is the number of features.
+        ref_graph : nx.DiGraph
+            The reference graph, or ground truth.
 
         Returns
         -------
         G_final : nx.DiGraph
             The final graph, after the correction stage.
         """
-        self.fit(X, y)
-        return self.predict(X)
+        self.fit(train)
+        self.predict(test, ref_graph)
 
     def score(
             self,
@@ -327,7 +330,7 @@ class Rex(BaseEstimator, ClassifierMixin):
         elif isinstance(predicted_graph, nx.DiGraph):
             pred_graph = predicted_graph
 
-        return evaluate_graph(ref_graph, pred_graph, self.feature_names_)
+        return evaluate_graph(ref_graph, pred_graph, self.feature_names)
 
     def knowledge(self, ref_graph: nx.DiGraph):
         """
@@ -492,7 +495,7 @@ class Rex(BaseEstimator, ClassifierMixin):
 
     def plot_shap_values(self, **kwargs):
         assert self.is_fitted_, "Model not fitted yet"
-        plot_args = [(target_name) for target_name in self.feature_names_]
+        plot_args = [(target_name) for target_name in self.feature_names]
         return subplots(self.shaps._plot_shap_summary, *plot_args, **kwargs)
 
 
@@ -527,18 +530,32 @@ class Knowledge:
         self.shaps = rex.shaps
         self.pi = rex.pi
         self.hierarchies = rex.hierarchies
-        self.feature_names_ = rex.feature_names_
+        self.feature_names = rex.feature_names
+        self.scoring = rex.models.scoring
         self.ref_graph = ref_graph
+
+    def _compute_regression_outliers(self):
+        """
+        Determine what features are outliers in the regression, according to their
+        score with a test set after fitting the model. The criteria to determine
+        whether a feature is an outlier is whether its score is greater than 2.5
+        times the interquartile range (IQR).
+        """
+        iqr = np.quantile(self.scoring, 0.75) - np.quantile(self.scoring, 0.25)
+        outliers_indices = np.where(self.scoring > 2.5*iqr)
+        self.regression_outliers = [self.feature_names[i]
+                                    for i in outliers_indices[0]]
 
     def data(self):
         """Returns a dataframe with the knowledge about each edge in the graph"""
         rows = []
-        for origin in self.feature_names_:
-            for target in self.feature_names_:
+        self._compute_regression_outliers()
+        for origin in self.feature_names:
+            for target in self.feature_names:
                 all_origins = [
-                    o for o in self.feature_names_ if o != target]
+                    o for o in self.feature_names if o != target]
                 all_targets = [
-                    t for t in self.feature_names_ if t != origin]
+                    t for t in self.feature_names if t != origin]
                 if origin != target:
                     origin_pos = all_origins.index(origin)
                     target_pos = all_targets.index(target)
@@ -563,7 +580,8 @@ class Knowledge:
                         'mean_shap': self.shaps.shap_mean_values[target][origin_pos],
                         'mean_pi': pi,
                         'slope_shap': shap_slope,
-                        'slope_target': parent_slope
+                        'slope_target': parent_slope,
+                        'potential_root': int(origin in self.regression_outliers)
                     })
         self.results = pd.DataFrame.from_dict(rows)
         return self.results
@@ -609,18 +627,22 @@ def main():
 
 
 def main2(path="/Users/renero/phd/data/RC3/",
-          dataset_name='rex_generated_polynew_10'):
+          dataset_name='rex_generated_polynew_1'):
 
     ref_graph = graph_from_dot_file(f"{path}{dataset_name}.dot")
     data = pd.read_csv(f"{path}{dataset_name}.csv")
     scaler = StandardScaler()
     data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)
+    train = data.sample(frac=0.9, random_state=42)
+    test = data.drop(train.index)
 
     # rex = Rex(model_type=GBTRegressor, explainer=shap.Explainer)
-    rex = Rex(model_type=NNRegressor, explainer=shap.GradientExplainer)
-    rex.fit(data)
-    pred_graph = rex.predict(data)
-    print(evaluate_graph(ref_graph, rex.G_shap, rex.shaps.feature_names_))
+    rex = Rex(
+        model_type=NNRegressor, explainer=shap.GradientExplainer, tune_model=True,
+        hpo_n_trials=1)
+    rex.fit(train)
+    rex.predict(test)
+    print(rex.score(ref_graph, 'shap'))
 
 
 if __name__ == "__main__":
