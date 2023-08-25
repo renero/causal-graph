@@ -144,19 +144,6 @@ class NNRegressor(BaseEstimator):
         self : object
             Returns self.
         """
-
-        # print what method called this function
-        # import inspect
-
-        # print(f"\nCalled with by {inspect.stack()[1][3]}")
-        # print(f"- hidden dim: {self.hidden_dim}")
-        # print(f"- activation: {self.activation}")
-        # print(f"- learning rate: {self.learning_rate}")
-        # print(f"- dropout: {self.dropout}")
-        # print(f"- batch size: {self.batch_size}")
-        # print(f"- num epochs: {self.num_epochs}")
-        # print("")
-
         # X, y = check_X_y(X, y)
         self.n_features_in_ = X.shape[1]
         self.feature_names = list(X.columns)
@@ -251,7 +238,12 @@ class NNRegressor(BaseEstimator):
             f"X has {X.shape[1]} features, expected {self.n_features_in_}"
         check_is_fitted(self, 'is_fitted_')
 
-        y_hat = torch.Tensor(self.predict(X))
+        y_hat = self.predict(X)
+        # Sometimes, when executed in batch, prediction returns numpy object type
+        # instead of a numpy array. This is a workaround to convert it to a numpy
+        # array. Otherwise, the call to Tensor will fail.
+        y_hat = np.vstack(y_hat[:, :]).astype('float')
+        y_hat = torch.Tensor(y_hat)
         scores = []
         for i, target in enumerate(self.feature_names):
             y_preds = torch.Tensor(y_hat[i])
@@ -365,15 +357,6 @@ class NNRegressor(BaseEstimator):
                 self.batch_size = trial.suggest_int('batch_size', 1, 64)
                 self.num_epochs = trial.suggest_int('num_epochs', 10, 100)
 
-                # print(f"\nSuggesting hyperparameters for trial {trial.number}")
-                # print(f"- hidden dim: {self.layers}")
-                # print(f"- activation: {self.activation}")
-                # print(f"- learning rate: {self.learning_rate}")
-                # print(f"- dropout: {self.dropout}")
-                # print(f"- batch size: {self.batch_size}")
-                # print(f"- num epochs: {self.num_epochs}")
-                # print("")
-
                 self.models = NNRegressor(
                     hidden_dim=self.layers,
                     activation=self.activation,
@@ -459,7 +442,7 @@ class NNRegressor(BaseEstimator):
             load_if_exists=load_if_exists)
         study.optimize(
             Objective(training_data, test_data), n_trials=n_trials,
-            show_progress_bar=self.prog_bar, callbacks=[callback])
+            show_progress_bar=(self.prog_bar & (not self.silent)), callbacks=[callback])
 
         # Capture the best parameters and the minimum MSE obtained.
         best_trials = sorted(study.best_trials, key=lambda x: x.values[0])

@@ -628,7 +628,7 @@ def main():
 
 
 def main2(path="/Users/renero/phd/data/RC3/",
-          dataset_name='rex_generated_polynew_1'):
+          dataset_name='rex_generated_polynew_8'):
 
     ref_graph = graph_from_dot_file(f"{path}{dataset_name}.dot")
     data = pd.read_csv(f"{path}{dataset_name}.csv")
@@ -639,10 +639,9 @@ def main2(path="/Users/renero/phd/data/RC3/",
 
     # rex = Rex(model_type=GBTRegressor, explainer=shap.Explainer)
     rex = Rex(
-        model_type=NNRegressor, explainer=shap.GradientExplainer, tune_model=True,
+        model_type=NNRegressor, explainer=shap.GradientExplainer, tune_model=False,
         hpo_n_trials=1)
-    rex.fit(train)
-    rex.predict(test)
+    rex.fit_predict(train, test, ref_graph)
     print(rex.score(ref_graph, 'shap'))
 
 
