@@ -542,7 +542,8 @@ class Knowledge:
         times the interquartile range (IQR).
         """
         iqr = np.quantile(self.scoring, 0.75) - np.quantile(self.scoring, 0.25)
-        outliers_indices = np.where(self.scoring > 2.5*iqr)
+        outliers_indices = np.where(
+            np.abs(self.scoring - np.median(self.scoring)) > 1.5*iqr)
         self.regression_outliers = [self.feature_names[i]
                                     for i in outliers_indices[0]]
 
