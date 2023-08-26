@@ -239,11 +239,11 @@ class NNRegressor(BaseEstimator):
         check_is_fitted(self, 'is_fitted_')
 
         y_hat = self.predict(X)
-        # Sometimes, when executed in batch, prediction returns numpy object type
-        # instead of a numpy array. This is a workaround to convert it to a numpy
-        # array. Otherwise, the call to Tensor will fail.
-        y_hat = np.vstack(y_hat[:, :]).astype('float')
-        y_hat = torch.Tensor(y_hat)
+        # Handle the case where the prediction returned by the model is not a numpy array
+        # but a numpy object type
+        if isinstance(y_hat, np.ndarray) and y_hat.dtype == np.object_:
+            y_hat = np.vstack(y_hat[:, :].flatten()).astype('float')
+            y_hat = torch.Tensor(y_hat)
         scores = []
         for i, target in enumerate(self.feature_names):
             y_preds = torch.Tensor(y_hat[i])
@@ -485,6 +485,11 @@ class NNRegressor(BaseEstimator):
         regressor_args = self.tune(
             train_data, test_data, n_trials=hpo_n_trials, study_name=hpo_study_name,
             min_mse=hpo_min_mse, storage=hpo_storage, load_if_exists=hpo_load_if_exists)
+
+        if self.verbose and not self.silent:
+            print(f"Best params (min MSE:{self.min_tunned_loss:.6f}):")
+            for k, v in regressor_args.items():
+                print(f"\t{k:<15s}: {v}")
 
         # Set the object parameters to the best parameters found.
         for k, v in regressor_args.items():
