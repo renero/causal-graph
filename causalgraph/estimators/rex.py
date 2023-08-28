@@ -4,8 +4,6 @@
 # (C) J. Renero, 2022, 2023
 #
 
-import inspect
-import math
 import os
 import types
 import warnings
@@ -22,8 +20,7 @@ from estimators.knowledge import Knowledge
 from matplotlib.backends.backend_pdf import PdfPages
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.preprocessing import StandardScaler
-from sklearn.utils.validation import (check_array, check_is_fitted,
-                                      check_random_state)
+from sklearn.utils.validation import (check_is_fitted, check_random_state)
 
 from causalgraph.common import GRAY, GREEN, RESET
 from causalgraph.common.pipeline import Pipeline
