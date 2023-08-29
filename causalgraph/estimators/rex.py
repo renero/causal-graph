@@ -16,11 +16,10 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 import shap
-from estimators.knowledge import Knowledge
 from matplotlib.backends.backend_pdf import PdfPages
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.preprocessing import StandardScaler
-from sklearn.utils.validation import (check_is_fitted, check_random_state)
+from sklearn.utils.validation import check_is_fitted, check_random_state
 
 from causalgraph.common import GRAY, GREEN, RESET
 from causalgraph.common.pipeline import Pipeline
@@ -29,7 +28,7 @@ from causalgraph.common.plots import (_cleanup_graph, _draw_graph_subplot,
                                       setup_plot, subplots)
 from causalgraph.common.utils import (graph_from_dot_file, load_experiment,
                                       save_experiment)
-# from causalgraph.estimators import Rex
+from causalgraph.estimators.knowledge import Knowledge
 from causalgraph.explainability import (Hierarchies, PermutationImportance,
                                         ShapEstimator)
 from causalgraph.independence.graph_independence import GraphIndependence
@@ -195,7 +194,7 @@ class Rex(BaseEstimator, ClassifierMixin):
         self : object
             Returns self.
         """
-        self.random_state_ = check_random_state(self.random_state)
+        self.random_state = check_random_state(self.random_state)
         self.n_features_in_ = X.shape[1]
         self.feature_names = list(X.columns)
         self.X = copy(X)
@@ -250,8 +249,7 @@ class Rex(BaseEstimator, ClassifierMixin):
         steps = [
             ('G_shap', 'shaps.predict'),
             ('indep', GraphIndependence, {'base_graph': 'G_shap'}),
-            'indep.fit',
-            ('G_indep', 'indep.predict'),
+            ('G_indep', 'indep.fit_predict'),
             ('G_final', 'shaps.adjust', {'graph': 'G_indep'})
         ]
         prediction.run(steps, "Predicting graph")
@@ -364,13 +362,16 @@ class Rex(BaseEstimator, ClassifierMixin):
                     continue
             elif isinstance(getattr(self, attr), pd.DataFrame):
                 ret += f"{attr:25} DataFrame {getattr(self, attr).shape}\n"
+            # check if attr is an object
+            elif isinstance(getattr(self, attr), BaseEstimator):
+                ret += f"{attr:25} {BaseEstimator}\n"
             else:
                 ret += f"{attr:25} {getattr(self, attr)}\n"
 
         return ret
 
+    @staticmethod
     def plot_dags(
-            self,
             dag: nx.DiGraph,
             reference: nx.DiGraph = None,
             names: List[str] = ["REX Prediction", "Ground truth"],
@@ -441,8 +442,8 @@ class Rex(BaseEstimator, ClassifierMixin):
                                 **formatting_kwargs)
             plt.show()
 
+    @staticmethod
     def plot_dag(
-            self,
             dag: nx.DiGraph,
             figsize: Tuple[int, int] = (5, 5),
             dpi: int = 75,

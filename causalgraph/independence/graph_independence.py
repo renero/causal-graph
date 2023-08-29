@@ -17,9 +17,6 @@ from tqdm.auto import tqdm
 
 from causalgraph.common import tqdm_params
 
-# TODO: Change the way this objects are called. Use a fit method instead of
-# passing the data to the constructor.
-
 
 class GraphIndependence(object):
 
@@ -94,6 +91,10 @@ class GraphIndependence(object):
 
     def predict(self):
         return self.G_skl
+
+    def fit_predict(self, X: DataFrame, y=None):
+        self.fit(X, y)
+        return self.predict()
 
     def _gen_cond_sets(self, x, y, size):
         """ A function to build the set of conditioning sets to be for

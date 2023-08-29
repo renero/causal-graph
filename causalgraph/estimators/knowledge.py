@@ -1,6 +1,7 @@
 import math
 import numpy as np
 import pandas as pd
+import networkx as nx
 
 
 class Knowledge:
@@ -23,7 +24,7 @@ class Knowledge:
 
     """
 
-    def __init__(self, rex: Rex, ref_graph: nx.DiGraph):
+    def __init__(self, rex: object, ref_graph: nx.DiGraph):
         """
         Arguments:
         ----------

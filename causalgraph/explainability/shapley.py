@@ -101,7 +101,9 @@ class ShapEstimator(BaseEstimator):
         ret = f"{GREEN}SHAP object attributes{RESET}\n"
         ret += f"{GRAY}{'-'*80}{RESET}\n"
         for attr in dir(self):
-            if attr.startswith('_') or attr in forbidden_attrs or type(getattr(self, attr)) == types.MethodType:
+            if attr.startswith('_') or \
+                attr in forbidden_attrs or \
+                    type(getattr(self, attr)) == types.MethodType:
                 continue
             elif attr == "X" or attr == "y":
                 if isinstance(getattr(self, attr), pd.DataFrame):
@@ -116,7 +118,9 @@ class ShapEstimator(BaseEstimator):
                 ret += f"{attr:25} DataFrame {getattr(self, attr).shape}\n"
             elif isinstance(getattr(self, attr), dict):
                 keys_list = [
-                    f"{k}:{type(getattr(self, attr)[k])}" for k in getattr(self, attr).keys()]
+                    f"{k}:{type(getattr(self, attr)[k])}"
+                    for k in getattr(self, attr).keys()
+                ]
                 ret += f"{attr:25} dict {keys_list}\n"
             else:
                 ret += f"{attr:25} {getattr(self, attr)}\n"
@@ -168,7 +172,6 @@ class ShapEstimator(BaseEstimator):
             elif self.explainer == shap.GradientExplainer:
                 X_train_tensor = torch.from_numpy(X_train).float()
                 X_test_tensor = torch.from_numpy(X_test).float()
-
                 self.shap_explainer[target_name] = self.explainer(
                     model.to(self.device), X_train_tensor.to(self.device))
                 self.shap_values[target_name] = self.shap_explainer[target_name](
@@ -240,7 +243,7 @@ class ShapEstimator(BaseEstimator):
     def predict(self, X):
         """
         Builds a causal graph from the shap values using a selection mechanism based
-        on the knee or abrupt methods.
+        on clustering, knee or abrupt methods.
         """
         # X_array = check_array(X)
         check_is_fitted(self, 'is_fitted_')
