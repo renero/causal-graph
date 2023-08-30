@@ -71,6 +71,7 @@ class NNRegressor(BaseEstimator):
             early_stop: bool = False,
             patience: int = 10,
             min_delta: float = 0.001,
+            correlation_th: float = None,
             random_state: int = 1234,
             verbose: bool = False,
             prog_bar: bool = True,
@@ -120,6 +121,7 @@ class NNRegressor(BaseEstimator):
         self.early_stop = early_stop
         self.patience = patience
         self.min_delta = min_delta
+        self.correlation_th = correlation_th
         self.random_state = random_state
         self.verbose = verbose
         self.prog_bar = prog_bar
@@ -149,15 +151,30 @@ class NNRegressor(BaseEstimator):
         self.feature_names = list(X.columns)
         self.regressor = dict()
 
+        if self.correlation_th:
+            corr = X.corr(method='spearman')
+            X_original = X.copy()
+
         pbar_in = tqdm(
             total=len(self.feature_names),
             **tqdm_params(self._fit_desc, self.prog_bar, silent=self.silent))
 
         for target in self.feature_names:
             pbar_in.refresh()
+
+            # if correlation_th is not None then, remove features that are highly
+            # correlated with the target, at each step of the loop
+            if self.correlation_th is not None:
+                corr_features = list(corr[(corr[target] > self.correlation_th)
+                                          & (corr[target] < 1.0)].index)
+                X = X_original.copy()
+                if len(corr_features) > 0:
+                    X = X.drop(corr_features, axis=1)
+                    print("REMOVED CORRELATED FEATURES: ", corr_features)
+
             self.regressor[target] = MLPModel(
                 target=target,
-                input_size=self.n_features_in_,
+                input_size=X.shape[1],
                 activation=self.activation,
                 hidden_dim=self.hidden_dim,
                 learning_rate=self.learning_rate,

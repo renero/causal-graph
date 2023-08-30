@@ -63,6 +63,7 @@ class ShapEstimator(BaseEstimator):
             self,
             explainer=shap.Explainer,
             models: BaseEstimator = None,
+            correlation_th: float = None,
             method: str = 'cluster',
             sensitivity: float = 1.0,
             mean_shap_percentile: float = 0.8,
@@ -79,6 +80,7 @@ class ShapEstimator(BaseEstimator):
         """
         self.explainer = explainer
         self.models = models
+        self.correlation_th = correlation_th
         self.method = method
         self.sensitivity = sensitivity
         self.mean_shap_percentile = mean_shap_percentile
@@ -146,8 +148,29 @@ class ShapEstimator(BaseEstimator):
         self.X_train, self.X_test = train_test_split(
             X, test_size=0.2, random_state=42)
 
+        # Make a copy of the data if correlation threshold is set, since I will have
+        # to drop some features at each iteration.
+        if self.correlation_th:
+            corr = X.corr(method='spearman')
+            X_train_original = self.X_train.copy()
+            X_test_original = self.X_test.copy()
+            self.correlated_features = {}
+
         for target_name in self.feature_names_:
             pbar.refresh()
+
+            # if correlation_th is not None then, remove features that are highly
+            # correlated with the target, at each step of the loop
+            if self.correlation_th is not None:
+                corr_features = list(corr[(corr[target_name] > self.correlation_th)
+                                          & (corr[target_name] < 1.0)].index)
+                self.X_train = X_train_original.copy()
+                self.X_test = X_test_original.copy()
+                if len(corr_features) > 0:
+                    self.X_train = self.X_train.drop(corr_features, axis=1)
+                    self.X_test = self.X_test.drop(corr_features, axis=1)
+                    self.correlated_features[target_name] = corr_features
+                    print("REMOVED CORRELATED FEATURES: ", corr_features)
 
             # Get the model and the data (tensor form)
             if hasattr(self.models.regressor[target_name], "model"):
@@ -195,6 +218,10 @@ class ShapEstimator(BaseEstimator):
             self.all_mean_shap_values.append(
                 self.shap_mean_values[target_name])
 
+            # Add zeroes to positions of correlated features
+            if self.correlation_th is not None:
+                self._add_zeroes(target_name, corr_features)
+
             pbar.update(1)
 
         pbar.close()
@@ -206,6 +233,13 @@ class ShapEstimator(BaseEstimator):
 
         self.is_fitted_ = True
         return self
+
+    def _add_zeroes(self, target, correlated_features):
+        features = [f for f in self.feature_names_ if f != target]
+        for correlated_feature in correlated_features:
+            correlated_feature_position = features.index(correlated_feature)
+            self.all_mean_shap_values[-1] = np.insert(
+                self.all_mean_shap_values[-1], correlated_feature_position, 0.)
 
     def _extract_data(self, X, target_name):
         """

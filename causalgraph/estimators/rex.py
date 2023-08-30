@@ -194,7 +194,7 @@ class Rex(BaseEstimator, ClassifierMixin):
         self : object
             Returns self.
         """
-        self.random_state = check_random_state(self.random_state)
+        self.random_state_state = check_random_state(self.random_state)
         self.n_features_in_ = X.shape[1]
         self.feature_names = list(X.columns)
         self.X = copy(X)
@@ -549,10 +549,12 @@ def main2(path="/Users/renero/phd/data/RC3/",
 
     # rex = Rex(model_type=GBTRegressor, explainer=shap.Explainer)
     rex = Rex(
-        model_type=NNRegressor, explainer=shap.GradientExplainer, tune_model=False,
-        hidden_dim=[81], activation='relu', learning_rate=0.01275,
-        dropout=0.218724, batch_size=51, num_epochs=80,
-        hpo_n_trials=1, hpo_study_name=dataset_name)
+        model_type=NNRegressor, explainer=shap.GradientExplainer,
+        correlation_th=0.3, prog_bar=False, verbose=True,
+        # hidden_dim=[81], activation='relu', learning_rate=0.01275,
+        # dropout=0.218724, batch_size=51, num_epochs=80,
+        # tune_model=False, hpo_n_trials=1, hpo_study_name=dataset_name
+    )
     rex.fit_predict(train, test, ref_graph)
     print(rex.score(ref_graph, 'shap'))
 
