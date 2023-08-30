@@ -26,6 +26,7 @@ class PermutationImportance(BaseEstimator):
     def __init__(
             self,
             models: dict,
+            correlation_th: float = None,
             n_repeats: int = 10,
             mean_pi_percentile: float = 0.8,
             random_state: int = 42,
@@ -54,6 +55,7 @@ class PermutationImportance(BaseEstimator):
         """
         super().__init__()
         self.regressors = models.regressor
+        self.correlation_th = correlation_th
         self.n_repeats = n_repeats
         self.mean_pi_percentile = mean_pi_percentile
         self.random_state = random_state
@@ -74,6 +76,9 @@ class PermutationImportance(BaseEstimator):
         for each feature. If the model is a SKLearn model, the fit method will
         compute the permutation importance for each feature.
         """
+        if self.correlation_th is not None:
+            self.corr = X.corr(method='spearman')
+
         first_key = self.feature_names_[0]
         if isinstance(self.regressors[first_key], MLPModel):
             return self._fit_pytorch()
@@ -92,8 +97,9 @@ class PermutationImportance(BaseEstimator):
         self.base_loss = dict()
         self.base_std = dict()
         for feature in self.feature_names_:
-            print(f"Feature: {feature} ", end="") if self.verbose else None
             pbar.refresh()
+            print(f"Feature: {feature} ", end="") if self.verbose else None
+
             regressor = self.regressors[feature]
             model = regressor.model.to(self.device)
 
@@ -105,6 +111,7 @@ class PermutationImportance(BaseEstimator):
             if (self.verbose) and (not self.silent):
                 print(f"Base loss: {self.base_loss[feature]:.6f} ", end="")
                 print(f"+/- {self.base_std[feature]:.6f}")
+
             pbar.update(1)
         pbar.close()
 
@@ -125,6 +132,8 @@ class PermutationImportance(BaseEstimator):
         self.X = X.copy()
         for target in self.feature_names_:
             pbar.refresh()
+            print(f"Feature: {target} ", end="") if self.verbose else None
+
             regressor = self.regressors[target]
             X = self.X.drop(columns=[target])
             y = self.X[target]
@@ -132,6 +141,7 @@ class PermutationImportance(BaseEstimator):
                 regressor, X, y, n_repeats=10,
                 random_state=self.random_state)
             self.all_pi.append(self.pi[target]['importances_mean'])
+
             pbar.update(1)
         pbar.close()
         self.all_pi = np.array(self.all_pi).flatten()
@@ -165,15 +175,21 @@ class PermutationImportance(BaseEstimator):
             pbar.refresh()
             regressor = self.regressors[target]
             model = regressor.model
-            print(f"Target: {target} ", end="") if self.verbose else None
-            print(
-                f" (base loss: {self.base_loss[target]:.6f})") if self.verbose else None
+            if self.verbose:
+                print(
+                    f"Target: {target} (base loss: {self.base_loss[target]:.6f})")
 
             # Create the dictionary to store the permutation importance, same way
             # as the sklearn implementation
             self.pi[target] = dict()
             self.pi[target]['importances_mean'] = []
             self.pi[target]['importances_std'] = []
+
+            if self.correlation_th is not None:
+                corr_features = list(
+                    self.corr[(self.corr[target] > self.correlation_th)
+                              & (self.corr[target] < 1.0)].index)
+                num_vars = len(self.feature_names_) - len(corr_features)
 
             # Compute the permutation importance for each feature
             for shuffle_col in range(num_vars-1):
@@ -182,21 +198,25 @@ class PermutationImportance(BaseEstimator):
                     f"+-> Feature: {feature} ", end="") if self.verbose else None
 
                 _, _, losses = self._compute_loss(
-                    model, regressor.train_loader, shuffle=shuffle_col)
+                    model, regressor.train_loader, shuffle_col=shuffle_col)
 
+                axis = 1 if self.n_repeats > 1 else 0
                 perm_importances = np.mean(
-                    losses, axis=1) - self.base_loss[target]
+                    losses, axis=axis) - self.base_loss[target]
 
                 self.pi[target]['importances_mean'].append(
                     np.mean(perm_importances))
-                self.pi[target]['importances_std'].append(
-                    np.std(perm_importances))
+                if self.n_repeats > 1:
+                    self.pi[target]['importances_std'].append(
+                        np.std(perm_importances))
+                else:
+                    self.pi[target]['importances_std'].append(
+                        np.abs(np.std(losses) - self.base_loss[target]))
 
                 if self.verbose:
                     print(
-                        f"Perm.imp.: {self.pi[target]['importances_mean'][-1]:.6f} ",
-                        end="")
-                    print(f"+/- {self.pi[target]['importances_std'][-1]:.6f}")
+                        f"Perm.imp.: {self.pi[target]['importances_mean'][-1]:.6f} "
+                        f"+/- {self.pi[target]['importances_std'][-1]:.6f}")
 
             pbar.update(1)
 
@@ -204,6 +224,10 @@ class PermutationImportance(BaseEstimator):
                 self.pi[target]['importances_mean'])
             self.pi[target]['importances_std'] = np.array(
                 self.pi[target]['importances_std'])
+
+            if self.correlation_th is not None:
+                self._add_zeroes(target, corr_features)
+
             self.all_pi.append(self.pi[target]['importances_mean'])
 
         pbar.close()
@@ -213,6 +237,18 @@ class PermutationImportance(BaseEstimator):
             self.all_pi, self.mean_pi_percentile)
 
         return self.pi
+
+    def _add_zeroes(self, target, correlated_features):
+        """
+        Add zeroes to the mean perm imp. values for correlated features.
+        """
+        features = [f for f in self.feature_names_ if f != target]
+        for correlated_feature in correlated_features:
+            correlated_feature_position = features.index(correlated_feature)
+            self.pi[target]['importances_mean'] = np.insert(
+                self.pi[target]['importances_mean'], correlated_feature_position, 0.)
+            self.pi[target]['importances_std'] = np.insert(
+                self.pi[target]['importances_std'], correlated_feature_position, 0.)
 
     def fit_predict(self, X, y=None):
         first_key = self.feature_names_[0]
@@ -233,7 +269,7 @@ class PermutationImportance(BaseEstimator):
             self,
             model: torch.nn.Module,
             dataloader: torch.utils.data.DataLoader,
-            shuffle: int = -1) -> Tuple[float, float, np.ndarray]:
+            shuffle_col: int = -1) -> Tuple[float, float, np.ndarray]:
         """
         Computes the average MSE loss for a given model and dataloader.
 
@@ -263,15 +299,18 @@ class PermutationImportance(BaseEstimator):
             loss = []
             # Loop over all batches in train loader
             for _, (X, y) in enumerate(dataloader):
-                # Shuffle data if specified
                 X = X.to(self.device)
                 y = y.to(self.device)
-                if shuffle >= 0:
-                    X = self._shuffle_2Dtensor_column(X, shuffle)
+
+                # Shuffle data if specified
+                if shuffle_col >= 0:
+                    X = self._shuffle_2Dtensor_column(X, shuffle_col)
+
                 # compute MSE loss for each batch
                 yhat = model.forward(X)
                 loss.append(model.loss_fn(yhat, y).item())
                 num_batches += 1
+
             if len(mse) == 0:
                 mse = np.array(loss)
             else:
@@ -378,18 +417,19 @@ class PermutationImportance(BaseEstimator):
 if __name__ == "__main__":
     path = "/Users/renero/phd/data/RC3/"
     output_path = "/Users/renero/phd/output/RC3/"
-    experiment_name = 'rex_generated_polynew_10'
+    experiment_name = 'custom_rex'
 
     ref_graph = utils.graph_from_dot_file(f"{path}{experiment_name}.dot")
     data = pd.read_csv(f"{path}{experiment_name}.csv")
     scaler = StandardScaler()
     data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)
-    rex = utils.load_experiment(f"{experiment_name}_mps", output_path)
-    print(f"Loaded experiment {experiment_name}_mps")
+    rex = utils.load_experiment(f"{experiment_name}", output_path)
+    print(f"Loaded experiment {experiment_name}")
 
     #  Run the permutation importance algorithm
     pi = PermutationImportance(
-        rex.models, n_repeats=10, prog_bar=False, verbose=True)
+        rex.models, n_repeats=10,
+        correlation_th=0.3, prog_bar=False, verbose=True)
     pi.fit(data)
     pi.predict()
     pi.plot(fig_size=(7, 5))
