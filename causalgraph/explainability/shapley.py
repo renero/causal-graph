@@ -170,7 +170,8 @@ class ShapEstimator(BaseEstimator):
                     self.X_train = self.X_train.drop(corr_features, axis=1)
                     self.X_test = self.X_test.drop(corr_features, axis=1)
                     self.correlated_features[target_name] = corr_features
-                    print("REMOVED CORRELATED FEATURES: ", corr_features)
+                    if self.verbose:
+                        print("REMOVED CORRELATED FEATURES: ", corr_features)
 
             # Get the model and the data (tensor form)
             if hasattr(self.models.regressor[target_name], "model"):
@@ -391,9 +392,10 @@ class ShapEstimator(BaseEstimator):
                 X = X_original.copy()
                 if len(self.correlated_features[target_name]) > 0:
                     X = X.drop(self.correlated_features[target_name], axis=1)
-                    print(
-                        f"REMOVED CORRELATED FEATURES ({target_name}): "
-                        f"{self.correlated_features[target_name]}")
+                    if self.verbose:
+                        print(
+                            f"REMOVED CORRELATED FEATURES ({target_name}): "
+                            f"{self.correlated_features[target_name]}")
 
             X_features = X.drop(target_name, axis=1)
             y = X[target_name].values
@@ -683,7 +685,12 @@ class ShapEstimator(BaseEstimator):
             fig, ax = plt.subplots(1, 1, figsize=figsize_)
 
         feature_inds = self.feature_order[target_name][:max_features_to_display]
-        feature_names = [f for f in self.feature_names_ if f != target_name]
+        if self.correlation_th is not None:
+            feature_names = [f for f in self.feature_names_ if (f != target_name) & (
+                f not in self.correlated_features[target_name])]
+        else:
+            feature_names = [
+                f for f in self.feature_names_ if f != target_name]
         selected_features = [parent for parent in self.parents[target_name]]
 
         y_pos = np.arange(len(feature_inds))

@@ -172,7 +172,8 @@ class NNRegressor(BaseEstimator):
                 if len(corr_features) > 0:
                     X = X.drop(corr_features, axis=1)
                     self.correlated_features[target_name] = corr_features
-                    print("REMOVED CORRELATED FEATURES: ", corr_features)
+                    if self.verbose:
+                        print("REMOVED CORRELATED FEATURES: ", corr_features)
 
             self.regressor[target_name] = MLPModel(
                 target=target_name,
