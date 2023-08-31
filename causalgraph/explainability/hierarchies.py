@@ -91,8 +91,9 @@ class Hierarchies:
                                       & (self.correlations[target_name] < 1.0)].index)
                 if len(corr_features) > 0:
                     self.correlated_features[target_name] = corr_features
-                    print(
-                        f"CORRELATED FEATS for {target_name}: {corr_features}")
+                    if self.verbose_:
+                        print(
+                            f"CORRELATED FEATS for {target_name}: {corr_features}")
 
         self.dissimilarity = 1 - np.abs(self.correlations)
         close_to_zero = self.dissimilarity < 1.0e-6
