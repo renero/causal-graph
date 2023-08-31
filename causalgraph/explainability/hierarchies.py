@@ -5,6 +5,7 @@ Can I use the information above to decide wether to connect groups
 of variables linked together?
 
 """
+from collections import defaultdict
 from typing import Callable, List, Tuple, Union
 
 import matplotlib.pyplot as plt
@@ -84,7 +85,7 @@ class Hierarchies:
 
         # Set the list of correlated features for each target
         if self.correlation_th:
-            self.correlated_features = {}
+            self.correlated_features = defaultdict(list)
             for target_name in self.feature_names_:
                 corr_features = list(
                     self.correlations[(self.correlations[target_name] > self.correlation_th)

@@ -65,8 +65,6 @@ class Knowledge:
         rows = []
         self._compute_regression_outliers()
         for target in self.feature_names:
-            print(f"Processing {target}\n"
-                  f"+-> Correlated: {self.correlated_features[target]}")
             for feature in self.feature_names:
                 if target == feature:
                     continue
@@ -74,8 +72,6 @@ class Knowledge:
                 if self.correlation_th is not None:
                     if feature in self.correlated_features[target]:
                         continue
-
-                print(f"  +-> Feature: {feature}")
 
                 # all_targets = [o for o in self.feature_names if o != feature]
                 # target_pos = all_targets.index(target)

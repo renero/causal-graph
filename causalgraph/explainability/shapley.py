@@ -1,6 +1,7 @@
 """
 This is a module to be used as a reference for building other modules
 """
+from collections import defaultdict
 import math
 import types
 import warnings
@@ -154,7 +155,7 @@ class ShapEstimator(BaseEstimator):
             self.corr = X.corr(method='spearman')
             X_train_original = self.X_train.copy()
             X_test_original = self.X_test.copy()
-            self.correlated_features = {}
+            self.correlated_features = defaultdict(list)
 
         for target_name in self.feature_names_:
             pbar.refresh()

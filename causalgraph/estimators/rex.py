@@ -208,14 +208,14 @@ class Rex(BaseEstimator, ClassifierMixin):
         pipeline = Pipeline(host=self, prog_bar=self.prog_bar, verbose=self.verbose,
                             silent=self.silent)
         steps = [
+            ('hierarchies', Hierarchies),
+            'hierarchies.fit',
             ('models', self.model_type),
             fit_step,
             ('shaps', ShapEstimator, {'models': 'models'}),
             'shaps.fit',
             ('pi', PermutationImportance, {'models': 'models'}),
             ('pi.fit_predict', {'X': self.X}),
-            ('hierarchies', Hierarchies),
-            'hierarchies.fit',
         ]
         pipeline.run(steps, self._fit_desc)
         self.is_fitted_ = True

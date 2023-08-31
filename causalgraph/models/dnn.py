@@ -1,3 +1,4 @@
+from collections import defaultdict
 import types
 import warnings
 from typing import List, Union, Tuple
@@ -154,7 +155,7 @@ class NNRegressor(BaseEstimator):
         if self.correlation_th:
             corr = X.corr(method='spearman')
             X_original = X.copy()
-            self.correlated_features = {}
+            self.correlated_features = defaultdict(list)
 
         pbar_in = tqdm(
             total=len(self.feature_names),
