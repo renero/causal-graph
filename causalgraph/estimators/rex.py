@@ -212,7 +212,7 @@ class Rex(BaseEstimator, ClassifierMixin):
             fit_step,
             ('shaps', ShapEstimator, {'models': 'models'}),
             'shaps.fit',
-            ('pi', PermutationImportance, {'regressors': 'models'}),
+            ('pi', PermutationImportance, {'models': 'models'}),
             ('pi.fit_predict', {'X': self.X}),
             ('hierarchies', Hierarchies),
             'hierarchies.fit',

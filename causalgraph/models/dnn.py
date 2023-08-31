@@ -266,7 +266,9 @@ class NNRegressor(BaseEstimator):
             f"X has {X.shape[1]} features, expected {self.n_features_in_}"
         check_is_fitted(self, 'is_fitted_')
 
+        # Call the class method to predict the values for each target variable
         y_hat = self.predict(X)
+
         # Handle the case where the prediction returned by the model is not a numpy array
         # but a numpy object type
         if isinstance(y_hat, np.ndarray) and y_hat.dtype == np.object_:

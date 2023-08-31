@@ -306,6 +306,8 @@ class ShapEstimator(BaseEstimator):
                 candidate_causes = [
                     f for f in candidate_causes if f not in self.correlated_features[target]]
 
+            print(
+                f"Selecting features for target {target}...") if self.verbose else None
             self.parents[target] = select_features(
                 values=self.shap_values[target],
                 feature_names=candidate_causes,

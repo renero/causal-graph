@@ -32,7 +32,8 @@ class Hierarchies:
             alpha: float = 0.6,
             c: int = 15,
             linkage_method: str = 'complete',
-            progbar: bool = False,
+            correlation_th: float = None,
+            prog_bar: bool = False,
             verbose: bool = False,
             silent: bool = False):
         """
@@ -50,7 +51,8 @@ class Hierarchies:
         self.alpha = alpha
         self.c = c
         self.linkage_method = linkage_method
-        self.progbar_ = progbar
+        self.correlation_th = correlation_th
+        self.prog_bar = prog_bar
         self.verbose_ = verbose
         self.silent_ = silent
 
@@ -72,20 +74,33 @@ class Hierarchies:
             self.correlations = self.data.corr(method=self.method)
         elif self.method == 'mic':
             self.correlations = pairwise_mic(
-                self.data, alpha=alpha, c=c, progbar=self.progbar_)
+                self.data, alpha=alpha, c=c, progbar=self.prog_bar)
         else:
             raise ValueError(
                 f"Unknown correlation method: {self.method}. \
                     Use 'spearman', 'pearson', 'kendall' or 'mic'.")
 
-        # feature_names = list(data.columns)
+        self.feature_names_ = list(self.data.columns)
+
+        # Set the list of correlated features for each target
+        if self.correlation_th:
+            self.correlated_features = {}
+            for target_name in self.feature_names_:
+                corr_features = list(
+                    self.correlations[(self.correlations[target_name] > self.correlation_th)
+                                      & (self.correlations[target_name] < 1.0)].index)
+                if len(corr_features) > 0:
+                    self.correlated_features[target_name] = corr_features
+                    print(
+                        f"CORRELATED FEATS for {target_name}: {corr_features}")
+
         self.dissimilarity = 1 - np.abs(self.correlations)
         close_to_zero = self.dissimilarity < 1.0e-6
         self.dissimilarity[close_to_zero] = 0.0
         self.linkage_mat = linkage(squareform(
             self.dissimilarity), self.linkage_method)
 
-        return self #self.correlations, self.linkage_mat
+        return self  # self.correlations, self.linkage_mat
 
     def expand_clusters_perm_importance(self, pi, ground_truth=None):
         """
@@ -315,11 +330,10 @@ class Hierarchies:
         """
         cw = plt.get_cmap('coolwarm')
         cmap = ListedColormap([cw(x)
-                            for x in np.arange(color_threshold, max_color, 0.01)])
+                               for x in np.arange(color_threshold, max_color, 0.01)])
         cm = copy(cmap)
         cm.set_under(color='white')
         return cm
-
 
     def plot(self, threshold=0.1, **kwargs):
         """
@@ -331,7 +345,8 @@ class Hierarchies:
         title = kwargs.get('title', 'Correlation matrix')
         fontsize = kwargs.get('fontsize', 9)
         xrot = kwargs.get('xrot', 0)
-        cm = Hierarchies._set_colormap(color_threshold=threshold, max_color=0.9)
+        cm = Hierarchies._set_colormap(
+            color_threshold=threshold, max_color=0.9)
         precision = 2
 
         def myround(v, ndigits=2):
