@@ -151,7 +151,7 @@ class ShapEstimator(BaseEstimator):
         # Make a copy of the data if correlation threshold is set, since I will have
         # to drop some features at each iteration.
         if self.correlation_th:
-            corr = X.corr(method='spearman')
+            self.corr = X.corr(method='spearman')
             X_train_original = self.X_train.copy()
             X_test_original = self.X_test.copy()
             self.correlated_features = {}
@@ -162,8 +162,8 @@ class ShapEstimator(BaseEstimator):
             # if correlation_th is not None then, remove features that are highly
             # correlated with the target, at each step of the loop
             if self.correlation_th is not None:
-                corr_features = list(corr[(corr[target_name] > self.correlation_th)
-                                          & (corr[target_name] < 1.0)].index)
+                corr_features = list(self.corr[(self.corr[target_name] > self.correlation_th)
+                                               & (self.corr[target_name] < 1.0)].index)
                 self.X_train = X_train_original.copy()
                 self.X_test = X_test_original.copy()
                 if len(corr_features) > 0:
@@ -231,6 +231,10 @@ class ShapEstimator(BaseEstimator):
         self.mean_shap_threshold = np.quantile(
             self.all_mean_shap_values, self.mean_shap_percentile)
 
+        # Leave X_train and X_test as they originally were
+        self.X_train = X_train_original
+        self.X_test = X_test_original
+
         self.is_fitted_ = True
         return self
 
@@ -296,6 +300,12 @@ class ShapEstimator(BaseEstimator):
         for target in self.feature_names_:
             candidate_causes = [
                 f for f in self.feature_names_ if f != target]
+
+            # Filter out features that are highly correlated with the target
+            if self.correlation_th is not None:
+                candidate_causes = [
+                    f for f in candidate_causes if f not in self.correlated_features[target]]
+
             self.parents[target] = select_features(
                 values=self.shap_values[target],
                 feature_names=candidate_causes,
@@ -321,6 +331,8 @@ class ShapEstimator(BaseEstimator):
         pbar.update(1)
         pbar.refresh()
 
+        if self.verbose:
+            print("Determining edge directions...")
         G_shap = nx.DiGraph()
         for u, v in G_shap_unoriented.edges():
             pbar.update(1)
@@ -367,18 +379,25 @@ class ShapEstimator(BaseEstimator):
         pd.DataFrame
             A dataframe containing the discrepancies for all features and all targets.
         """
+        check_is_fitted(self, 'is_fitted_')
         self.discrepancies = pd.DataFrame(columns=self.feature_names_)
         self.shap_discrepancies = dict()
-        for target_name in tqdm(
-                self.feature_names_,
-                **tqdm_params("Computing Shap discrepancies", self.prog_bar,
-                              silent=self.silent)):
+        X_original = X.copy() if self.correlation_th else None
+        for target_name in self.feature_names_:
+            # Check if we must remove correlated features
+            if self.correlation_th is not None:
+                X = X_original.copy()
+                if len(self.correlated_features[target_name]) > 0:
+                    X = X.drop(self.correlated_features[target_name], axis=1)
+                    print(
+                        f"REMOVED CORRELATED FEATURES ({target_name}): "
+                        f"{self.correlated_features[target_name]}")
 
             X_features = X.drop(target_name, axis=1)
             y = X[target_name].values
 
             feature_names = [
-                f for f in self.feature_names_ if f != target_name]
+                f for f in self.feature_names_ if (f != target_name) & (f not in self.correlated_features[target_name])]
 
             self.discrepancies.loc[target_name] = 0
             self.shap_discrepancies[target_name] = dict()
@@ -768,7 +787,26 @@ class ShapEstimator(BaseEstimator):
             _remove_ticks_and_box(ax[ax_idx])
 
 
-if __name__ == "__main__":
+def custom_main():
+    path = "/Users/renero/phd/data/RC3/"
+    output_path = "/Users/renero/phd/output/RC3/"
+    experiment_name = 'custom_rex'
+
+    ref_graph = utils.graph_from_dot_file(f"{path}{experiment_name}.dot")
+    data = pd.read_csv(f"{path}{experiment_name}.csv")
+    scaler = StandardScaler()
+    data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)
+    # Split the dataframe into train and test
+    train = data.sample(frac=0.9, random_state=42)
+    test = data.drop(train.index)
+    rex = utils.load_experiment(f"{experiment_name}", output_path)
+    rex.is_fitted_ = True
+    print(f"Loaded experiment {experiment_name}")
+
+    rex.shaps.predict(test)
+
+
+def main():
     np.set_printoptions(precision=4, linewidth=150)
     warnings.filterwarnings('ignore')
 
@@ -784,3 +822,7 @@ if __name__ == "__main__":
                               explainer=shap.KernelExplainer)
     rex.shaps.fit(data)
     rex.shaps.predict(data)
+
+
+if __name__ == "__main__":
+    custom_main()

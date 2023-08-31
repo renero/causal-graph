@@ -251,6 +251,9 @@ class PermutationImportance(BaseEstimator):
                 self.pi[target]['importances_std'], correlated_feature_position, 0.)
 
     def fit_predict(self, X, y=None):
+        if self.correlation_th is not None:
+            self.corr = X.corr(method='spearman')
+
         first_key = self.feature_names_[0]
         if isinstance(self.regressors[first_key], MLPModel):
             return self._fit_predict_pytorch()

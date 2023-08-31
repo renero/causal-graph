@@ -154,26 +154,28 @@ class NNRegressor(BaseEstimator):
         if self.correlation_th:
             corr = X.corr(method='spearman')
             X_original = X.copy()
+            self.correlated_features = {}
 
         pbar_in = tqdm(
             total=len(self.feature_names),
             **tqdm_params(self._fit_desc, self.prog_bar, silent=self.silent))
 
-        for target in self.feature_names:
+        for target_name in self.feature_names:
             pbar_in.refresh()
 
             # if correlation_th is not None then, remove features that are highly
             # correlated with the target, at each step of the loop
             if self.correlation_th is not None:
-                corr_features = list(corr[(corr[target] > self.correlation_th)
-                                          & (corr[target] < 1.0)].index)
+                corr_features = list(corr[(corr[target_name] > self.correlation_th)
+                                          & (corr[target_name] < 1.0)].index)
                 X = X_original.copy()
                 if len(corr_features) > 0:
                     X = X.drop(corr_features, axis=1)
+                    self.correlated_features[target_name] = corr_features
                     print("REMOVED CORRELATED FEATURES: ", corr_features)
 
-            self.regressor[target] = MLPModel(
-                target=target,
+            self.regressor[target_name] = MLPModel(
+                target=target_name,
                 input_size=X.shape[1],
                 activation=self.activation,
                 hidden_dim=self.hidden_dim,
@@ -190,7 +192,7 @@ class NNRegressor(BaseEstimator):
                 patience=self.patience,
                 min_delta=self.min_delta,
                 prog_bar=self.prog_bar)
-            self.regressor[target].train()
+            self.regressor[target_name].train()
             pbar_in.update(1)
         pbar_in.close()
 
@@ -216,8 +218,15 @@ class NNRegressor(BaseEstimator):
         # X = check_array(X, accept_sparse=True)
         check_is_fitted(self, 'is_fitted_')
 
+        if self.correlation_th is not None:
+            X_original = X.copy()
+
         prediction = pd.DataFrame(columns=self.feature_names)
         for target in self.feature_names:
+            # Remove those features from the loader that are highly correlated to target
+            if self.correlation_th is not None:
+                X = X_original.drop(self.correlated_features[target], axis=1)
+
             # Creat a data loader for the target variable. The ColumnsDataset will
             # return the target variable as the second element of the tuple, and
             # will drop the target from the features.
@@ -225,6 +234,8 @@ class NNRegressor(BaseEstimator):
                 ColumnsDataset(target, X), batch_size=self.batch_size,
                 shuffle=False)
             model = self.regressor[target].model
+
+            # Obtain the predictions for the target variable
             preds = []
             for (tensor_X, _) in loader:
                 tensor_X = tensor_X.to(self.device)
@@ -520,6 +531,26 @@ class NNRegressor(BaseEstimator):
 # Main function
 #
 
+def custom_main():
+    from causalgraph.common import utils
+    path = "/Users/renero/phd/data/RC3/"
+    output_path = "/Users/renero/phd/output/RC3/"
+    experiment_name = 'custom_rex'
+
+    ref_graph = utils.graph_from_dot_file(f"{path}{experiment_name}.dot")
+    data = pd.read_csv(f"{path}{experiment_name}.csv")
+    scaler = StandardScaler()
+    data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)
+    # Split the dataframe into train and test
+    train = data.sample(frac=0.9, random_state=42)
+    test = data.drop(train.index)
+
+    rex = utils.load_experiment(f"{experiment_name}", output_path)
+    rex.is_fitted_ = True
+    print(f"Loaded experiment {experiment_name}")
+
+    rex.models.score(test)
+
 
 def main(tune: bool = False):
     warnings.filterwarnings("ignore", category=UserWarning)
@@ -538,4 +569,4 @@ def main(tune: bool = False):
 
 
 if __name__ == "__main__":
-    main(tune=True)
+    custom_main()
