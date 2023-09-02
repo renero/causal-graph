@@ -17,6 +17,7 @@ from tqdm.auto import tqdm
 from causalgraph.common import GRAY, GREEN, RESET, tqdm_params
 from causalgraph.models._columnar import ColumnsDataset
 from causalgraph.models._models import MLPModel
+from causalgraph.explainability.hierarchies import Hierarchies
 
 
 warnings.filterwarnings("ignore")
@@ -153,9 +154,11 @@ class NNRegressor(BaseEstimator):
         self.regressor = dict()
 
         if self.correlation_th:
-            corr = X.corr(method='spearman')
+            self.corr_matrix = Hierarchies.compute_correlation_matrix(X)
+            self.correlated_features = Hierarchies.compute_correlated_features(
+                self.corr_matrix, self.correlation_th, self.feature_names,
+                verbose=self.verbose)
             X_original = X.copy()
-            self.correlated_features = defaultdict(list)
 
         pbar_in = tqdm(
             total=len(self.feature_names),
@@ -167,14 +170,12 @@ class NNRegressor(BaseEstimator):
             # if correlation_th is not None then, remove features that are highly
             # correlated with the target, at each step of the loop
             if self.correlation_th is not None:
-                corr_features = list(corr[(corr[target_name] > self.correlation_th)
-                                          & (corr[target_name] < 1.0)].index)
                 X = X_original.copy()
-                if len(corr_features) > 0:
-                    X = X.drop(corr_features, axis=1)
-                    self.correlated_features[target_name] = corr_features
+                if len(self.correlated_features[target_name]) > 0:
+                    X = X.drop(self.correlated_features[target_name], axis=1)
                     if self.verbose:
-                        print("REMOVED CORRELATED FEATURES: ", corr_features)
+                        print("REMOVED CORRELATED FEATURES: ",
+                              self.correlated_features[target_name])
 
             self.regressor[target_name] = MLPModel(
                 target=target_name,

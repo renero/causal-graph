@@ -32,7 +32,8 @@ from causalgraph.common import utils
 from causalgraph.common.utils import graph_from_dot_file, load_experiment
 from causalgraph.independence.edge_orientation import get_edge_orientation
 from causalgraph.independence.feature_selection import select_features
-from causalgraph.models.dnn import NNRegressor
+from causalgraph.explainability.hierarchies import Hierarchies
+
 
 AnyGraph = Union[nx.DiGraph, nx.Graph]
 K = 180.0 / math.pi
@@ -152,10 +153,12 @@ class ShapEstimator(BaseEstimator):
         # Make a copy of the data if correlation threshold is set, since I will have
         # to drop some features at each iteration.
         if self.correlation_th:
-            self.corr = X.corr(method='spearman')
+            self.corr_matrix = Hierarchies.compute_correlation_matrix(X)
+            self.correlated_features = Hierarchies.compute_correlated_features(
+                self.corr_matrix, self.correlation_th, self.feature_names_, 
+                verbose=self.verbose)
             X_train_original = self.X_train.copy()
             X_test_original = self.X_test.copy()
-            self.correlated_features = defaultdict(list)
 
         for target_name in self.feature_names_:
             pbar.refresh()
@@ -163,16 +166,13 @@ class ShapEstimator(BaseEstimator):
             # if correlation_th is not None then, remove features that are highly
             # correlated with the target, at each step of the loop
             if self.correlation_th is not None:
-                corr_features = list(self.corr[(self.corr[target_name] > self.correlation_th)
-                                               & (self.corr[target_name] < 1.0)].index)
                 self.X_train = X_train_original.copy()
                 self.X_test = X_test_original.copy()
-                if len(corr_features) > 0:
-                    self.X_train = self.X_train.drop(corr_features, axis=1)
-                    self.X_test = self.X_test.drop(corr_features, axis=1)
-                    self.correlated_features[target_name] = corr_features
+                if len(self.correlated_features[target_name]) > 0:
+                    self.X_train = self.X_train.drop(self.correlated_features[target_name], axis=1)
+                    self.X_test = self.X_test.drop(self.correlated_features[target_name], axis=1)
                     if self.verbose:
-                        print("REMOVED CORRELATED FEATURES: ", corr_features)
+                        print("REMOVED CORRELATED FEATURES: ", self.correlated_features[target_name])
 
             # Get the model and the data (tensor form)
             if hasattr(self.models.regressor[target_name], "model"):
@@ -189,23 +189,7 @@ class ShapEstimator(BaseEstimator):
                     f"Reduced X_test to {X_test.shape[0]} samples") if self.verbose else None
 
             # Run the selected SHAP explainer
-            if self.explainer == shap.KernelExplainer:
-                self.shap_explainer[target_name] = self.explainer(
-                    model.predict, X_train)
-                self.shap_values[target_name] = self.shap_explainer[target_name].\
-                    shap_values(X_test)[0]
-            elif self.explainer == shap.GradientExplainer:
-                X_train_tensor = torch.from_numpy(X_train).float()
-                X_test_tensor = torch.from_numpy(X_test).float()
-                self.shap_explainer[target_name] = self.explainer(
-                    model.to(self.device), X_train_tensor.to(self.device))
-                self.shap_values[target_name] = self.shap_explainer[target_name](
-                    X_test_tensor.to(self.device)).values
-            else:
-                self.shap_explainer[target_name] = self.explainer(
-                    model.predict, X_train)
-                explanation = self.shap_explainer[target_name](X_test)
-                self.shap_values[target_name] = explanation.values
+            self._run_selected_shap_explainer(target_name, model, X_train, X_test)
 
             # Scale the SHAP values
             scaler = StandardScaler()
@@ -222,7 +206,7 @@ class ShapEstimator(BaseEstimator):
 
             # Add zeroes to positions of correlated features
             if self.correlation_th is not None:
-                self._add_zeroes(target_name, corr_features)
+                self._add_zeroes(target_name, self.correlated_features[target_name])
 
             pbar.update(1)
 
@@ -234,11 +218,50 @@ class ShapEstimator(BaseEstimator):
             self.all_mean_shap_values, self.mean_shap_percentile)
 
         # Leave X_train and X_test as they originally were
-        self.X_train = X_train_original
-        self.X_test = X_test_original
+        if self.correlation_th is not None:
+            self.X_train = X_train_original
+            self.X_test = X_test_original
 
         self.is_fitted_ = True
         return self
+
+    def _run_selected_shap_explainer(self, target_name, model, X_train, X_test):
+        """
+        Run the selected SHAP explainer, according to the given parameters.
+        
+        Parameters
+        ----------
+        target_name : str
+            The name of the target feature.
+        model : torch.nn.Module
+            The model for the given target.
+        X_train : PyTorch.Tensor object
+            The training data.
+        X_test : PyTorch.Tensor object
+            The testing data.
+            
+        Returns
+        -------
+        shap.Explainer
+            The SHAP explainer.
+        """
+        if self.explainer == shap.KernelExplainer:
+            self.shap_explainer[target_name] = self.explainer(
+                    model.predict, X_train)
+            self.shap_values[target_name] = self.shap_explainer[target_name].\
+                    shap_values(X_test)[0]
+        elif self.explainer == shap.GradientExplainer:
+            X_train_tensor = torch.from_numpy(X_train).float()
+            X_test_tensor = torch.from_numpy(X_test).float()
+            self.shap_explainer[target_name] = self.explainer(
+                    model.to(self.device), X_train_tensor.to(self.device))
+            self.shap_values[target_name] = self.shap_explainer[target_name](
+                    X_test_tensor.to(self.device)).values
+        else:
+            self.shap_explainer[target_name] = self.explainer(
+                    model.predict, X_train)
+            explanation = self.shap_explainer[target_name](X_test)
+            self.shap_values[target_name] = explanation.values
 
     def _add_zeroes(self, target, correlated_features):
         features = [f for f in self.feature_names_ if f != target]
@@ -385,7 +408,7 @@ class ShapEstimator(BaseEstimator):
         """
         check_is_fitted(self, 'is_fitted_')
         self.discrepancies = pd.DataFrame(columns=self.feature_names_)
-        self.shap_discrepancies = dict()
+        self.shap_discrepancies = defaultdict(dict)
         X_original = X.copy() if self.correlation_th else None
         for target_name in self.feature_names_:
             # Check if we must remove correlated features
@@ -402,10 +425,11 @@ class ShapEstimator(BaseEstimator):
             y = X[target_name].values
 
             feature_names = [
-                f for f in self.feature_names_ if (f != target_name) & (f not in self.correlated_features[target_name])]
+                f for f in self.feature_names_ if (f != target_name) & \
+                    (f not in self.correlated_features[target_name])]
 
             self.discrepancies.loc[target_name] = 0
-            self.shap_discrepancies[target_name] = dict()
+            self.shap_discrepancies[target_name] = defaultdict(ShapDiscrepancy)
 
             # Loop through all features and compute the discrepancy
             for parent_name in feature_names:

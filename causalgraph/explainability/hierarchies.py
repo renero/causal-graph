@@ -71,38 +71,52 @@ class Hierarchies:
         """
         # copy X into self.data
         self.data = X.copy()
-        if self.method in ['spearman', 'pearson', 'kendall']:
-            self.correlations = self.data.corr(method=self.method)
-        elif self.method == 'mic':
-            self.correlations = pairwise_mic(
-                self.data, alpha=alpha, c=c, progbar=self.prog_bar)
-        else:
-            raise ValueError(
-                f"Unknown correlation method: {self.method}. \
-                    Use 'spearman', 'pearson', 'kendall' or 'mic'.")
-
         self.feature_names_ = list(self.data.columns)
-
+        
         # Set the list of correlated features for each target
-        if self.correlation_th:
-            self.correlated_features = defaultdict(list)
-            for target_name in self.feature_names_:
-                corr_features = list(
-                    self.correlations[(self.correlations[target_name] > self.correlation_th)
-                                      & (self.correlations[target_name] < 1.0)].index)
-                if len(corr_features) > 0:
-                    self.correlated_features[target_name] = corr_features
-                    if self.verbose_:
-                        print(
-                            f"CORRELATED FEATS for {target_name}: {corr_features}")
+        self.correlations = self.compute_correlation_matrix(
+            self.data, method=self.method, prog_bar=self.prog_bar)
+        self.correlated_features = self.compute_correlated_features(
+            self.correlations, self.correlation_th, self.feature_names_)
 
+        # Compute the dissimilarity matrix
         self.dissimilarity = 1 - np.abs(self.correlations)
         close_to_zero = self.dissimilarity < 1.0e-6
         self.dissimilarity[close_to_zero] = 0.0
         self.linkage_mat = linkage(squareform(
             self.dissimilarity), self.linkage_method)
 
-        return self  # self.correlations, self.linkage_mat
+        return self 
+
+    @staticmethod
+    def compute_correlation_matrix(data: pd.DataFrame, method='spearman', prog_bar=False):
+        if method in ['spearman', 'pearson', 'kendall']:
+            correlations = data.corr(method=method)
+        elif method == 'mic':
+            correlations = pairwise_mic(
+                data, alpha=alpha, c=c, progbar=prog_bar)
+        else:
+            raise ValueError(
+                f"Unknown correlation method: {method}. \
+                    Use 'spearman', 'pearson', 'kendall' or 'mic'.")
+            
+        return correlations
+
+    @staticmethod
+    def compute_correlated_features(correlations, correlation_th, feature_names, verbose=False):
+        correlated_features = defaultdict(list)
+        if correlation_th:
+            for target_name in feature_names:
+                corr_features = list(
+                    correlations[(correlations[target_name] > correlation_th)
+                                      & (correlations[target_name] < 1.0)].index)
+                if len(corr_features) > 0:
+                    correlated_features[target_name] = corr_features
+                    if verbose:
+                        print(
+                            f"CORRELATED FEATS for {target_name}: {corr_features}")
+
+        return correlated_features
 
     def expand_clusters_perm_importance(self, pi, ground_truth=None):
         """

@@ -209,11 +209,11 @@ class Rex(BaseEstimator, ClassifierMixin):
                             silent=self.silent)
         steps = [
             ('hierarchies', Hierarchies),
-            'hierarchies.fit',
+            ('hierarchies.fit'),
             ('models', self.model_type),
-            fit_step,
+            (fit_step),
             ('shaps', ShapEstimator, {'models': 'models'}),
-            'shaps.fit',
+            ('shaps.fit'),
             ('pi', PermutationImportance, {'models': 'models'}),
             ('pi.fit_predict', {'X': self.X}),
         ]
@@ -498,47 +498,7 @@ class Rex(BaseEstimator, ClassifierMixin):
         return subplots(self.shaps._plot_shap_summary, *plot_args, **kwargs)
 
 
-def main():
-    load = False
-    save = False
-    input_path = "/Users/renero/phd/data/RC3/"
-    output_path = input_path.replace('data', 'output')
-    dataset_name = 'rex_generated_polynomial_1'
-
-    data = pd.read_csv(f"{input_path}{dataset_name}.csv")
-    ref_graph = graph_from_dot_file(f"{input_path}{dataset_name}.dot")
-
-    if load:
-        rex = load_experiment('rex', output_path)
-    else:
-        rex = Rex(
-            explainer=shap.Explainer, num_epochs=100, hidden_dim=[10],
-            early_stop=False, learning_rate=0.002, batch_size=64, dropout=0.05)
-        rex.fit(data, ref_graph)
-
-    rex.prog_bar = True
-    rex.verbose = False
-    pred_graph = rex.predict(data)
-
-    metric = evaluate_graph(ref_graph, pred_graph,
-                            rex.shaps.all_feature_names_)
-    print(metric)
-
-    rex.plot_shap_discrepancies('V6')
-
-    # Plot the SHAP values for each regression
-    plot_args = [(target_name) for target_name in rex.shaps.all_feature_names_]
-    subplots(rex.shaps._plot_shap_summary, *plot_args, dpi=75)
-
-    # Plot the predicted graph
-    rex.plot_dags(pred_graph, ref_graph)
-
-    if save:
-        save_experiment('rex', "/Users/renero/phd/output/REX", rex)
-
-
-def main2(path="/Users/renero/phd/data/RC3/",
-          dataset_name='rex_generated_gp_add_3'):
+def main2(dataset_name, path="/Users/renero/phd/data/RC3/"):
 
     ref_graph = graph_from_dot_file(f"{path}{dataset_name}.dot")
     data = pd.read_csv(f"{path}{dataset_name}.csv")
@@ -550,14 +510,11 @@ def main2(path="/Users/renero/phd/data/RC3/",
     # rex = Rex(model_type=GBTRegressor, explainer=shap.Explainer)
     rex = Rex(
         model_type=NNRegressor, explainer=shap.GradientExplainer,
-        correlation_th=0.3, prog_bar=False, verbose=True,
-        # hidden_dim=[81], activation='relu', learning_rate=0.01275,
-        # dropout=0.218724, batch_size=51, num_epochs=80,
-        # tune_model=False, hpo_n_trials=1, hpo_study_name=dataset_name
+        correlation_th=0.9, prog_bar=False, verbose=True
     )
     rex.fit_predict(train, test, ref_graph)
     print(rex.score(ref_graph, 'shap'))
 
 
 if __name__ == "__main__":
-    main2()
+    main2('rex_generated_polynew_1')

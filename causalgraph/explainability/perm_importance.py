@@ -12,6 +12,7 @@ from tqdm.auto import tqdm
 from causalgraph.common import tqdm_params, utils
 from causalgraph.common.plots import subplots
 from causalgraph.models._models import MLPModel
+from causalgraph.explainability.hierarchies import Hierarchies
 
 
 class PermutationImportance(BaseEstimator):
@@ -76,14 +77,20 @@ class PermutationImportance(BaseEstimator):
         for each feature. If the model is a SKLearn model, the fit method will
         compute the permutation importance for each feature.
         """
-        if self.correlation_th is not None:
-            self.corr = X.corr(method='spearman')
+        self._obtain_correlation_info(X)
 
         first_key = self.feature_names_[0]
         if isinstance(self.regressors[first_key], MLPModel):
             return self._fit_pytorch()
         else:
             return self._fit_sklearn(X)
+
+    def _obtain_correlation_info(self, X):
+        if self.correlation_th:
+            self.corr_matrix = Hierarchies.compute_correlation_matrix(X)
+            self.correlated_features = Hierarchies.compute_correlated_features(
+                self.corr_matrix, self.correlation_th, self.feature_names_,
+                verbose=self.verbose)
 
     def _fit_pytorch(self):
         """
@@ -187,8 +194,8 @@ class PermutationImportance(BaseEstimator):
 
             if self.correlation_th is not None:
                 corr_features = list(
-                    self.corr[(self.corr[target] > self.correlation_th)
-                              & (self.corr[target] < 1.0)].index)
+                    self.corr_matrix[(self.corr_matrix[target] > self.correlation_th)
+                                     & (self.corr_matrix[target] < 1.0)].index)
                 num_vars = len(self.feature_names_) - len(corr_features)
 
             # Compute the permutation importance for each feature
@@ -251,8 +258,7 @@ class PermutationImportance(BaseEstimator):
                 self.pi[target]['importances_std'], correlated_feature_position, 0.)
 
     def fit_predict(self, X, y=None):
-        if self.correlation_th is not None:
-            self.corr = X.corr(method='spearman')
+        self._obtain_correlation_info(X)
 
         first_key = self.feature_names_[0]
         if isinstance(self.regressors[first_key], MLPModel):
