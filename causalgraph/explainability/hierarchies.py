@@ -351,7 +351,7 @@ class Hierarchies:
         cm.set_under(color='white')
         return cm
 
-    def plot(self, threshold=0.1, **kwargs):
+    def plot(self, threshold=0.5, **kwargs):
         """
         Plot the hierarchical clustering and correlation matrix of the data.
 

@@ -65,6 +65,7 @@ class Rex(BaseEstimator, ClassifierMixin):
             model_type: BaseEstimator = NNRegressor,
             explainer=shap.Explainer,
             tune_model: bool = False,
+            corr_th: float = None,
             corr_method: str = 'spearman',
             corr_alpha: float = 0.6,
             corr_clusters: int = 15,
@@ -126,6 +127,7 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.model_type = model_type
         self.explainer = explainer
         self.tune_model = tune_model
+        self.correlation_th = corr_th
         self.corr_method = corr_method
         self.corr_alpha = corr_alpha
         self.corr_clusters = corr_clusters

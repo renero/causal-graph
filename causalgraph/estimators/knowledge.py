@@ -43,6 +43,7 @@ class Knowledge:
         self.feature_names = rex.feature_names
         self.scoring = rex.models.scoring
         self.ref_graph = ref_graph
+        
         self.correlation_th = rex.correlation_th
         if self.correlation_th is not None:
             self.correlated_features = self.hierarchies.correlated_features
@@ -75,8 +76,11 @@ class Knowledge:
 
                 # all_targets = [o for o in self.feature_names if o != feature]
                 # target_pos = all_targets.index(target)
-                all_features = [f for f in self.feature_names if (
-                    f != target) and (f not in self.correlated_features[target])]
+                if self.correlation_th is not None:
+                    all_features = [f for f in self.feature_names if (
+                        f != target) and (f not in self.correlated_features[target])]
+                else:
+                    all_features = [f for f in self.feature_names if f != target]
                 feature_pos = all_features.index(feature)
 
                 sd = self.shaps.shap_discrepancies[target][feature]
