@@ -34,19 +34,19 @@ def get_edge_orientation(data, x, y, iters=20, method='gpr', verbose=False):
     r2 = Hsic().test(res_x, data[y].values, reps=iters).pvalue
     if r1 > r2:
         if verbose:
-            print(f"{x:>3s}-->{y:<3s}", end="")
+            print(f" {x:>3s}-->{y:<3s}", end="")
             print(
                 f"  [p({x:>3s}->{y:<3s}): {r1:8.6f}; p({y:>3s}->{x:<3s}): {r2:8.6f}]")
         return +1
     elif r1 < r2:
         if verbose:
-            print(f"{x:>3s}<--{y:<3s}", end="")
+            print(f" {x:>3s}<--{y:<3s}", end="")
             print(
                 f"  [p({x:>3s}->{y:<3s}): {r1:8.6f}; p({y:>3s}->{x:<3s}): {r2:8.6f}]")
         return -1
     else:
         if verbose:
-            print(f"{x:>3s}·-·{y:<3s}", end="")
+            print(f" {x:>3s}·-·{y:<3s}", end="")
             print(
                 f"  [p({x:>3s}->{y:<3s}): {r1:8.6f}; p({y:>3s}->{x:<3s}): {r2:8.6f}]")
         return 0

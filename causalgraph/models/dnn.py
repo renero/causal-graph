@@ -1,3 +1,4 @@
+from collections import defaultdict
 import types
 import warnings
 from typing import List, Union, Tuple
@@ -16,6 +17,7 @@ from tqdm.auto import tqdm
 from causalgraph.common import GRAY, GREEN, RESET, tqdm_params
 from causalgraph.models._columnar import ColumnsDataset
 from causalgraph.models._models import MLPModel
+from causalgraph.explainability.hierarchies import Hierarchies
 
 
 warnings.filterwarnings("ignore")
@@ -71,6 +73,7 @@ class NNRegressor(BaseEstimator):
             early_stop: bool = False,
             patience: int = 10,
             min_delta: float = 0.001,
+            correlation_th: float = None,
             random_state: int = 1234,
             verbose: bool = False,
             prog_bar: bool = True,
@@ -120,6 +123,7 @@ class NNRegressor(BaseEstimator):
         self.early_stop = early_stop
         self.patience = patience
         self.min_delta = min_delta
+        self.correlation_th = correlation_th
         self.random_state = random_state
         self.verbose = verbose
         self.prog_bar = prog_bar
@@ -149,15 +153,33 @@ class NNRegressor(BaseEstimator):
         self.feature_names = list(X.columns)
         self.regressor = dict()
 
+        if self.correlation_th:
+            self.corr_matrix = Hierarchies.compute_correlation_matrix(X)
+            self.correlated_features = Hierarchies.compute_correlated_features(
+                self.corr_matrix, self.correlation_th, self.feature_names,
+                verbose=self.verbose)
+            X_original = X.copy()
+
         pbar_in = tqdm(
             total=len(self.feature_names),
             **tqdm_params(self._fit_desc, self.prog_bar, silent=self.silent))
 
-        for target in self.feature_names:
+        for target_name in self.feature_names:
             pbar_in.refresh()
-            self.regressor[target] = MLPModel(
-                target=target,
-                input_size=self.n_features_in_,
+
+            # if correlation_th is not None then, remove features that are highly
+            # correlated with the target, at each step of the loop
+            if self.correlation_th is not None:
+                X = X_original.copy()
+                if len(self.correlated_features[target_name]) > 0:
+                    X = X.drop(self.correlated_features[target_name], axis=1)
+                    if self.verbose:
+                        print("REMOVED CORRELATED FEATURES: ",
+                              self.correlated_features[target_name])
+
+            self.regressor[target_name] = MLPModel(
+                target=target_name,
+                input_size=X.shape[1],
                 activation=self.activation,
                 hidden_dim=self.hidden_dim,
                 learning_rate=self.learning_rate,
@@ -173,7 +195,7 @@ class NNRegressor(BaseEstimator):
                 patience=self.patience,
                 min_delta=self.min_delta,
                 prog_bar=self.prog_bar)
-            self.regressor[target].train()
+            self.regressor[target_name].train()
             pbar_in.update(1)
         pbar_in.close()
 
@@ -199,8 +221,15 @@ class NNRegressor(BaseEstimator):
         # X = check_array(X, accept_sparse=True)
         check_is_fitted(self, 'is_fitted_')
 
+        if self.correlation_th is not None:
+            X_original = X.copy()
+
         prediction = pd.DataFrame(columns=self.feature_names)
         for target in self.feature_names:
+            # Remove those features from the loader that are highly correlated to target
+            if self.correlation_th is not None:
+                X = X_original.drop(self.correlated_features[target], axis=1)
+
             # Creat a data loader for the target variable. The ColumnsDataset will
             # return the target variable as the second element of the tuple, and
             # will drop the target from the features.
@@ -208,6 +237,8 @@ class NNRegressor(BaseEstimator):
                 ColumnsDataset(target, X), batch_size=self.batch_size,
                 shuffle=False)
             model = self.regressor[target].model
+
+            # Obtain the predictions for the target variable
             preds = []
             for (tensor_X, _) in loader:
                 tensor_X = tensor_X.to(self.device)
@@ -238,7 +269,9 @@ class NNRegressor(BaseEstimator):
             f"X has {X.shape[1]} features, expected {self.n_features_in_}"
         check_is_fitted(self, 'is_fitted_')
 
+        # Call the class method to predict the values for each target variable
         y_hat = self.predict(X)
+
         # Handle the case where the prediction returned by the model is not a numpy array
         # but a numpy object type
         if isinstance(y_hat, np.ndarray) and y_hat.dtype == np.object_:
@@ -503,6 +536,26 @@ class NNRegressor(BaseEstimator):
 # Main function
 #
 
+def custom_main():
+    from causalgraph.common import utils
+    path = "/Users/renero/phd/data/RC3/"
+    output_path = "/Users/renero/phd/output/RC3/"
+    experiment_name = 'custom_rex'
+
+    ref_graph = utils.graph_from_dot_file(f"{path}{experiment_name}.dot")
+    data = pd.read_csv(f"{path}{experiment_name}.csv")
+    scaler = StandardScaler()
+    data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)
+    # Split the dataframe into train and test
+    train = data.sample(frac=0.9, random_state=42)
+    test = data.drop(train.index)
+
+    rex = utils.load_experiment(f"{experiment_name}", output_path)
+    rex.is_fitted_ = True
+    print(f"Loaded experiment {experiment_name}")
+
+    rex.models.score(test)
+
 
 def main(tune: bool = False):
     warnings.filterwarnings("ignore", category=UserWarning)
@@ -521,4 +574,4 @@ def main(tune: bool = False):
 
 
 if __name__ == "__main__":
-    main(tune=True)
+    custom_main()

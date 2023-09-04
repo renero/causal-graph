@@ -19,16 +19,17 @@ GRAY = colorama.Fore.LIGHTBLACK_EX
 RESET = colorama.Style.RESET_ALL
 
 
-def select_features(values,
-                    feature_names,
-                    method='cluster',
-                    tolerance=None,
-                    sensitivity=1.0,
-                    return_shaps=False,
-                    descending=False,
-                    strict=True,
-                    min_impact: float=1e-06,
-                    verbose=False) -> List[str]:
+def select_features(
+        values,
+        feature_names,
+        method='cluster',
+        tolerance=None,
+        sensitivity=1.0,
+        return_shaps=False,
+        descending=False,
+        strict=True,
+        min_impact: float = 1e-06,
+        verbose=False) -> List[str]:
     """
     Sort the values and select those before (strict) the point of max. curvature,
     according to the Knee algorithm. If strict is False, the point of max curv. is also 
@@ -79,13 +80,11 @@ def select_features(values,
     if descending:
         sorted_impact_values = sorted_impact_values[::-1]
     if verbose:
-        print("Selecting features", )
         print("  Sum SHAP values....:", end="")
         print(','.join([f"({f}:{s:.03f})" for f, s in zip(
             feature_names, np.sum(np.abs(values), axis=0))]))
         print(
-            f"  Feature_order......: {','.join([f'{feature_names[i]}' for i in feature_order])}")
-        print(
+            f"  Feature_order......: {','.join([f'{feature_names[i]}' for i in feature_order])}\n"
             f"  sorted_mean_values.: {','.join([f'{x:.6f}' for x in sorted_impact_values])}")
 
     if method == 'knee':
@@ -119,12 +118,13 @@ def select_features(values,
             [feature_names[i] for i in feature_order[limit_idx:]]))
 
     if verbose:
-        print(f"  Limit_idx(cut-off)..: {limit_idx}")
-        print(f"  Selected_features...: {selected_features}")
+        print(f"  Limit_idx(cut-off).: {limit_idx}")
+        print(f"  Selected_features..: {selected_features}")
     if return_shaps:
         return selected_features, list(reversed(sorted(mean_shap_values)[limit_idx:]))
 
     return selected_features
+
 
 def abrupt_change(X: np.array, tolerance: float = 0.1, verbose=False) -> int:
     """
@@ -183,8 +183,8 @@ def cluster_change(X: List, verbose: bool = False):
     while n_clusters_ <= 1 and len(pairwise_distances) > 0:
         max_distance = pairwise_distances.max()
         if verbose:
-            print(f"  pairwise_distances: {pairwise_distances}")
-            print(f"  max_distance: {max_distance}")
+            print(f"  pairwise_distances.: {pairwise_distances}")
+            print(f"  max_distance.......: {max_distance:.4f}")
 
         db = DBSCAN(eps=max_distance, min_samples=1).fit(X)
         labels = db.labels_
@@ -193,19 +193,54 @@ def cluster_change(X: List, verbose: bool = False):
         n_noise_ = list(labels).count(-1)
         if n_clusters_ <= 1:
             if verbose:
-                print("  ** Only 1 cluster generated. Increasing min_distance **")
+                print("  +-> Only 1 cluster generated. Increasing min_distance.")
             pairwise_distances = pairwise_distances[1:]
 
     if pairwise_distances.size == 0:
         print("** No clusters generated") if verbose else None
         return None
-    
+
     if verbose:
-        print(f"  Estimated number of clusters: {n_clusters_}")
-        print(f"  Estimated number of noise points: {n_noise_}")
-        print(f"  Silhouette Coefficient: {metrics.silhouette_score(X, labels):.3f}")
-        print(f"  > Labels: {labels}")
+        print(f"  Est.clusters/noise.: {n_clusters_}/{n_noise_}")
+        if (len(labels) > 3) and (len(labels) < (X.shape[0]-1)):
+            print(
+                f"  Silhouette Coeff...: {metrics.silhouette_score(X, labels):.3f}\n"
+                f"  +-> Labels: {labels}")
 
     winner_label = n_clusters_ - 1
     samples_in_winner_cluster = np.argwhere(X[labels != winner_label])
     return samples_in_winner_cluster[:, 0][-1]+1
+
+
+if __name__ == "__main__":
+    import numpy as np
+    import pandas as pd
+    from causalgraph.common.utils import graph_from_dot_file, load_experiment
+    from sklearn.preprocessing import StandardScaler
+
+    # Display Options
+    np.set_printoptions(precision=4, linewidth=100)
+    pd.set_option('display.precision', 4)
+    pd.set_option('display.float_format', '{:.4f}'.format)
+
+    # Paths
+    path = "/Users/renero/phd/data/RC3/"
+    output_path = "/Users/renero/phd/output/RC3/"
+    # experiment_name = 'rex_generated_linear_1'
+    experiment_name = 'custom_rex'
+
+    # Read the data
+    ref_graph = graph_from_dot_file(f"{path}{experiment_name}.dot")
+    data = pd.read_csv(f"{path}{experiment_name}.csv")
+    scaler = StandardScaler()
+    data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)
+
+    # Split the dataframe into train and test
+    train = data.sample(frac=0.9, random_state=42)
+    test = data.drop(train.index)
+
+    custom = load_experiment(f"{experiment_name}", output_path)
+    custom.is_fitted_ = True
+    print(f"Loaded experiment {experiment_name}")
+
+    custom.G_shap = custom.shaps.predict(test)

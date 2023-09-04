@@ -1,6 +1,7 @@
 """
 This is a module to be used as a reference for building other modules
 """
+from collections import defaultdict
 import math
 import types
 import warnings
@@ -31,7 +32,8 @@ from causalgraph.common import utils
 from causalgraph.common.utils import graph_from_dot_file, load_experiment
 from causalgraph.independence.edge_orientation import get_edge_orientation
 from causalgraph.independence.feature_selection import select_features
-from causalgraph.models.dnn import NNRegressor
+from causalgraph.explainability.hierarchies import Hierarchies
+
 
 AnyGraph = Union[nx.DiGraph, nx.Graph]
 K = 180.0 / math.pi
@@ -63,6 +65,7 @@ class ShapEstimator(BaseEstimator):
             self,
             explainer=shap.Explainer,
             models: BaseEstimator = None,
+            correlation_th: float = None,
             method: str = 'cluster',
             sensitivity: float = 1.0,
             mean_shap_percentile: float = 0.8,
@@ -79,6 +82,7 @@ class ShapEstimator(BaseEstimator):
         """
         self.explainer = explainer
         self.models = models
+        self.correlation_th = correlation_th
         self.method = method
         self.sensitivity = sensitivity
         self.mean_shap_percentile = mean_shap_percentile
@@ -132,7 +136,7 @@ class ShapEstimator(BaseEstimator):
         """
         # X, y = check_X_y(X, y, accept_sparse=True)
 
-        self.feature_names_ = list(self.models.regressor.keys())
+        self.feature_names = list(self.models.regressor.keys())
         self.shap_explainer = dict()
         self.shap_values = dict()
         self.shap_scaled_values = dict()
@@ -140,14 +144,35 @@ class ShapEstimator(BaseEstimator):
         self.feature_order = dict()
         self.all_mean_shap_values = []
 
-        pbar = tqdm(total=len(self.feature_names_),
+        pbar = tqdm(total=len(self.feature_names),
                     **tqdm_params(self._fit_desc, self.prog_bar, silent=self.silent))
 
         self.X_train, self.X_test = train_test_split(
             X, test_size=0.2, random_state=42)
 
-        for target_name in self.feature_names_:
+        # Make a copy of the data if correlation threshold is set, since I will have
+        # to drop some features at each iteration.
+        if self.correlation_th:
+            self.corr_matrix = Hierarchies.compute_correlation_matrix(X)
+            self.correlated_features = Hierarchies.compute_correlated_features(
+                self.corr_matrix, self.correlation_th, self.feature_names, 
+                verbose=self.verbose)
+            X_train_original = self.X_train.copy()
+            X_test_original = self.X_test.copy()
+
+        for target_name in self.feature_names:
             pbar.refresh()
+
+            # if correlation_th is not None then, remove features that are highly
+            # correlated with the target, at each step of the loop
+            if self.correlation_th is not None:
+                self.X_train = X_train_original.copy()
+                self.X_test = X_test_original.copy()
+                if len(self.correlated_features[target_name]) > 0:
+                    self.X_train = self.X_train.drop(self.correlated_features[target_name], axis=1)
+                    self.X_test = self.X_test.drop(self.correlated_features[target_name], axis=1)
+                    if self.verbose:
+                        print("REMOVED CORRELATED FEATURES: ", self.correlated_features[target_name])
 
             # Get the model and the data (tensor form)
             if hasattr(self.models.regressor[target_name], "model"):
@@ -164,23 +189,7 @@ class ShapEstimator(BaseEstimator):
                     f"Reduced X_test to {X_test.shape[0]} samples") if self.verbose else None
 
             # Run the selected SHAP explainer
-            if self.explainer == shap.KernelExplainer:
-                self.shap_explainer[target_name] = self.explainer(
-                    model.predict, X_train)
-                self.shap_values[target_name] = self.shap_explainer[target_name].\
-                    shap_values(X_test)[0]
-            elif self.explainer == shap.GradientExplainer:
-                X_train_tensor = torch.from_numpy(X_train).float()
-                X_test_tensor = torch.from_numpy(X_test).float()
-                self.shap_explainer[target_name] = self.explainer(
-                    model.to(self.device), X_train_tensor.to(self.device))
-                self.shap_values[target_name] = self.shap_explainer[target_name](
-                    X_test_tensor.to(self.device)).values
-            else:
-                self.shap_explainer[target_name] = self.explainer(
-                    model.predict, X_train)
-                explanation = self.shap_explainer[target_name](X_test)
-                self.shap_values[target_name] = explanation.values
+            self._run_selected_shap_explainer(target_name, model, X_train, X_test)
 
             # Scale the SHAP values
             scaler = StandardScaler()
@@ -195,6 +204,10 @@ class ShapEstimator(BaseEstimator):
             self.all_mean_shap_values.append(
                 self.shap_mean_values[target_name])
 
+            # Add zeroes to positions of correlated features
+            if self.correlation_th is not None:
+                self._add_zeroes(target_name, self.correlated_features[target_name])
+
             pbar.update(1)
 
         pbar.close()
@@ -204,8 +217,58 @@ class ShapEstimator(BaseEstimator):
         self.mean_shap_threshold = np.quantile(
             self.all_mean_shap_values, self.mean_shap_percentile)
 
+        # Leave X_train and X_test as they originally were
+        if self.correlation_th is not None:
+            self.X_train = X_train_original
+            self.X_test = X_test_original
+
         self.is_fitted_ = True
         return self
+
+    def _run_selected_shap_explainer(self, target_name, model, X_train, X_test):
+        """
+        Run the selected SHAP explainer, according to the given parameters.
+        
+        Parameters
+        ----------
+        target_name : str
+            The name of the target feature.
+        model : torch.nn.Module
+            The model for the given target.
+        X_train : PyTorch.Tensor object
+            The training data.
+        X_test : PyTorch.Tensor object
+            The testing data.
+            
+        Returns
+        -------
+        shap.Explainer
+            The SHAP explainer.
+        """
+        if self.explainer == shap.KernelExplainer:
+            self.shap_explainer[target_name] = self.explainer(
+                    model.predict, X_train)
+            self.shap_values[target_name] = self.shap_explainer[target_name].\
+                    shap_values(X_test)[0]
+        elif self.explainer == shap.GradientExplainer:
+            X_train_tensor = torch.from_numpy(X_train).float()
+            X_test_tensor = torch.from_numpy(X_test).float()
+            self.shap_explainer[target_name] = self.explainer(
+                    model.to(self.device), X_train_tensor.to(self.device))
+            self.shap_values[target_name] = self.shap_explainer[target_name](
+                    X_test_tensor.to(self.device)).values
+        else:
+            self.shap_explainer[target_name] = self.explainer(
+                    model.predict, X_train)
+            explanation = self.shap_explainer[target_name](X_test)
+            self.shap_values[target_name] = explanation.values
+
+    def _add_zeroes(self, target, correlated_features):
+        features = [f for f in self.feature_names if f != target]
+        for correlated_feature in correlated_features:
+            correlated_feature_position = features.index(correlated_feature)
+            self.all_mean_shap_values[-1] = np.insert(
+                self.all_mean_shap_values[-1], correlated_feature_position, 0.)
 
     def _extract_data(self, X, target_name):
         """
@@ -259,9 +322,17 @@ class ShapEstimator(BaseEstimator):
         pbar.refresh()
 
         self.parents = dict()
-        for target in self.feature_names_:
+        for target in self.feature_names:
             candidate_causes = [
-                f for f in self.feature_names_ if f != target]
+                f for f in self.feature_names if f != target]
+
+            # Filter out features that are highly correlated with the target
+            if self.correlation_th is not None:
+                candidate_causes = [
+                    f for f in candidate_causes if f not in self.correlated_features[target]]
+
+            print(
+                f"Selecting features for target {target}...") if self.verbose else None
             self.parents[target] = select_features(
                 values=self.shap_values[target],
                 feature_names=candidate_causes,
@@ -275,7 +346,7 @@ class ShapEstimator(BaseEstimator):
         pbar.refresh()
 
         G_shap_unoriented = nx.Graph()
-        for target in self.feature_names_:
+        for target in self.feature_names:
             for parent in self.parents[target]:
                 # Add edges ONLY between nodes where SHAP recognizes both directions
                 if self.reciprocity:
@@ -287,6 +358,8 @@ class ShapEstimator(BaseEstimator):
         pbar.update(1)
         pbar.refresh()
 
+        if self.verbose:
+            print("Determining edge directions...")
         G_shap = nx.DiGraph()
         for u, v in G_shap_unoriented.edges():
             pbar.update(1)
@@ -333,21 +406,34 @@ class ShapEstimator(BaseEstimator):
         pd.DataFrame
             A dataframe containing the discrepancies for all features and all targets.
         """
-        self.discrepancies = pd.DataFrame(columns=self.feature_names_)
-        self.shap_discrepancies = dict()
-        for target_name in tqdm(
-                self.feature_names_,
-                **tqdm_params("Computing Shap discrepancies", self.prog_bar,
-                              silent=self.silent)):
+        check_is_fitted(self, 'is_fitted_')
+        self.discrepancies = pd.DataFrame(columns=self.feature_names)
+        self.shap_discrepancies = defaultdict(dict)
+        X_original = X.copy() if self.correlation_th else None
+        for target_name in self.feature_names:
+            # Check if we must remove correlated features
+            if self.correlation_th is not None:
+                X = X_original.copy()
+                if len(self.correlated_features[target_name]) > 0:
+                    X = X.drop(self.correlated_features[target_name], axis=1)
+                    if self.verbose:
+                        print(
+                            f"REMOVED CORRELATED FEATURES ({target_name}): "
+                            f"{self.correlated_features[target_name]}")
 
             X_features = X.drop(target_name, axis=1)
             y = X[target_name].values
 
-            feature_names = [
-                f for f in self.feature_names_ if f != target_name]
+            if self.correlation_th is not None:
+                feature_names = [
+                    f for f in self.feature_names if (f != target_name) & \
+                        (f not in self.correlated_features[target_name])]
+            else:
+                feature_names = [
+                    f for f in self.feature_names if f != target_name]
 
             self.discrepancies.loc[target_name] = 0
-            self.shap_discrepancies[target_name] = dict()
+            self.shap_discrepancies[target_name] = defaultdict(ShapDiscrepancy)
 
             # Loop through all features and compute the discrepancy
             for parent_name in feature_names:
@@ -456,7 +542,7 @@ class ShapEstimator(BaseEstimator):
         else:
             increase_upper_tolerance = False
 
-        for target in self.feature_names_:
+        for target in self.feature_names:
             target_mean = np.mean(self.discrepancies.loc[target].values)
             # Experimental
             if increase_upper_tolerance:
@@ -465,7 +551,7 @@ class ShapEstimator(BaseEstimator):
                 tolerance = 0.0
 
             # Iterate over the features and check if the edge should be reversed.
-            for feature in self.feature_names_:
+            for feature in self.feature_names:
                 # If the edge is already reversed, skip it.
                 if (target, feature) in edges_reversed or \
                         feature == target or \
@@ -628,7 +714,12 @@ class ShapEstimator(BaseEstimator):
             fig, ax = plt.subplots(1, 1, figsize=figsize_)
 
         feature_inds = self.feature_order[target_name][:max_features_to_display]
-        feature_names = [f for f in self.feature_names_ if f != target_name]
+        if self.correlation_th is not None:
+            feature_names = [f for f in self.feature_names if (f != target_name) & (
+                f not in self.correlated_features[target_name])]
+        else:
+            feature_names = [
+                f for f in self.feature_names if f != target_name]
         selected_features = [parent for parent in self.parents[target_name]]
 
         y_pos = np.arange(len(feature_inds))
@@ -656,7 +747,7 @@ class ShapEstimator(BaseEstimator):
         mpl.rcParams['figure.dpi'] = kwargs.get('dpi', 75)
         figsize_ = kwargs.get('figsize', (10, 16))
         feature_names = [
-            f for f in self.feature_names_ if f != target_name]
+            f for f in self.feature_names if f != target_name]
         fig, ax = plt.subplots(len(feature_names), 4, figsize=figsize_)
 
         for i, parent_name in enumerate(feature_names):
@@ -734,7 +825,26 @@ class ShapEstimator(BaseEstimator):
             _remove_ticks_and_box(ax[ax_idx])
 
 
-if __name__ == "__main__":
+def custom_main():
+    path = "/Users/renero/phd/data/RC3/"
+    output_path = "/Users/renero/phd/output/RC3/"
+    experiment_name = 'custom_rex'
+
+    ref_graph = utils.graph_from_dot_file(f"{path}{experiment_name}.dot")
+    data = pd.read_csv(f"{path}{experiment_name}.csv")
+    scaler = StandardScaler()
+    data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)
+    # Split the dataframe into train and test
+    train = data.sample(frac=0.9, random_state=42)
+    test = data.drop(train.index)
+    rex = utils.load_experiment(f"{experiment_name}", output_path)
+    rex.is_fitted_ = True
+    print(f"Loaded experiment {experiment_name}")
+
+    rex.shaps.predict(test)
+
+
+def main():
     np.set_printoptions(precision=4, linewidth=150)
     warnings.filterwarnings('ignore')
 
@@ -750,3 +860,7 @@ if __name__ == "__main__":
                               explainer=shap.KernelExplainer)
     rex.shaps.fit(data)
     rex.shaps.predict(data)
+
+
+if __name__ == "__main__":
+    custom_main()
