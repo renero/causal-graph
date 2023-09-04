@@ -2,6 +2,7 @@ from sklearn.ensemble import GradientBoostingRegressor
 from tqdm.auto import tqdm
 
 from causalgraph.common import tqdm_params
+from causalgraph.explainability.hierarchies import Hierarchies
 
 
 class GBTRegressor(GradientBoostingRegressor):
@@ -22,13 +23,14 @@ class GBTRegressor(GradientBoostingRegressor):
             random_state=None,
             max_features=None,
             alpha=0.9,
-            verbose=False,
             max_leaf_nodes=None,
             warm_start=False,
             validation_fraction=0.1,
             n_iter_no_change=None,
             tol=0.0001,
             ccp_alpha=0.0,
+            correlation_th: float = None,
+            verbose=False,
             silent=False,
             prog_bar=True):
 
@@ -46,14 +48,15 @@ class GBTRegressor(GradientBoostingRegressor):
         self.random_state = random_state
         self.max_features = max_features
         self.alpha = alpha
-        self.verbose = verbose
         self.max_leaf_nodes = max_leaf_nodes
         self.warm_start = warm_start
         self.validation_fraction = validation_fraction
         self.n_iter_no_change = n_iter_no_change
         self.tol = tol
         self.ccp_alpha = ccp_alpha
+        self.correlation_th = correlation_th
 
+        self.verbose = verbose
         self.silent = silent
         self.prog_bar = prog_bar
         self.regressor = None
@@ -70,14 +73,32 @@ class GBTRegressor(GradientBoostingRegressor):
         self.n_features_in_ = X.shape[1]
         self.feature_names = list(X.columns)
         self.regressor = dict()
+        
+        if self.correlation_th:
+            self.corr_matrix = Hierarchies.compute_correlation_matrix(X)
+            self.correlated_features = Hierarchies.compute_correlated_features(
+                self.corr_matrix, self.correlation_th, self.feature_names,
+                verbose=self.verbose)
+            X_original = X.copy()        
 
         pbar_in = tqdm(total=len(self.feature_names),
                        **tqdm_params(self._fit_desc, self.prog_bar,
                                      silent=self.silent))
 
-        for target in self.feature_names:
+        for target_name in self.feature_names:
             pbar_in.refresh()
-            self.regressor[target] = GradientBoostingRegressor(
+            
+            # if correlation_th is not None then, remove features that are highly
+            # correlated with the target, at each step of the loop
+            if self.correlation_th is not None:
+                X = X_original.copy()
+                if len(self.correlated_features[target_name]) > 0:
+                    X = X.drop(self.correlated_features[target_name], axis=1)
+                    if self.verbose:
+                        print("REMOVED CORRELATED FEATURES: ",
+                              self.correlated_features[target_name])            
+            
+            self.regressor[target_name] = GradientBoostingRegressor(
                 loss=self.loss,
                 learning_rate=self.learning_rate,
                 n_estimators=self.n_estimators,
@@ -100,7 +121,7 @@ class GBTRegressor(GradientBoostingRegressor):
                 tol=self.tol,
                 ccp_alpha=self.ccp_alpha
             )
-            self.regressor[target].fit(X.drop(target, axis=1), X[target])
+            self.regressor[target_name].fit(X.drop(target_name, axis=1), X[target_name])
             pbar_in.update(1)
         pbar_in.close()
 

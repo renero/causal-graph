@@ -134,23 +134,44 @@ class PermutationImportance(BaseEstimator):
             total=len(self.feature_names_),
             **tqdm_params(self._fit_desc, self.prog_bar, silent=self.silent))
 
+        # If me must exclude features due to correlation, we must do it before
+        # computing the base loss        
+        if self.correlation_th:
+            self.corr_matrix = Hierarchies.compute_correlation_matrix(X)
+            self.correlated_features = Hierarchies.compute_correlated_features(
+                self.corr_matrix, self.correlation_th, self.feature_names,
+                verbose=self.verbose)
+
         self.pi = {}
         self.all_pi = []
-        self.X = X.copy()
-        for target in self.feature_names_:
+        X_original = X.copy()
+        for target_name in self.feature_names_:
             pbar.refresh()
-            print(f"Feature: {target} ", end="") if self.verbose else None
+            X = X_original.copy()
+             
+            # if correlation_th is not None then, remove features that are highly
+            # correlated with the target, at each step of the loop
+            if self.correlation_th is not None:
+                if len(self.correlated_features[target_name]) > 0:
+                    X = X.drop(self.correlated_features[target_name], axis=1)
+                    if self.verbose:
+                        print("REMOVED CORRELATED FEATURES: ",
+                              self.correlated_features[target_name])
+            
+            print(f"Feature: {target_name} ", end="") if self.verbose else None
 
-            regressor = self.regressors[target]
-            X = self.X.drop(columns=[target])
-            y = self.X[target]
-            self.pi[target] = permutation_importance(
+            regressor = self.regressors[target_name]
+            X = X.drop(columns=[target_name])
+            y = X[target_name]
+            self.pi[target_name] = permutation_importance(
                 regressor, X, y, n_repeats=10,
                 random_state=self.random_state)
-            self.all_pi.append(self.pi[target]['importances_mean'])
+            self.all_pi.append(self.pi[target_name]['importances_mean'])
 
             pbar.update(1)
+            
         pbar.close()
+        
         self.all_pi = np.array(self.all_pi).flatten()
         self.mean_pi_threshold = np.quantile(
             self.all_pi, self.mean_pi_percentile)
@@ -193,10 +214,10 @@ class PermutationImportance(BaseEstimator):
             self.pi[target]['importances_std'] = []
 
             if self.correlation_th is not None:
-                corr_features = list(
-                    self.corr_matrix[(self.corr_matrix[target] > self.correlation_th)
-                                     & (self.corr_matrix[target] < 1.0)].index)
-                num_vars = len(self.feature_names_) - len(corr_features)
+                # corr_features = list(
+                #     self.corr_matrix[(self.corr_matrix[target] > self.correlation_th)
+                #                      & (self.corr_matrix[target] < 1.0)].index)
+                num_vars = len(self.feature_names_) - len(self.correlated_features[target])
 
             # Compute the permutation importance for each feature
             for shuffle_col in range(num_vars-1):
