@@ -424,9 +424,13 @@ class ShapEstimator(BaseEstimator):
             X_features = X.drop(target_name, axis=1)
             y = X[target_name].values
 
-            feature_names = [
-                f for f in self.feature_names if (f != target_name) & \
-                    (f not in self.correlated_features[target_name])]
+            if self.correlation_th is not None:
+                feature_names = [
+                    f for f in self.feature_names if (f != target_name) & \
+                        (f not in self.correlated_features[target_name])]
+            else:
+                feature_names = [
+                    f for f in self.feature_names if f != target_name]
 
             self.discrepancies.loc[target_name] = 0
             self.shap_discrepancies[target_name] = defaultdict(ShapDiscrepancy)
