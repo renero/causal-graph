@@ -63,7 +63,7 @@ class PermutationImportance(BaseEstimator):
         self.prog_bar = prog_bar
         self.verbose = verbose
         self.silent = silent
-        self.feature_names_ = list(self.regressors.keys())
+        self.feature_names = list(self.regressors.keys())
 
         self.is_fitted_ = False
 
@@ -79,7 +79,7 @@ class PermutationImportance(BaseEstimator):
         """
         self._obtain_correlation_info(X)
 
-        first_key = self.feature_names_[0]
+        first_key = self.feature_names[0]
         if isinstance(self.regressors[first_key], MLPModel):
             return self._fit_pytorch()
         else:
@@ -89,7 +89,7 @@ class PermutationImportance(BaseEstimator):
         if self.correlation_th:
             self.corr_matrix = Hierarchies.compute_correlation_matrix(X)
             self.correlated_features = Hierarchies.compute_correlated_features(
-                self.corr_matrix, self.correlation_th, self.feature_names_,
+                self.corr_matrix, self.correlation_th, self.feature_names,
                 verbose=self.verbose)
 
     def _fit_pytorch(self):
@@ -97,13 +97,13 @@ class PermutationImportance(BaseEstimator):
         Fit the model to compute the base loss for each feature for pyTorch models.
         """
         pbar = tqdm(
-            total=len(self.feature_names_),
+            total=len(self.feature_names),
             **tqdm_params(self._fit_desc, self.prog_bar, silent=self.silent))
         print("Computing base loss (PyTorch)") if self.verbose else None
 
         self.base_loss = dict()
         self.base_std = dict()
-        for feature in self.feature_names_:
+        for feature in self.feature_names:
             pbar.refresh()
             print(f"Feature: {feature} ", end="") if self.verbose else None
 
@@ -131,7 +131,7 @@ class PermutationImportance(BaseEstimator):
         Fit the model to compute the base loss for each feature, for SKLearn models.
         """
         pbar = tqdm(
-            total=len(self.feature_names_),
+            total=len(self.feature_names),
             **tqdm_params(self._fit_desc, self.prog_bar, silent=self.silent))
 
         # If me must exclude features due to correlation, we must do it before
@@ -145,7 +145,7 @@ class PermutationImportance(BaseEstimator):
         self.pi = {}
         self.all_pi = []
         X_original = X.copy()
-        for target_name in self.feature_names_:
+        for target_name in self.feature_names:
             pbar.refresh()
             X = X_original.copy()
              
@@ -161,11 +161,15 @@ class PermutationImportance(BaseEstimator):
             print(f"Feature: {target_name} ", end="") if self.verbose else None
 
             regressor = self.regressors[target_name]
-            X = X.drop(columns=[target_name])
             y = X[target_name]
+            X = X.drop(columns=[target_name])
             self.pi[target_name] = permutation_importance(
                 regressor, X, y, n_repeats=10,
                 random_state=self.random_state)
+
+            if self.correlation_th is not None:
+                self._add_zeroes(target_name, self.correlated_features[target_name])
+
             self.all_pi.append(self.pi[target_name]['importances_mean'])
 
             pbar.update(1)
@@ -180,7 +184,7 @@ class PermutationImportance(BaseEstimator):
         return self
 
     def predict(self, X=None, y=None):
-        first_key = self.feature_names_[0]
+        first_key = self.feature_names[0]
         if isinstance(self.regressors[first_key], MLPModel):
             return self._predict_pytorch()
         #  SKLearn models don't have a predict stage for permutation importance.
@@ -192,14 +196,14 @@ class PermutationImportance(BaseEstimator):
         under the PyTorch implementation of the algorithm.
         """
         pbar = tqdm(
-            total=len(self.feature_names_),
+            total=len(self.feature_names),
             **tqdm_params(self._fit_desc, self.prog_bar, silent=self.silent))
         print("Computing permutation loss (PyTorch)") if self.verbose else None
 
         self.all_pi = []
         self.pi = dict()
-        num_vars = len(self.feature_names_)
-        for target in self.feature_names_:
+        num_vars = len(self.feature_names)
+        for target in self.feature_names:
             pbar.refresh()
             regressor = self.regressors[target]
             model = regressor.model
@@ -217,7 +221,7 @@ class PermutationImportance(BaseEstimator):
                 # corr_features = list(
                 #     self.corr_matrix[(self.corr_matrix[target] > self.correlation_th)
                 #                      & (self.corr_matrix[target] < 1.0)].index)
-                num_vars = len(self.feature_names_) - len(self.correlated_features[target])
+                num_vars = len(self.feature_names) - len(self.correlated_features[target])
 
             # Compute the permutation importance for each feature
             for shuffle_col in range(num_vars-1):
@@ -254,7 +258,7 @@ class PermutationImportance(BaseEstimator):
                 self.pi[target]['importances_std'])
 
             if self.correlation_th is not None:
-                self._add_zeroes(target, corr_features)
+                self._add_zeroes(target, self.correlated_features[target])
 
             self.all_pi.append(self.pi[target]['importances_mean'])
 
@@ -270,7 +274,7 @@ class PermutationImportance(BaseEstimator):
         """
         Add zeroes to the mean perm imp. values for correlated features.
         """
-        features = [f for f in self.feature_names_ if f != target]
+        features = [f for f in self.feature_names if f != target]
         for correlated_feature in correlated_features:
             correlated_feature_position = features.index(correlated_feature)
             self.pi[target]['importances_mean'] = np.insert(
@@ -281,7 +285,7 @@ class PermutationImportance(BaseEstimator):
     def fit_predict(self, X, y=None):
         self._obtain_correlation_info(X)
 
-        first_key = self.feature_names_[0]
+        first_key = self.feature_names[0]
         if isinstance(self.regressors[first_key], MLPModel):
             return self._fit_predict_pytorch()
         else:
@@ -395,7 +399,7 @@ class PermutationImportance(BaseEstimator):
             The figure containing the plot.
         """
         assert self.is_fitted_, "Model not fitted yet"
-        plot_args = [(target_name) for target_name in self.feature_names_]
+        plot_args = [(target_name) for target_name in self.feature_names]
         return subplots(self._plot_perm_imp, *plot_args, **kwargs)
 
     def _plot_perm_imp(self, target, ax, **kwargs):
@@ -419,7 +423,7 @@ class PermutationImportance(BaseEstimator):
             The figure containing the subplot.
 
         """
-        feature_names = [f for f in self.feature_names_ if f != target]
+        feature_names = [f for f in self.feature_names if f != target]
         figsize_ = kwargs.get('figsize', (6, 3))
         fig = None
         if ax is None:

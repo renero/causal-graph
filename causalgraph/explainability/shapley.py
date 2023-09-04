@@ -136,7 +136,7 @@ class ShapEstimator(BaseEstimator):
         """
         # X, y = check_X_y(X, y, accept_sparse=True)
 
-        self.feature_names_ = list(self.models.regressor.keys())
+        self.feature_names = list(self.models.regressor.keys())
         self.shap_explainer = dict()
         self.shap_values = dict()
         self.shap_scaled_values = dict()
@@ -144,7 +144,7 @@ class ShapEstimator(BaseEstimator):
         self.feature_order = dict()
         self.all_mean_shap_values = []
 
-        pbar = tqdm(total=len(self.feature_names_),
+        pbar = tqdm(total=len(self.feature_names),
                     **tqdm_params(self._fit_desc, self.prog_bar, silent=self.silent))
 
         self.X_train, self.X_test = train_test_split(
@@ -155,12 +155,12 @@ class ShapEstimator(BaseEstimator):
         if self.correlation_th:
             self.corr_matrix = Hierarchies.compute_correlation_matrix(X)
             self.correlated_features = Hierarchies.compute_correlated_features(
-                self.corr_matrix, self.correlation_th, self.feature_names_, 
+                self.corr_matrix, self.correlation_th, self.feature_names, 
                 verbose=self.verbose)
             X_train_original = self.X_train.copy()
             X_test_original = self.X_test.copy()
 
-        for target_name in self.feature_names_:
+        for target_name in self.feature_names:
             pbar.refresh()
 
             # if correlation_th is not None then, remove features that are highly
@@ -264,7 +264,7 @@ class ShapEstimator(BaseEstimator):
             self.shap_values[target_name] = explanation.values
 
     def _add_zeroes(self, target, correlated_features):
-        features = [f for f in self.feature_names_ if f != target]
+        features = [f for f in self.feature_names if f != target]
         for correlated_feature in correlated_features:
             correlated_feature_position = features.index(correlated_feature)
             self.all_mean_shap_values[-1] = np.insert(
@@ -322,9 +322,9 @@ class ShapEstimator(BaseEstimator):
         pbar.refresh()
 
         self.parents = dict()
-        for target in self.feature_names_:
+        for target in self.feature_names:
             candidate_causes = [
-                f for f in self.feature_names_ if f != target]
+                f for f in self.feature_names if f != target]
 
             # Filter out features that are highly correlated with the target
             if self.correlation_th is not None:
@@ -346,7 +346,7 @@ class ShapEstimator(BaseEstimator):
         pbar.refresh()
 
         G_shap_unoriented = nx.Graph()
-        for target in self.feature_names_:
+        for target in self.feature_names:
             for parent in self.parents[target]:
                 # Add edges ONLY between nodes where SHAP recognizes both directions
                 if self.reciprocity:
@@ -407,10 +407,10 @@ class ShapEstimator(BaseEstimator):
             A dataframe containing the discrepancies for all features and all targets.
         """
         check_is_fitted(self, 'is_fitted_')
-        self.discrepancies = pd.DataFrame(columns=self.feature_names_)
+        self.discrepancies = pd.DataFrame(columns=self.feature_names)
         self.shap_discrepancies = defaultdict(dict)
         X_original = X.copy() if self.correlation_th else None
-        for target_name in self.feature_names_:
+        for target_name in self.feature_names:
             # Check if we must remove correlated features
             if self.correlation_th is not None:
                 X = X_original.copy()
@@ -425,7 +425,7 @@ class ShapEstimator(BaseEstimator):
             y = X[target_name].values
 
             feature_names = [
-                f for f in self.feature_names_ if (f != target_name) & \
+                f for f in self.feature_names if (f != target_name) & \
                     (f not in self.correlated_features[target_name])]
 
             self.discrepancies.loc[target_name] = 0
@@ -538,7 +538,7 @@ class ShapEstimator(BaseEstimator):
         else:
             increase_upper_tolerance = False
 
-        for target in self.feature_names_:
+        for target in self.feature_names:
             target_mean = np.mean(self.discrepancies.loc[target].values)
             # Experimental
             if increase_upper_tolerance:
@@ -547,7 +547,7 @@ class ShapEstimator(BaseEstimator):
                 tolerance = 0.0
 
             # Iterate over the features and check if the edge should be reversed.
-            for feature in self.feature_names_:
+            for feature in self.feature_names:
                 # If the edge is already reversed, skip it.
                 if (target, feature) in edges_reversed or \
                         feature == target or \
@@ -711,11 +711,11 @@ class ShapEstimator(BaseEstimator):
 
         feature_inds = self.feature_order[target_name][:max_features_to_display]
         if self.correlation_th is not None:
-            feature_names = [f for f in self.feature_names_ if (f != target_name) & (
+            feature_names = [f for f in self.feature_names if (f != target_name) & (
                 f not in self.correlated_features[target_name])]
         else:
             feature_names = [
-                f for f in self.feature_names_ if f != target_name]
+                f for f in self.feature_names if f != target_name]
         selected_features = [parent for parent in self.parents[target_name]]
 
         y_pos = np.arange(len(feature_inds))
@@ -743,7 +743,7 @@ class ShapEstimator(BaseEstimator):
         mpl.rcParams['figure.dpi'] = kwargs.get('dpi', 75)
         figsize_ = kwargs.get('figsize', (10, 16))
         feature_names = [
-            f for f in self.feature_names_ if f != target_name]
+            f for f in self.feature_names if f != target_name]
         fig, ax = plt.subplots(len(feature_names), 4, figsize=figsize_)
 
         for i, parent_name in enumerate(feature_names):

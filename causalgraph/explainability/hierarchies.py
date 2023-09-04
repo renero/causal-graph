@@ -71,13 +71,13 @@ class Hierarchies:
         """
         # copy X into self.data
         self.data = X.copy()
-        self.feature_names_ = list(self.data.columns)
+        self.feature_names = list(self.data.columns)
         
         # Set the list of correlated features for each target
         self.correlations = self.compute_correlation_matrix(
             self.data, method=self.method, prog_bar=self.prog_bar)
         self.correlated_features = self.compute_correlated_features(
-            self.correlations, self.correlation_th, self.feature_names_)
+            self.correlations, self.correlation_th, self.feature_names)
 
         # Compute the dissimilarity matrix
         self.dissimilarity = 1 - np.abs(self.correlations)

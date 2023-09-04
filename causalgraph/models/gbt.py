@@ -1,3 +1,4 @@
+import numpy as np
 from sklearn.ensemble import GradientBoostingRegressor
 from tqdm.auto import tqdm
 
@@ -113,7 +114,7 @@ class GBTRegressor(GradientBoostingRegressor):
                 random_state=self.random_state,
                 max_features=self.max_features,
                 alpha=self.alpha,
-                verbose=self.verbose,
+                verbose=False,
                 max_leaf_nodes=self.max_leaf_nodes,
                 warm_start=self.warm_start,
                 validation_fraction=self.validation_fraction,
@@ -129,4 +130,51 @@ class GBTRegressor(GradientBoostingRegressor):
         return self
 
     def predict(self, X):
-        return super().predict(X)
+        """
+        Call the predict method of the parent class with every feature from the "X" 
+        dataframe as a target variable. This will predict a separate value for each
+        feature in the dataframe.
+        """
+        if not self.is_fitted_:
+            raise ValueError(
+                f"This {self.__class__.__name__} instance is not fitted yet."
+                f"Call 'fit' with appropriate arguments before using this method.")
+        y_pred = list()
+        
+        if self.correlation_th is not None:
+            X_original = X.copy()
+
+        for target_name in self.feature_names:
+            if self.correlation_th is not None:
+                X = X_original.drop(self.correlated_features[target_name], axis=1)
+            
+            y_pred.append(
+                self.regressor[target_name].predict(X.drop(target_name, axis=1)))
+            
+        return np.array(y_pred)
+    
+    def score(self, X):
+        """
+        Call the score method of the parent class with every feature from the "X" 
+        dataframe as a target variable. This will score a separate model for each
+        feature in the dataframe.
+        """
+        if not self.is_fitted_:
+            raise ValueError(
+                f"This {self.__class__.__name__} instance is not fitted yet."
+                f"Call 'fit' with appropriate arguments before using this method.")
+
+        if self.correlation_th is not None:
+            X_original = X.copy()
+
+        scores = list()
+        for target_name in self.feature_names:
+            if self.correlation_th is not None:
+                X = X_original.drop(self.correlated_features[target_name], axis=1)
+                
+            scores.append(
+                self.regressor[target_name].score(
+                    X.drop(target_name, axis=1), X[target_name]))
+            
+        self.scoring = np.array(scores)
+        return self.scoring
