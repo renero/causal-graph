@@ -91,6 +91,7 @@ class Rex(BaseEstimator, ClassifierMixin):
                 or SKLearn GradientBoostingRegressor.
             explainer (shap.Explainer): The explainer to use for the shap values.
             tune_model (bool): Whether to tune the model for HPO. Default is False.
+            corr_th (float): The threshold for the correlation. Default is None.
             corr_method (str): The method to use for the correlation.
                 Default is "spearman", but it can also be 'pearson', 'kendall or 'mic'.
             corr_alpha (float): The alpha value for the correlation. Default is 0.6.
@@ -259,8 +260,12 @@ class Rex(BaseEstimator, ClassifierMixin):
             self.G_final.remove_node('\\n')
 
         # Obtain the regression loss metric from each regressor trained to predict
-        # each of the variables.
+        # each of the variables. Add regression loss to the properties of the graph.
         self.models.score(X)
+        for i, feature in enumerate(self.feature_names):
+            self.G_shap.nodes[feature]['regr_score'] = self.models.scoring[i]
+            self.G_indep.nodes[feature]['regr_score'] = self.models.scoring[i]
+            self.G_final.nodes[feature]['regr_score'] = self.models.scoring[i]
 
         # If a reference graph is provided, compute the metrics for the predicted
         # graph against the reference graph.
@@ -405,12 +410,14 @@ class Rex(BaseEstimator, ClassifierMixin):
         formatting_kwargs.update(kwargs)
 
         G = nx.DiGraph()
+        G.add_nodes_from(dag.nodes(data=True))
         G.add_edges_from(dag.edges())
         if reference:
+            # Clean up reference graph for inconsistencies along the DOT conversion
+            # and add potential missing nodes to the predicted graph.
             Gt = _cleanup_graph(reference.copy())
             for missing in set(list(Gt.nodes)) - set(list(G.nodes)):
                 G.add_node(missing)
-
             # Gt = _format_graph(Gt, Gt, inv_color="red", wrong_color="black")
             # G  = _format_graph(G, Gt, inv_color="red", wrong_color="gray")
             Gt = _format_graph(
@@ -500,22 +507,28 @@ class Rex(BaseEstimator, ClassifierMixin):
         return subplots(self.shaps._plot_shap_summary, *plot_args, **kwargs)
 
 
-def main2(dataset_name, path="/Users/renero/phd/data/RC3/"):
+def main2(dataset_name, 
+          input_path="/Users/renero/phd/data/RC3/",
+          output_path="/Users/renero/phd/output/RC3/"):
 
-    ref_graph = graph_from_dot_file(f"{path}{dataset_name}.dot")
-    data = pd.read_csv(f"{path}{dataset_name}.csv")
+    ref_graph = graph_from_dot_file(f"{input_path}{dataset_name}.dot")
+    data = pd.read_csv(f"{input_path}{dataset_name}.csv")
     scaler = StandardScaler()
     data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)
     train = data.sample(frac=0.9, random_state=42)
     test = data.drop(train.index)
 
     # rex = Rex(model_type=GBTRegressor, explainer=shap.Explainer)
-    rex = Rex(
-        model_type=NNRegressor, explainer=shap.GradientExplainer,
-        correlation_th=0.9, prog_bar=False, verbose=True
-    )
-    rex.fit_predict(train, test, ref_graph)
+    # rex = Rex(
+    #     model_type=NNRegressor, explainer=shap.GradientExplainer,
+    #     correlation_th=0.9, prog_bar=False, verbose=True
+    # )
+    # rex.fit_predict(train, test, ref_graph)
+    
+    rex = load_experiment(dataset_name, output_path)
+    
     print(rex.score(ref_graph, 'shap'))
+    rex.plot_dags(rex.G_shap, ref_graph)
 
 
 if __name__ == "__main__":

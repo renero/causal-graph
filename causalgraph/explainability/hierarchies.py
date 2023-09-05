@@ -9,18 +9,16 @@ from collections import defaultdict
 from typing import Callable, List, Tuple, Union
 
 import matplotlib.pyplot as plt
-import seaborn as sns
 import networkx as nx
 import numpy as np
 import pandas as pd
 
 from copy import copy
-from matplotlib.colors import ListedColormap
 from scipy.cluster.hierarchy import dendrogram, fcluster, linkage
 from scipy.spatial.distance import squareform
 
 from causalgraph.independence.mic import pairwise_mic
-
+from causalgraph.common import plots
 
 class Hierarchies:
 
@@ -94,7 +92,7 @@ class Hierarchies:
             correlations = data.corr(method=method)
         elif method == 'mic':
             correlations = pairwise_mic(
-                data, alpha=alpha, c=c, progbar=prog_bar)
+                data, alpha=alpha, c=c, prog_bar=prog_bar)
         else:
             raise ValueError(
                 f"Unknown correlation method: {method}. \
@@ -326,31 +324,6 @@ class Hierarchies:
                 return disimilarity
         return None
 
-    @staticmethod
-    def _set_colormap(color_threshold=0.15, max_color=0.8) -> ListedColormap:
-        """
-        Set the colormap for the graph edges.
-
-        Parameters
-        ----------
-        color_threshold : float
-            The threshold for the color of the values in the plot, below which the color
-            will be white.
-        max_color : float
-            The maximum color for the edges, above which the color will be red.
-
-        Returns
-        -------
-        LinearColormap 
-            The colormap to be used in the plot.
-        """
-        cw = plt.get_cmap('coolwarm')
-        cmap = ListedColormap([cw(x)
-                               for x in np.arange(color_threshold, max_color, 0.01)])
-        cm = copy(cmap)
-        cm.set_under(color='white')
-        return cm
-
     def plot(self, threshold=0.5, **kwargs):
         """
         Plot the hierarchical clustering and correlation matrix of the data.
@@ -361,7 +334,7 @@ class Hierarchies:
         title = kwargs.get('title', 'Correlation matrix')
         fontsize = kwargs.get('fontsize', 9)
         xrot = kwargs.get('xrot', 0)
-        cm = Hierarchies._set_colormap(
+        cm = plots._set_colormap(
             color_threshold=threshold, max_color=0.9)
         precision = 2
 

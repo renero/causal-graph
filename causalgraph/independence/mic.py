@@ -14,7 +14,7 @@ def pairwise_mic(
         c=15,
         to_return='mic',
         est="mic_approx",
-        progbar=True,
+        prog_bar=True,
         silent=False):
     """
     From a dataframe, compute the MIC for each pair of features. See
@@ -37,7 +37,7 @@ def pairwise_mic(
         est (str): MINE MIC value for est. Default is est=”mic_approx” where the 
             original MINE statistics will be computed, with est=”mic_e” the 
             equicharacteristic matrix is is evaluated and MIC_e and TIC_e are returned.
-        progbar (bool): whether to print the progbar or not.
+        prog_bar (bool): whether to print the prog_bar or not.
 
     Returns:
         A dataframe with the MIC values between pairs.
@@ -49,8 +49,8 @@ def pairwise_mic(
     m = len(data.columns)
     mic, tic = np.ones((m, m)), np.ones((m, m))
     pbar = tqdm(total=m*(m-1)/2, **
-                tqdm_params("Computing MIC", progbar, silent=silent))
-    # desc="Computing MIC", disable=not progbar,
+                tqdm_params("Computing MIC", prog_bar, silent=silent))
+    # desc="Computing MIC", disable=not prog_bar,
     # position=1, leave=False)
     for i in range(m):
         for j in range(i+1, m):
@@ -68,7 +68,7 @@ def pairwise_mic(
 
 
 @deprecated("Use pairwise_mic instead")
-def pairwise_MIC(data: pd.DataFrame, c=15, alpha=0.6, progbar=True, silent=False):
+def pairwise_MIC(data: pd.DataFrame, c=15, alpha=0.6, prog_bar=True, silent=False):
     """
     From a dataframe, compute the MIC for each pair of features.
 
@@ -76,7 +76,7 @@ def pairwise_MIC(data: pd.DataFrame, c=15, alpha=0.6, progbar=True, silent=False
         data (DataFrame): A DF with continuous numerical values
         c (int): MINE MIC value for c
         alpha (float): MINE MIC value for alpha
-        progbar (bool): whether to print the progbar or not.
+        prog_bar (bool): whether to print the prog_bar or not.
 
     Returns:
         A dataframe with the MIC values between pairs.
@@ -85,9 +85,9 @@ def pairwise_MIC(data: pd.DataFrame, c=15, alpha=0.6, progbar=True, silent=False
     list_pairs = list(combinations(list_nodes, 2))
     mine = MINE(alpha=alpha, c=c)
     score_df = pd.DataFrame(0, index=data.columns, columns=data.columns)
-    pbar = tqdm(total=len(list_pairs), **tqdm_params("Computing MIC", progbar,
+    pbar = tqdm(total=len(list_pairs), **tqdm_params("Computing MIC", prog_bar,
                                                      silent=silent))
-    # disable=not progbar, desc="Computing MIC", position=1, leave=False)
+    # disable=not prog_bar, desc="Computing MIC", position=1, leave=False)
     for feat1, feat2 in list_pairs:
         pbar.update(1)
         x, y = data[feat1], data[feat2]

@@ -4,22 +4,26 @@
 # (C) J. Renero, 2022, 2023
 #
 
+from copy import copy
 from typing import Any, Callable
 
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
+import pydotplus
 import seaborn as sns
+from matplotlib.colors import ListedColormap
 from matplotlib.ticker import MultipleLocator
 from pydot import Dot
-import pydotplus
 
 
 # Defaults for the graphs plotted
 formatting_kwargs = {
     "node_size": 1000,
     "node_color": "white",
+    "alpha": 0.8,
     "edgecolors": "black",
+    "font_weight": "bold",
     "font_family": "monospace",
     "horizontalalignment": "center",
     "verticalalignment": "center_baseline",
@@ -203,12 +207,71 @@ def _format_graph(
     return G
 
 
-def _draw_graph_subplot(G: nx.DiGraph, layout: dict, title: str, ax: plt.Axes, **formatting_kwargs):
-    colors = list(nx.get_edge_attributes(G, 'color').values())
+def _draw_graph_subplot(
+        G: nx.DiGraph,
+        layout: dict,
+        title: str,
+        ax: plt.Axes,
+        **formatting_kwargs):
+    """
+    Draw a graph in a subplot.
+
+    Parameters
+    ----------
+    G : nx.DiGraph
+        The graph to be drawn.
+    layout : dict
+        The layout of the graph.
+    title : str
+        The title of the graph.
+    ax : plt.Axes
+        The axis in which to draw the graph.
+    **formatting_kwargs : dict
+        The formatting arguments for the graph.
+
+    Returns
+    -------
+    None
+    """
+    edge_colors = list(nx.get_edge_attributes(G, 'color').values())
     widths = list(nx.get_edge_attributes(G, 'width').values())
     styles = list(nx.get_edge_attributes(G, 'style').values())
-    nx.draw(G, pos=layout, edge_color=colors, width=widths, style=styles,
-            **formatting_kwargs, ax=ax)
+
+    # Create a colormap list with the colors of the nodes, based on the regr_score
+    if all(['regr_score' in G.nodes[node] for node in G.nodes]):
+        reg_scores = [G.nodes[node]['regr_score'] for node in G.nodes]
+        max_cmap_value = max(max(reg_scores), 1.0)
+        color_map = _set_colormap(0.0, max_cmap_value, 'OrRd')
+        color_map_r = _set_colormap(0.0, max_cmap_value, 'Greys_r')
+        formatting_kwargs['font_color'] = "white"
+        
+        # Set with_labels to False if there is color information of each node, 
+        # since I will draw the labels afterwards
+        formatting_kwargs['with_labels'] = False
+
+        # Set the node colors and the label colors according to the value of the
+        # regr_score of each node.
+        node_colors = []
+        label_colors = []
+        for node in G:
+            node_colors.append(color_map(G.nodes[node]['regr_score']))
+            label_colors.append(color_map_r(G.nodes[node]['regr_score']))
+        formatting_kwargs['node_color'] = node_colors
+
+    nx.draw(G, pos=layout, edge_color=edge_colors,
+            width=widths, style=styles, **formatting_kwargs, ax=ax)
+    
+    if formatting_kwargs['with_labels'] == False:
+        for i, node in enumerate(G):
+            font_color = label_colors[i]
+            nx.draw_networkx_labels(
+                G, pos=layout, labels={node:node}, font_color=font_color, 
+                font_weight=formatting_kwargs['font_weight'],
+                font_family=formatting_kwargs['font_family'],
+                horizontalalignment=formatting_kwargs['horizontalalignment'],
+                verticalalignment=formatting_kwargs['verticalalignment'],
+                ax=ax)
+    
     if title is not None:
         ax.set_title(title, y=-0.1)
 
@@ -290,3 +353,31 @@ def plot_values_distribution(values, **kwargs):
     sns.ecdfplot(data=values, ax=ax[1])
     plt.tight_layout()
     plt.show()
+
+
+def _set_colormap(
+        color_threshold=0.15,
+        max_color=0.8,
+        cmap_name: str = "OrRd") -> ListedColormap:
+    """
+    Set the colormap for the graph edges.
+
+    Parameters
+    ----------
+    color_threshold : float
+        The threshold for the color of the values in the plot, below which the color
+        will be white.
+    max_color : float
+        The maximum color for the edges, above which the color will be red.
+
+    Returns
+    -------
+    LinearColormap 
+        The colormap to be used in the plot.
+    """
+    cw = plt.get_cmap(cmap_name)
+    cmap = ListedColormap([cw(x)
+                           for x in np.arange(color_threshold, max_color, 0.01)])
+    cm = copy(cmap)
+    cm.set_under(color='white')
+    return cm
