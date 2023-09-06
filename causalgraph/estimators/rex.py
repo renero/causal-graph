@@ -65,7 +65,7 @@ class Rex(BaseEstimator, ClassifierMixin):
             model_type: BaseEstimator = NNRegressor,
             explainer=shap.Explainer,
             tune_model: bool = False,
-            corr_th: float = None,
+            correlation_th: float = None,
             corr_method: str = 'spearman',
             corr_alpha: float = 0.6,
             corr_clusters: int = 15,
@@ -91,7 +91,7 @@ class Rex(BaseEstimator, ClassifierMixin):
                 or SKLearn GradientBoostingRegressor.
             explainer (shap.Explainer): The explainer to use for the shap values.
             tune_model (bool): Whether to tune the model for HPO. Default is False.
-            corr_th (float): The threshold for the correlation. Default is None.
+            correlation_th (float): The threshold for the correlation. Default is None.
             corr_method (str): The method to use for the correlation.
                 Default is "spearman", but it can also be 'pearson', 'kendall or 'mic'.
             corr_alpha (float): The alpha value for the correlation. Default is 0.6.
@@ -128,7 +128,7 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.model_type = model_type
         self.explainer = explainer
         self.tune_model = tune_model
-        self.correlation_th = corr_th
+        self.correlation_th = correlation_th
         self.corr_method = corr_method
         self.corr_alpha = corr_alpha
         self.corr_clusters = corr_clusters
@@ -350,7 +350,7 @@ class Rex(BaseEstimator, ClassifierMixin):
 
     def __repr__(self):
         forbidden_attrs = [
-            'fit', 'predict', 'score', 'get_params', 'set_params']
+            'fit', 'predict', 'fit_predict', 'score', 'get_params', 'set_params']
         ret = f"{GREEN}REX object attributes{RESET}\n"
         ret += f"{GRAY}{'-'*80}{RESET}\n"
         for attr in dir(self):
