@@ -170,9 +170,22 @@ def select_device(force: str = None) -> str:
 
     Returns:
         (str) The device to be used for training.
+
+    Raises:
+        ValueError: If the forced device is not available or not a valid device.
     """
     if force is not None:
-        device = force
+        if force in ['cuda', 'mps', 'cpu']:
+            if force == 'cuda' and torch.cuda.is_available():
+                device = force
+            elif force == 'mps' and torch.backends.mps.is_available():
+                device = force
+            elif force == 'cpu':
+                device = force
+            else:
+                raise ValueError(f"Invalid device: {force}")
+        else:
+            raise ValueError(f"Invalid device: {force}")
     else:
         if torch.cuda.is_available() and torch.backends.cuda.is_built():
             device = "cuda"

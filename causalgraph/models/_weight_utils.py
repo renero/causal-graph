@@ -14,7 +14,7 @@ from tqdm.auto import tqdm
 
 from causalgraph.common.utils import graph_from_dictionary
 from causalgraph.common import tqdm_params
-from causalgraph.models import MLPModel
+from causalgraph.models._models import MLPModel
 
 
 def extract_weights(model, verbose=False):
@@ -91,7 +91,7 @@ def plot_feature(result, axis=None):
 
 
 def plot_features(
-        results: List[Union[MDNModel, DFFModel]],
+        results: List[MLPModel],
         n_rows, n_cols, all_columns
 ):
     sns.set_style("whitegrid")
@@ -216,7 +216,7 @@ def identify_relationships(weights, feature_names, eps=0.5, min_counts=2, plot=T
     return rels
 
 
-def _get_shap_values(model: Union[DFFModel, MLPModel, MDNModel]) -> np.ndarray:
+def _get_shap_values(model: MLPModel) -> np.ndarray:
     explainer = shap.DeepExplainer(
         model.model, model.train_loader.dataset.features)
     shap_values = explainer.shap_values(
@@ -342,7 +342,7 @@ def _remove_asymmetric_shap_edges(
 
 
 def infer_causal_relationships(
-        trained_models: Dict[str, Union[DFFModel, MLPModel, MDNModel]],
+        trained_models: Dict[str, MLPModel],
         feature_names: List[str],
         prune: bool = False,
         verbose=False,

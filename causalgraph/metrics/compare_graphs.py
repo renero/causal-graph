@@ -7,28 +7,28 @@
     possible), and all metrics will be computed.
 
     Use:
-    >>>> target = nx.DiGraph()
-    >>>> target.add_nodes_from(['A', 'B', 'C', 'D', 'E'])
-    >>>> target.add_weighted_edges_from([
+    >>> target = nx.DiGraph()
+    >>> target.add_nodes_from(['A', 'B', 'C', 'D', 'E'])
+    >>> target.add_weighted_edges_from([
         ('A', 'B', rand()), ('B', 'D', rand()),('C', 'B', rand()),
         ('D', 'E', rand()), ('C', 'E', rand())])
 
-    >>>> predicted = nx.DiGraph()
-    >>>> predicted.add_nodes_from(['A', 'B', 'C', 'D', 'E'])
-    >>>> predicted.add_weighted_edges_from([
+    >>> predicted = nx.DiGraph()
+    >>> predicted.add_nodes_from(['A', 'B', 'C', 'D', 'E'])
+    >>> predicted.add_weighted_edges_from([
         ('A', 'B', rand()), ('A', 'C', rand()), ('E', 'A', rand()),
         ('E', 'B', rand()), ('C', 'D', rand())])
-    >>>> result = compare_graphs(target, predicted)
-    >>>> result
+    >>> result = compare_graphs(target, predicted)
+    >>> result
     {'Tp': 1, 'Fn': 4, 'Fp': 4, 'precision': 0.2, 'recall': 0.2,
     'AuPR': 0.18000000000000005, 'f1': 0.20000000000000004, 'SHD': 8}
-    >>>> result._precision
+    >>> result._precision
     0.2
-    >>>> result._recall
+    >>> result._recall
     0.2
-    >>>> result._f1
+    >>> result._f1
     0.2
-    >>>> result._SHD
+    >>> result._SHD
     8
 """
 
