@@ -317,7 +317,7 @@ class Pipeline:
         print("-"*80) if self.verbose else None
 
         for step_name in steps:
-            print(f"Running step {step_name}") if self.verbose else None
+            print(f"Running step {str(step_name)}") if self.verbose else None
 
             # Get the method to be called, the parameters that the
             # method accepts and the arguments to be passed to the method.

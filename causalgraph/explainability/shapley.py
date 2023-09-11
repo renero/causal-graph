@@ -33,6 +33,7 @@ from causalgraph.common.utils import graph_from_dot_file, load_experiment
 from causalgraph.independence.edge_orientation import get_edge_orientation
 from causalgraph.independence.feature_selection import select_features
 from causalgraph.explainability.hierarchies import Hierarchies
+from causalgraph.explainability.regression_quality import RegQuality
 
 
 AnyGraph = Union[nx.DiGraph, nx.Graph]
@@ -369,7 +370,6 @@ class ShapEstimator(BaseEstimator):
         
         # Determine edge orientation for each edge
         for u, v in G_shap_unoriented.edges():
-            pbar.update(1)
             orientation = get_edge_orientation(
                 X, u, v, iters=self.iters, method="gpr", verbose=self.verbose)
             if orientation == +1:
@@ -378,8 +378,23 @@ class ShapEstimator(BaseEstimator):
                 G_shap.add_edge(v, u)
             else:
                 pass
-                # G_shap.add_edge(u, v)
-                # G_shap.add_edge(v, u)
+            
+        # Apply a simple fix: if quality of regression for a feature is poor, then
+        # that feature can be considered a root or parent node. Therefore, we cannot
+        # have an edge pointing to that node.
+        parent_idx = RegQuality.predict(self.models.scoring)
+        print("Parent idxs: ", parent_idx)
+        changes = []
+        for idx in parent_idx:
+            parent_node = self.feature_names[idx]
+            print(f"Checking parent node {parent_node}...") if self.verbose else None
+            for cause, effect in G_shap.edges():
+                if effect == parent_node:
+                    print(f"Reverting edge {cause} -> {effect}") if self.verbose else None
+                    changes.append((cause, effect))
+        for cause, effect in changes:
+            G_shap.remove_edge(cause, effect)
+            G_shap.add_edge(effect, cause)
 
         pbar.update(1)
         pbar.close()
@@ -388,7 +403,6 @@ class ShapEstimator(BaseEstimator):
 
     def adjust(
             self,
-            X: np.ndarray,
             graph: AnyGraph,
             increase_tolerance: float = 0.0,
             sd_upper: float = 0.1):
@@ -832,10 +846,10 @@ class ShapEstimator(BaseEstimator):
             _remove_ticks_and_box(ax[ax_idx])
 
 
-def custom_main():
+def custom_main(experiment_name):
     path = "/Users/renero/phd/data/RC3/"
     output_path = "/Users/renero/phd/output/RC3/"
-    experiment_name = 'custom_rex'
+    
 
     ref_graph = utils.graph_from_dot_file(f"{path}{experiment_name}.dot")
     data = pd.read_csv(f"{path}{experiment_name}.csv")
@@ -849,25 +863,8 @@ def custom_main():
     print(f"Loaded experiment {experiment_name}")
 
     rex.shaps.predict(test)
-
-
-def main():
-    np.set_printoptions(precision=4, linewidth=150)
-    warnings.filterwarnings('ignore')
-
-    dataset_name = 'rex_generated_polynomial_1'
-    data = pd.read_csv(f"~/phd/data/RC3/{dataset_name}.csv")
-    ref_graph = graph_from_dot_file(
-        "/Users/renero/phd/data/RC3/rex_generated_polynomial_1.dot")
-    rex = load_experiment('rex', "/Users/renero/phd/output/RC3")
-    # rex = Rex(prog_bar=False, verbose=True).fit(data, ref_graph)
-    rex.prog_bar = False
-    rex.verbose = True
-    rex.shaps = ShapEstimator(models=rex.regressor,
-                              explainer=shap.KernelExplainer)
-    rex.shaps.fit(data)
-    rex.shaps.predict(data)
+    
 
 
 if __name__ == "__main__":
-    custom_main()
+    custom_main('custom_rex')

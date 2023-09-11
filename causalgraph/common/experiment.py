@@ -87,12 +87,12 @@ class Experiment:
         self.test = data.drop(self.train.index)
         
 
-    def run(self) -> Rex:
+    def run(self, **kwargs) -> Rex:
         if self.load:
             rex = load_experiment(self.name, self.output_path)
             print(f"Loaded '{self.name}' from '{self.output_path}'")
         else:
-            rex = Rex(model_type=NNRegressor, explainer=shap.GradientExplainer)
+            rex = Rex(model_type=NNRegressor, explainer=shap.GradientExplainer, **kwargs)
             rex.fit_predict(self.train, self.test, self.ref_graph)
 
         return rex
