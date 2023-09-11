@@ -74,10 +74,11 @@ class GraphIndependence(object):
         for p in itertools.permutations(self.feature_names, 2):
             self.sepset[p] = ()
         edge = list(self.base_graph.edges)
-        contains_data = len(self.base_graph.get_edge_data(
-            edge[0][0], edge[0][1])) != 0
+
         self.G_skl = nx.DiGraph()
-        self.G_skl.add_edges_from(self.base_graph.edges(data=contains_data))
+        self.G_skl.add_nodes_from(self.base_graph.nodes(data=True))
+        self.G_skl.add_edges_from(self.base_graph.edges(data=True))
+
         # check if all column names in experiment.data correspond to nodes in G_skl.
         # If not add them
         for col in self.data.columns:

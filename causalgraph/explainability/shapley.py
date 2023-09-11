@@ -553,7 +553,7 @@ class ShapEstimator(BaseEstimator):
         """
 
         new_graph = nx.DiGraph()
-        new_graph.add_nodes_from(graph.nodes())
+        new_graph.add_nodes_from(graph.nodes(data=True))
         new_graph.add_edges_from(graph.edges())
         edges_reversed = []
 

@@ -97,7 +97,7 @@ class Experiment:
 
         return rex
 
-    def save_experiment(self, rex: Rex):
+    def save(self, rex: Rex):
         if self.save_experiment:
             where_to = save_experiment(self.name, self.output_path, rex)
             print(f"Saved '{self.name}' to '{where_to}'")
