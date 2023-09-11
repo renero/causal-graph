@@ -58,7 +58,6 @@ class ShapDiscrepancy:
 class ShapEstimator(BaseEstimator):
     """
     """
-
     device = utils.select_device("cpu")
 
     def __init__(
@@ -328,11 +327,12 @@ class ShapEstimator(BaseEstimator):
 
             # Filter out features that are highly correlated with the target
             if self.correlation_th is not None:
-                candidate_causes = [
-                    f for f in candidate_causes if f not in self.correlated_features[target]]
+                candidate_causes = [f for f in candidate_causes \
+                    if f not in self.correlated_features[target]]
 
             print(
                 f"Selecting features for target {target}...") if self.verbose else None
+            
             self.parents[target] = select_features(
                 values=self.shap_values[target],
                 feature_names=candidate_causes,
@@ -361,6 +361,13 @@ class ShapEstimator(BaseEstimator):
         if self.verbose:
             print("Determining edge directions...")
         G_shap = nx.DiGraph()
+        
+        # Add regression mean score to each node
+        for i, feature in enumerate(self.feature_names):
+            G_shap.add_node(feature)
+            G_shap.nodes[feature]['regr_score'] = self.models.scoring[i]
+        
+        # Determine edge orientation for each edge
         for u, v in G_shap_unoriented.edges():
             pbar.update(1)
             orientation = get_edge_orientation(

@@ -250,6 +250,7 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.shaps.verbose = self.verbose
 
         steps = [
+            ('models.score', {'X': X}),
             ('G_shap', 'shaps.predict'),
             ('indep', GraphIndependence, {'base_graph': 'G_shap'}),
             ('G_indep', 'indep.fit_predict'),
@@ -258,14 +259,6 @@ class Rex(BaseEstimator, ClassifierMixin):
         prediction.run(steps, "Predicting graph")
         if '\\n' in self.G_final.nodes:
             self.G_final.remove_node('\\n')
-
-        # Obtain the regression loss metric from each regressor trained to predict
-        # each of the variables. Add regression loss to the properties of the graph.
-        self.models.score(X)
-        for i, feature in enumerate(self.feature_names):
-            self.G_shap.nodes[feature]['regr_score'] = self.models.scoring[i]
-            self.G_indep.nodes[feature]['regr_score'] = self.models.scoring[i]
-            self.G_final.nodes[feature]['regr_score'] = self.models.scoring[i]
 
         # If a reference graph is provided, compute the metrics for the predicted
         # graph against the reference graph.
@@ -507,7 +500,7 @@ class Rex(BaseEstimator, ClassifierMixin):
         return subplots(self.shaps._plot_shap_summary, *plot_args, **kwargs)
 
 
-def main2(dataset_name, 
+def custom_main(dataset_name, 
           input_path="/Users/renero/phd/data/RC3/",
           output_path="/Users/renero/phd/output/RC3/"):
 
@@ -532,4 +525,4 @@ def main2(dataset_name,
 
 
 if __name__ == "__main__":
-    main2('rex_generated_polynew_1')
+    custom_main('rex_generated_polynew_1')

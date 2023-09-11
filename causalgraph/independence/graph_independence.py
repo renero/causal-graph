@@ -20,9 +20,15 @@ from causalgraph.common import tqdm_params
 
 class GraphIndependence(object):
 
-    def __init__(self, base_graph, condlen: int = 1,
-                 condsize: int = 0, prog_bar: bool = True, verbose: bool = False,
-                 silent: bool = False):
+    def __init__(
+            self,
+            base_graph,
+            condlen: int = 1,
+            condsize: int = 0, 
+            prog_bar: bool = True, 
+            verbose: bool = False,
+            silent: bool = False):
+        
         self.base_graph = base_graph
         self.condlen = condlen
         self.condsize = condsize
