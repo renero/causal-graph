@@ -383,7 +383,6 @@ class ShapEstimator(BaseEstimator):
         # that feature can be considered a root or parent node. Therefore, we cannot
         # have an edge pointing to that node.
         parent_idx = RegQuality.predict(self.models.scoring)
-        print("Parent idxs: ", parent_idx)
         changes = []
         for idx in parent_idx:
             parent_node = self.feature_names[idx]
