@@ -39,6 +39,9 @@ np.set_printoptions(precision=4, linewidth=120)
 warnings.filterwarnings('ignore')
 
 
+# TODO:
+# - Add tuning for the GBTRegressor
+
 class Rex(BaseEstimator, ClassifierMixin):
     """ Regression with Explainability (Rex) is a causal inference discovery that
     uses a regression model to predict the outcome of a treatment and uses
