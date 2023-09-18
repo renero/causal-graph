@@ -6,19 +6,18 @@ of variables linked together?
 
 """
 from collections import defaultdict
-from typing import Callable, List, Tuple, Union
+from typing import List, Tuple, Union
 
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 import pandas as pd
 
-from copy import copy
 from scipy.cluster.hierarchy import dendrogram, fcluster, linkage
 from scipy.spatial.distance import squareform
 
 from causalgraph.independence.mic import pairwise_mic
-from causalgraph.common import plots
+from causalgraph.common import plot
 
 class Hierarchies:
 
@@ -178,6 +177,20 @@ class Hierarchies:
         This function clusters the features of the data based on the linkage matrix
         obtained from the hierarchical clustering. It is used in the method 
         plot_correlations.
+        
+        Parameters
+        ----------
+            - method (str)
+                Method to compute the correlation.
+            - threshold (float)
+                Threshold for the correlation.
+        
+        Returns
+        -------
+            - pd.DataFrame
+                Correlation matrix.
+            - List[str]
+                List of sorted column names.        
         """
         # Keep the indices to sort labels
         labels = fcluster(self.linkage_mat, threshold, criterion='distance')
@@ -331,18 +344,6 @@ class Hierarchies:
         https://www.kaggle.com/code/sgalella/correlation-heatmaps-with-hierarchical-clustering/notebook
         """
         f_size = kwargs.get('figsize', (9, 4))
-        title = kwargs.get('title', 'Correlation matrix')
-        fontsize = kwargs.get('fontsize', 9)
-        xrot = kwargs.get('xrot', 0)
-        cm = plots._set_colormap(
-            color_threshold=threshold, max_color=0.9)
-        precision = 2
-
-        def myround(v, ndigits=2):
-            if np.isclose(v, 0.0):
-                return "0"
-            return format(v, '.' + str(ndigits) + 'f')
-
         _, (ax1, ax2) = plt.subplots(nrows=1, ncols=2, figsize=f_size)
         dendrogram(self.linkage_mat, labels=self.data.columns, orientation='top',
                    leaf_rotation=90, ax=ax1)
@@ -352,43 +353,9 @@ class Hierarchies:
 
         correlations, sorted_colnames = self._cluster_features(
             "spearman", threshold)
+        plot.correlations(
+            correlations, sorted_colnames, threshold, ax2, **kwargs)
 
-        corr_data = np.abs(copy(correlations.values))
-        ncols, nrows = corr_data.shape
-        for x in range(ncols):
-            for y in range(nrows):
-                if x == y or corr_data[x, y] < threshold:
-                    corr_data[x, y] = 0
-
-        ax2.set_xticks(range(len(sorted_colnames)), sorted_colnames, rotation=xrot,
-                       horizontalalignment='center',
-                       fontsize=fontsize, fontname="Arial", color='black')
-        ax2.set_yticks(range(len(sorted_colnames)), sorted_colnames,
-                       verticalalignment='center',
-                       fontsize=fontsize, fontname="Arial", color='black')
-        ax2.imshow(corr_data, cmap=cm, vmin=threshold,
-                   vmax=1.0, aspect='equal')
-        ax2.grid(True, which='major', alpha=.25)
-        for x in range(ncols):
-            for y in range(nrows):
-                if (x) == y:
-                    ax2.annotate('x', xy=(y, x),
-                                 horizontalalignment='center',
-                                 verticalalignment='center',
-                                 fontsize=fontsize, fontname="Arial", color='black')
-                if (x) != y and not np.isclose(round(corr_data[x, y], precision), 0.0):
-                    ax2.annotate(myround(corr_data[x, y], precision), xy=(y, x),
-                                 horizontalalignment='center',
-                                 verticalalignment='center',
-                                 fontsize=fontsize, fontname="Arial", color='black')
-        plt.tick_params(pad=10, axis='x', which='both')
-
-        ax2.spines['top'].set_linewidth(.3)
-        ax2.spines['right'].set_linewidth(.3)
-        ax2.spines['left'].set_linewidth(1)
-        ax2.spines['left'].set_edgecolor('grey')
-        ax2.spines['bottom'].set_linewidth(.3)
-        ax2.set_title(title)
 
 
 def _get_directed_pair(g, u, v):

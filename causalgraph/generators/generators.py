@@ -13,7 +13,7 @@ import networkx as nx
 from sklearn.preprocessing import scale
 
 from causalgraph.generators.mechanisms import *
-from causalgraph.common.plots import dag2dot
+from causalgraph.common.plot import dag2dot
 
 
 class AcyclicGraphGenerator(object):

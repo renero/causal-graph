@@ -10,6 +10,9 @@ Example:
 (C) 2023 J. Renero
 """
 
+import warnings
+warnings.filterwarnings('ignore')
+
 from os import path
 import os
 import networkx as nx
@@ -22,8 +25,6 @@ from causalgraph.estimators.rex import Rex
 from causalgraph.models import GBTRegressor, NNRegressor
 from sklearn.preprocessing import StandardScaler
 import glob
-import warnings
-warnings.filterwarnings('ignore')
 
 
 class BaseExperiment:
@@ -57,7 +58,7 @@ class BaseExperiment:
         as the experiment file, with the .dot extension
         """
         self.experiment_name = path.basename(experiment_filename)
-        self.data = pd.read_csv(f"{experiment_filename}.csv")
+        self.data = pd.read_csv(f"{path.join(self.input_path, self.experiment_name)}.csv")
         self.data = self.data.apply(pd.to_numeric, downcast='float')
         scaler = StandardScaler()
         self.data = pd.DataFrame(
@@ -70,7 +71,7 @@ class BaseExperiment:
 
         if self.verbose:
             print(
-                f"Experiment {self.experiment_name}\n"
+                f"Data for {self.experiment_name}\n"
                 f"+-> Train....: {self.data.shape[0]} rows, {self.data.shape[1]} cols\n"
                 f"+-> Test.....: {self.test.shape[0]} rows, {self.data.shape[1]} cols\n"
                 f"+-> Ref.graph: {self.experiment_name}.dot")
@@ -94,25 +95,27 @@ class BaseExperiment:
         """
         experiment_exists = self.experiment_exists(self.experiment_name)
         if experiment_exists:
-            self.load = True and not self.train_anyway
+            self.load_experiment = True and not self.train_anyway
         else:
-            self.load = False and not self.train_anyway
+            self.load_experiment = False and not self.train_anyway
         self.save_experiment = (
-            True if self.load is False else False) or self.save_anyway
+            True if self.load_experiment is False else False) or self.save_anyway
 
-        if self.load:
-            print(f"    +-> Experiment '{self.experiment_name}' will be LOADED")
-        else:
-            print(f"    +-> Experiment '{self.experiment_name}' will be TRAINED")
+        if self.verbose:
+            if self.load_experiment:
+                print(f"    +-> Experiment '{self.experiment_name}' will be LOADED")
+            else:
+                print(f"    +-> Experiment '{self.experiment_name}' will be TRAINED")
 
-        self.save = True
+        self.save_experiment = True
         if self.save_experiment and not experiment_exists:
-            print(f"    +-> Experiment will be saved.")
+            print(f"    +-> Experiment will be saved.") if self.verbose else None
         elif self.save_experiment and experiment_exists:
-            print(f"    +-> Experiment exists and will be overwritten.")
+            print(f"    +-> Experiment exists and will be overwritten.") \
+                if self.verbose else None
         else:
-            print(f"    +-> Experiment will NOT be saved.")
-            self.save = False
+            print(f"    +-> Experiment will NOT be saved.") if self.verbose else None
+            self.save_experiment = False
 
     def list_files(self) -> list:
         """
@@ -155,7 +158,7 @@ class Experiment(BaseExperiment):
         self.prepare_experiment_input(experiment_name)
 
     def run(self, **kwargs) -> Rex:
-        if self.load:
+        if self.load_experiment:
             rex = load_experiment(self.experiment_name, self.output_path)
             print(f"Loaded '{self.experiment_name}' from '{self.output_path}'")
         else:
@@ -198,19 +201,36 @@ class Experiments(BaseExperiment):
             print(
                 f"Found {len(self.input_files)} files matching <{self.input_pattern}>")
 
-    def run(self) -> list:
-        output_files = []
+    def load(self) -> dict:
+        """
+        Loads all the experiments matching the input pattern
+        """
+        exp = {}
         for filename in self.input_files:
-            # if self.experiment_exists(filename):
-            #     print(f"Skipping {filename}.pickle (already exists)")
-            #     continue
+            self.experiment_name = path.basename(filename)
+            self.decide_what_to_do()
 
+            if self.load_experiment:
+                exp[self.experiment_name] = load_experiment(
+                    self.experiment_name, self.output_path)
+                if self.verbose:
+                    print(f"        +-> Loaded {self.experiment_name} "
+                        f"({type(exp[self.experiment_name])})")
+            else:
+                print(f"No trained experiment for {filename}...") if self.verbose else None
+        
+        return exp
+
+    def train(self) -> list:
+        exps = {}
+        for filename in self.input_files:
             self.prepare_experiment_input(filename)
             self.decide_what_to_do()
 
-            if self.load:
-                # rex = load_experiment(f'{experiment}', output_path)
-                pass
+            if self.load_experiment:
+                exps[self.experiment_name] = load_experiment(
+                    self.experiment_name, self.output_path)
+                print(f"        +-> Loaded {self.experiment_name} ({type(rex)})")
             else:
                 print(f"Training Rex on {filename}...")
                 # rex = Rex(
@@ -219,7 +239,7 @@ class Experiments(BaseExperiment):
                 #     silent=True)
                 # rex.fit_predict(self.train, self.test, self.ref_graph)
 
-            if self.save:
+            if self.save_experiment:
                 saved_to = "dummy"
                 # saved_to = save_experiment(
                 #     f'{self.experiment_name}', self.output_path, rex)
@@ -228,6 +248,6 @@ class Experiments(BaseExperiment):
 
 
 if __name__ == "__main__":
-    experiments = Experiments("rex_generated_linear_*.csv", verbose=True)
-    experiments.run()
+    experiments = Experiments("rex_generated_linear_*.csv", verbose=False)
+    experiments.load()
     

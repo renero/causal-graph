@@ -175,7 +175,7 @@ def subplots(
     plt.show()
 
 
-def _format_graph(
+def format_graph(
         G: nx.DiGraph,
         Gt: nx.DiGraph = None,
         ok_color="green",
@@ -207,7 +207,7 @@ def _format_graph(
     return G
 
 
-def _draw_graph_subplot(
+def draw_graph_subplot(
         G: nx.DiGraph,
         layout: dict,
         title: str,
@@ -241,8 +241,8 @@ def _draw_graph_subplot(
     if all(['regr_score' in G.nodes[node] for node in G.nodes]):
         reg_scores = [G.nodes[node]['regr_score'] for node in G.nodes]
         max_cmap_value = max(max(reg_scores), 1.0)
-        color_map = _set_colormap(0.0, max_cmap_value, 'OrRd')
-        color_map_r = _set_colormap(0.0, max_cmap_value, 'Greys_r')
+        color_map = set_colormap(0.0, max_cmap_value, 'OrRd')
+        color_map_r = set_colormap(0.0, max_cmap_value, 'Greys_r')
         formatting_kwargs['font_color'] = "white"
         
         # Set with_labels to False if there is color information of each node, 
@@ -276,10 +276,38 @@ def _draw_graph_subplot(
         ax.set_title(title, y=-0.1)
 
 
-def _cleanup_graph(G: nx.DiGraph) -> nx.DiGraph:
+def cleanup_graph(G: nx.DiGraph) -> nx.DiGraph:
     if '\\n' in G.nodes:
         G.remove_node('\\n')
     return G
+
+
+def set_colormap(
+        color_threshold=0.15,
+        max_color=0.8,
+        cmap_name: str = "OrRd") -> ListedColormap:
+    """
+    Set the colormap for the graph edges.
+
+    Parameters
+    ----------
+    color_threshold : float
+        The threshold for the color of the values in the plot, below which the color
+        will be white.
+    max_color : float
+        The maximum color for the edges, above which the color will be red.
+
+    Returns
+    -------
+    LinearColormap 
+        The colormap to be used in the plot.
+    """
+    cw = plt.get_cmap(cmap_name)
+    cmap = ListedColormap([cw(x)
+                           for x in np.arange(color_threshold, max_color, 0.01)])
+    cm = copy(cmap)
+    cm.set_under(color='white')
+    return cm
 
 
 def dag2dot(
@@ -338,7 +366,7 @@ def dag2dot(
     return dot_object
 
 
-def plot_values_distribution(values, **kwargs):
+def values_distribution(values, **kwargs):
     # Plot two subplots: one with probability density of "all_mean_shap_values"
     # and another with the cumulative density of "all_shap_values"
     figsize = kwargs.get('figsize', (7, 5))
@@ -355,29 +383,80 @@ def plot_values_distribution(values, **kwargs):
     plt.show()
 
 
-def _set_colormap(
-        color_threshold=0.15,
-        max_color=0.8,
-        cmap_name: str = "OrRd") -> ListedColormap:
+def correlations(correlations, sorted_colnames, threshold, ax, **kwargs):
     """
-    Set the colormap for the graph edges.
-
+    Plot the correlation matrix of the data.
+    
     Parameters
     ----------
-    color_threshold : float
-        The threshold for the color of the values in the plot, below which the color
-        will be white.
-    max_color : float
-        The maximum color for the edges, above which the color will be red.
-
+        - correlations (pd.DataFrame)
+            Correlation matrix.
+        - sorted_colnames (List[str])
+            List of sorted column names.
+        - threshold (float)
+            Threshold for the correlation.
+        - ax (matplotlib.axes.Axes)
+            Axes to plot the correlation matrix.
+        - **kwargs
+            Keyword arguments to be passed to the plot_dendogram function.
+            - title (str)
+                Title of the plot.
+            - fontsize (int)    
+                Font size for the labels.
+            - fontname (str)
+                Font name for the labels.
+            - xrot (int)
+                Rotation of the labels.
+                
     Returns
     -------
-    LinearColormap 
-        The colormap to be used in the plot.
+        None
     """
-    cw = plt.get_cmap(cmap_name)
-    cmap = ListedColormap([cw(x)
-                           for x in np.arange(color_threshold, max_color, 0.01)])
-    cm = copy(cmap)
-    cm.set_under(color='white')
-    return cm
+    title = kwargs.get('title', 'Correlation matrix')
+    fontsize = kwargs.get('fontsize', 9)
+    fontname = kwargs.get('fontname', "Arial")
+    xrot = kwargs.get('xrot', 0)
+    cm = set_colormap(color_threshold=threshold, max_color=0.9)
+    precision = 2
+
+    def myround(v, ndigits=2):
+        if np.isclose(v, 0.0):
+            return "0"
+        return format(v, '.' + str(ndigits) + 'f')
+
+    corr_data = np.abs(copy(correlations.values))
+    ncols, nrows = corr_data.shape
+    for x in range(ncols):
+        for y in range(nrows):
+            if x == y or corr_data[x, y] < threshold:
+                corr_data[x, y] = 0
+
+    ax.set_xticks(range(len(sorted_colnames)), sorted_colnames, rotation=xrot,
+                    horizontalalignment='center',
+                    fontsize=fontsize, fontname=fontname, color='black')
+    ax.set_yticks(range(len(sorted_colnames)), sorted_colnames,
+                    verticalalignment='center',
+                    fontsize=fontsize, fontname=fontname, color='black')
+    ax.imshow(corr_data, cmap=cm, vmin=threshold,
+                vmax=1.0, aspect='equal')
+    ax.grid(True, which='major', alpha=.25)
+    for x in range(ncols):
+        for y in range(nrows):
+            if (x) == y:
+                ax.annotate('x', xy=(y, x),
+                                horizontalalignment='center',
+                                verticalalignment='center',
+                                fontsize=fontsize, fontname=fontname, color='black')
+            if (x) != y and not np.isclose(round(corr_data[x, y], precision), 0.0):
+                ax.annotate(myround(corr_data[x, y], precision), xy=(y, x),
+                                horizontalalignment='center',
+                                verticalalignment='center',
+                                fontsize=fontsize, fontname=fontname, color='black')
+    plt.tick_params(pad=10, axis='x', which='both')
+
+    ax.spines['top'].set_linewidth(.3)
+    ax.spines['right'].set_linewidth(.3)
+    ax.spines['left'].set_linewidth(1)
+    ax.spines['left'].set_edgecolor('grey')
+    ax.spines['bottom'].set_linewidth(.3)
+    ax.set_title(title)

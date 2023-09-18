@@ -23,9 +23,7 @@ from sklearn.utils.validation import check_is_fitted, check_random_state
 
 from causalgraph.common import GRAY, GREEN, RESET
 from causalgraph.common.pipeline import Pipeline
-from causalgraph.common.plots import (_cleanup_graph, _draw_graph_subplot,
-                                      _format_graph, formatting_kwargs,
-                                      setup_plot, subplots)
+from causalgraph.common import plot
 from causalgraph.common.utils import (graph_from_dot_file, load_experiment,
                                       save_experiment)
 from causalgraph.estimators.knowledge import Knowledge
@@ -403,7 +401,7 @@ class Rex(BaseEstimator, ClassifierMixin):
         ncols = 1 if reference is None else 2
 
         # Overwrite formatting_kwargs with kwargs if they are provided
-        formatting_kwargs.update(kwargs)
+        plot.formatting_kwargs.update(kwargs)
 
         G = nx.DiGraph()
         G.add_nodes_from(dag.nodes(data=True))
@@ -411,19 +409,19 @@ class Rex(BaseEstimator, ClassifierMixin):
         if reference:
             # Clean up reference graph for inconsistencies along the DOT conversion
             # and add potential missing nodes to the predicted graph.
-            Gt = _cleanup_graph(reference.copy())
+            Gt = plot.cleanup_graph(reference.copy())
             for missing in set(list(Gt.nodes)) - set(list(G.nodes)):
                 G.add_node(missing)
             # Gt = _format_graph(Gt, Gt, inv_color="red", wrong_color="black")
             # G  = _format_graph(G, Gt, inv_color="red", wrong_color="gray")
-            Gt = _format_graph(
+            Gt = plot.format_graph(
                 Gt, G, inv_color="lightgreen", wrong_color="lightgreen")
-            G = _format_graph(G, Gt, inv_color="orange", wrong_color="red")
+            G = plot.format_graph(G, Gt, inv_color="orange", wrong_color="red")
         else:
-            G = _format_graph(G)
+            G = plot.format_graph(G)
 
         ref_layout = None
-        setup_plot(dpi=dpi)
+        plot.setup_plot(dpi=dpi)
         f, ax = plt.subplots(ncols=ncols, figsize=figsize)
         ax_graph = ax[1] if reference else ax
         if save_to_pdf is not None:
@@ -431,20 +429,20 @@ class Rex(BaseEstimator, ClassifierMixin):
                 if reference:
                     ref_layout = nx.drawing.nx_agraph.graphviz_layout(
                         Gt, prog="dot")
-                    _draw_graph_subplot(Gt, layout=ref_layout, title=None, ax=ax[0],
-                                        **formatting_kwargs)
-                _draw_graph_subplot(G, layout=ref_layout, title=None, ax=ax_graph,
-                                    **formatting_kwargs)
+                    plot.draw_graph_subplot(Gt, layout=ref_layout, title=None, ax=ax[0],
+                                        **plot.formatting_kwargs)
+                plot.draw_graph_subplot(G, layout=ref_layout, title=None, ax=ax_graph,
+                                    **plot.formatting_kwargs)
                 pdf.savefig(f, bbox_inches='tight', pad_inches=0)
                 plt.close()
         else:
             if reference:
                 ref_layout = nx.drawing.nx_agraph.graphviz_layout(
                     Gt, prog="dot")
-                _draw_graph_subplot(Gt, layout=ref_layout, title=names[1], ax=ax[0],
-                                    **formatting_kwargs)
-            _draw_graph_subplot(G, layout=ref_layout, title=names[0], ax=ax_graph,
-                                **formatting_kwargs)
+                plot.draw_graph_subplot(Gt, layout=ref_layout, title=names[1], ax=ax[0],
+                                    **plot.formatting_kwargs)
+            plot.draw_graph_subplot(G, layout=ref_layout, title=names[0], ax=ax_graph,
+                                **plot.formatting_kwargs)
             plt.show()
 
     @staticmethod
@@ -471,24 +469,24 @@ class Rex(BaseEstimator, ClassifierMixin):
             - "with_labels": True
         """
         # Overwrite formatting_kwargs with kwargs if they are provided
-        formatting_kwargs.update(kwargs)
+        plot.formatting_kwargs.update(kwargs)
 
         G = nx.DiGraph()
         G.add_edges_from(dag.edges())
-        G = _format_graph(G)
+        G = plot.format_graph(G)
         ref_layout = nx.drawing.nx_agraph.graphviz_layout(G, prog="dot")
 
-        setup_plot(dpi=dpi)
+        plot.setup_plot(dpi=dpi)
         f, ax = plt.subplots(figsize=figsize)
         if save_to_pdf is not None:
             with PdfPages(save_to_pdf) as pdf:
-                _draw_graph_subplot(G, layout=ref_layout,
-                                    title=None, ax=ax, **formatting_kwargs)
+                plot.draw_graph_subplot(G, layout=ref_layout,
+                                    title=None, ax=ax, **plot.formatting_kwargs)
                 pdf.savefig(f, bbox_inches='tight', pad_inches=0)
                 plt.close()
         else:
-            _draw_graph_subplot(G, layout=ref_layout, title=None,
-                                ax=ax, **formatting_kwargs)
+            plot.draw_graph_subplot(G, layout=ref_layout, title=None,
+                                ax=ax, **plot.formatting_kwargs)
 
     def plot_shap_discrepancies(self, target_name: str, **kwargs):
         assert self.is_fitted_, "Model not fitted yet"
@@ -500,7 +498,7 @@ class Rex(BaseEstimator, ClassifierMixin):
     def plot_shap_values(self, **kwargs):
         assert self.is_fitted_, "Model not fitted yet"
         plot_args = [(target_name) for target_name in self.feature_names]
-        return subplots(self.shaps._plot_shap_summary, *plot_args, **kwargs)
+        return plot.subplots(self.shaps._plot_shap_summary, *plot_args, **kwargs)
 
 
 def custom_main(dataset_name, 

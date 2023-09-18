@@ -10,7 +10,7 @@ from sklearn.inspection import permutation_importance
 from tqdm.auto import tqdm
 
 from causalgraph.common import tqdm_params, utils
-from causalgraph.common.plots import subplots
+from causalgraph.common.plot import subplots
 from causalgraph.models._models import MLPModel
 from causalgraph.explainability.hierarchies import Hierarchies
 
