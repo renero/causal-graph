@@ -123,12 +123,12 @@ class BaseExperiment:
         """
         input_files = glob.glob(os.path.join(
             self.input_path, self.input_pattern))
-        input_files = [os.path.splitext(f)[0] for f in input_files]
+        input_files = sorted([os.path.splitext(f)[0] for f in input_files])
 
-        assert len(input_files) > 0, \
+        assert len(self.input_files) > 0, \
             f"No files found in {self.input_path} matching <{self.input_pattern}>"
 
-        return sorted(input_files)
+        return input_files
 
 
 class Experiment(BaseExperiment):
@@ -162,8 +162,7 @@ class Experiment(BaseExperiment):
             rex = load_experiment(self.experiment_name, self.output_path)
             print(f"Loaded '{self.experiment_name}' from '{self.output_path}'")
         else:
-            rex = Rex(model_type=NNRegressor,
-                      explainer=shap.GradientExplainer, **kwargs)
+            rex = Rex(**kwargs)
             rex.fit_predict(self.train, self.test, self.ref_graph)
 
         return rex
@@ -213,6 +212,8 @@ class Experiments(BaseExperiment):
             if self.load_experiment:
                 exp[self.experiment_name] = load_experiment(
                     self.experiment_name, self.output_path)
+                exp[self.experiment_name].ref_graph = graph_from_dot_file(
+                    f"{path.join(self.input_path, self.experiment_name)}.dot")
                 if self.verbose:
                     print(f"        +-> Loaded {self.experiment_name} "
                         f"({type(exp[self.experiment_name])})")
