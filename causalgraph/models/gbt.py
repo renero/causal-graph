@@ -1,5 +1,8 @@
 import numpy as np
+import optuna
+import pandas as pd
 from sklearn.ensemble import GradientBoostingRegressor
+from sklearn.preprocessing import StandardScaler
 from tqdm.auto import tqdm
 
 from causalgraph.common import tqdm_params
@@ -7,9 +10,11 @@ from causalgraph.explainability.hierarchies import Hierarchies
 
 
 class GBTRegressor(GradientBoostingRegressor):
+    
+    random_state = 42
 
     def __init__(
-        self,
+            self,
             loss='squared_error',
             learning_rate=0.1,
             n_estimators=100,
@@ -21,7 +26,7 @@ class GBTRegressor(GradientBoostingRegressor):
             max_depth=3,
             min_impurity_decrease=0.0,
             init=None,
-            random_state=None,
+            random_state=42,
             max_features=None,
             alpha=0.9,
             max_leaf_nodes=None,
@@ -74,13 +79,13 @@ class GBTRegressor(GradientBoostingRegressor):
         self.n_features_in_ = X.shape[1]
         self.feature_names = list(X.columns)
         self.regressor = dict()
-        
+
         if self.correlation_th:
             self.corr_matrix = Hierarchies.compute_correlation_matrix(X)
             self.correlated_features = Hierarchies.compute_correlated_features(
                 self.corr_matrix, self.correlation_th, self.feature_names,
                 verbose=self.verbose)
-            X_original = X.copy()        
+            X_original = X.copy()
 
         pbar_in = tqdm(total=len(self.feature_names),
                        **tqdm_params(self._fit_desc, self.prog_bar,
@@ -88,7 +93,7 @@ class GBTRegressor(GradientBoostingRegressor):
 
         for target_name in self.feature_names:
             pbar_in.refresh()
-            
+
             # if correlation_th is not None then, remove features that are highly
             # correlated with the target, at each step of the loop
             if self.correlation_th is not None:
@@ -97,8 +102,8 @@ class GBTRegressor(GradientBoostingRegressor):
                     X = X.drop(self.correlated_features[target_name], axis=1)
                     if self.verbose:
                         print("REMOVED CORRELATED FEATURES: ",
-                              self.correlated_features[target_name])            
-            
+                              self.correlated_features[target_name])
+
             self.regressor[target_name] = GradientBoostingRegressor(
                 loss=self.loss,
                 learning_rate=self.learning_rate,
@@ -122,7 +127,8 @@ class GBTRegressor(GradientBoostingRegressor):
                 tol=self.tol,
                 ccp_alpha=self.ccp_alpha
             )
-            self.regressor[target_name].fit(X.drop(target_name, axis=1), X[target_name])
+            self.regressor[target_name].fit(
+                X.drop(target_name, axis=1), X[target_name])
             pbar_in.update(1)
         pbar_in.close()
 
@@ -140,19 +146,20 @@ class GBTRegressor(GradientBoostingRegressor):
                 f"This {self.__class__.__name__} instance is not fitted yet."
                 f"Call 'fit' with appropriate arguments before using this method.")
         y_pred = list()
-        
+
         if self.correlation_th is not None:
             X_original = X.copy()
 
         for target_name in self.feature_names:
             if self.correlation_th is not None:
-                X = X_original.drop(self.correlated_features[target_name], axis=1)
-            
+                X = X_original.drop(
+                    self.correlated_features[target_name], axis=1)
+
             y_pred.append(
                 self.regressor[target_name].predict(X.drop(target_name, axis=1)))
-            
+
         return np.array(y_pred)
-    
+
     def score(self, X):
         """
         Call the score method of the parent class with every feature from the "X" 
@@ -170,11 +177,208 @@ class GBTRegressor(GradientBoostingRegressor):
         scores = list()
         for target_name in self.feature_names:
             if self.correlation_th is not None:
-                X = X_original.drop(self.correlated_features[target_name], axis=1)
-                
-            scores.append(
-                self.regressor[target_name].score(
-                    X.drop(target_name, axis=1), X[target_name]))
+                X = X_original.drop(
+                    self.correlated_features[target_name], axis=1)
+
+            R2 = self.regressor[target_name].score(
+                    X.drop(target_name, axis=1), X[target_name])
             
+            # Append 1.0 if R2 is negative, or 1.0 - R2 otherwise since we're 
+            # in the minimization mode of the error function.
+            scores.append(1.0) if R2 < 0.0 else scores.append(1.0 - R2)
+
         self.scoring = np.array(scores)
         return self.scoring
+
+    def tune(
+            self,
+            training_data: pd.DataFrame,
+            test_data: pd.DataFrame,
+            study_name: str = None,
+            min_loss: float = 0.05,
+            storage: str = "sqlite:///rex_tuning.db",
+            load_if_exists: bool = True,
+            n_trials: int = 20):
+        """
+        Tune the hyperparameters of the model using Optuna.
+        """
+        class Objective:
+            """
+            A class to define the objective function for the hyperparameter optimization
+            Some of the parameters for NNRegressor have been taken to default values to
+            reduce the number of hyperparameters to optimize.
+
+            Include this class in the hyperparameter optimization as follows:
+
+            >>> study = optuna.create_study(direction='minimize',
+            >>>                             study_name='study_name_here',
+            >>>                             storage='sqlite:///db.sqlite3',
+            >>>                             load_if_exists=True)
+            >>> study.optimize(Objective(train_data, test_data), n_trials=100)
+
+            The only dependency is you need to pass the train and test data to the class
+            constructor. Tha class will build the data loaders for them from the 
+            dataframes.
+            """
+
+            def __init__(self, train_data, test_data, device='cpu'):
+                self.train_data = train_data
+                self.test_data = test_data
+                self.device = device
+                self.random_state = GBTRegressor.random_state
+                
+            def __call__(self, trial):
+                """
+                This method is called by Optuna to evaluate the objective function.
+                """
+                # Define the model hyperparameters
+                self.n_iter_no_change = 5
+                self.tol = 0.0001
+                
+                # Define the hyperparameters to optimize
+                self.learning_rate = trial.suggest_float("learning_rate", 0.001, 0.2)
+                self.n_estimators = trial.suggest_int("n_estimators", 10, 1000)
+                self.subsample = trial.suggest_float("subsample", 0.1, 1.0)
+                self.min_samples_split = trial.suggest_int("min_samples_split", 2, 10)
+                self.min_samples_leaf = trial.suggest_int("min_samples_leaf", 1, 10)
+                self.min_weight_fraction_leaf = trial.suggest_float("min_weight_fraction_leaf", 0.0, 0.5)
+                self.max_depth = trial.suggest_int("max_depth", 3, 20)
+                self.max_leaf_nodes = trial.suggest_int("max_leaf_nodes", 10, 1000)
+                # self.max_features = trial.suggest_categorical("max_features", ["auto", "sqrt", "log2"])
+                self.min_impurity_decrease = trial.suggest_float("min_impurity_decrease", 0.0, 0.5)
+                
+                # Extract feature_names from the train_data dataframe
+                
+                self.models = GBTRegressor(
+                    learning_rate=self.learning_rate,
+                    n_estimators=self.n_estimators,
+                    subsample=self.subsample,
+                    min_samples_split=self.min_samples_split,
+                    min_samples_leaf=self.min_samples_leaf,
+                    min_weight_fraction_leaf=self.min_weight_fraction_leaf,
+                    max_depth=self.max_depth,
+                    min_impurity_decrease=self.min_impurity_decrease,
+                    random_state=self.random_state,
+                    # max_features=self.max_features,
+                    verbose=False,
+                    max_leaf_nodes=self.max_leaf_nodes,
+                    n_iter_no_change=self.n_iter_no_change,
+                    tol=self.tol
+                )
+                self.models.fit(self.train_data)
+                
+                # Now, measure the performance of the model with the test data.
+                loss = []
+                for target_name in list(self.train_data.columns):
+                    R2 = self.models.regressor[target_name].score(
+                        self.test_data.drop(target_name, axis=1), 
+                        self.test_data[target_name])
+                    # Append 1.0 if R2 is negative, or 1.0 - R2 otherwise since we're 
+                    # in the minimization mode of the error function.
+                    loss.append(1.0) if R2 < 0.0 else loss.append(1.0 - R2)
+
+                return np.median(loss)
+
+        # Callback function to stop the stud if the loss is below a given threshold
+        def callback(study: optuna.study.Study, trial: optuna.trial.FrozenTrial):
+            if trial.value < min_loss or study.best_value < min_loss:
+                study.stop()
+        
+        if self.verbose is False:
+            optuna.logging.set_verbosity(optuna.logging.WARNING)
+            
+        # Create and run the HPO study
+        study = optuna.create_study(
+            direction='minimize', study_name=study_name, storage=storage,
+            load_if_exists=load_if_exists)
+        study.optimize(Objective(training_data, test_data), n_trials=n_trials,
+                       show_progress_bar=(self.prog_bar & (not self.silent)),
+                       callbacks=[callback])
+        
+        # Capture the best hyperparameters and the minimum loss
+        best_trials = sorted(study.best_trials, key=lambda x: x.values[0])
+        self.best_params = best_trials[0].params
+        self.min_tunned_loss = best_trials[0].values[0]
+        
+        regressor_args = {
+            'learning_rate': self.best_params['learning_rate'],
+            'n_estimators': self.best_params['n_estimators'],
+            'subsample': self.best_params['subsample'],
+            'min_samples_split': self.best_params['min_samples_split'],
+            'min_samples_leaf': self.best_params['min_samples_leaf'],
+            'min_weight_fraction_leaf': self.best_params['min_weight_fraction_leaf'],
+            'max_depth': self.best_params['max_depth'],
+            'max_leaf_nodes': self.best_params['max_leaf_nodes'],
+            # 'max_features': self.best_params['max_features'],
+            'min_impurity_decrease': self.best_params['min_impurity_decrease']
+        }
+        
+        return regressor_args
+    
+    def tune_fit(
+            self,
+            X: pd.DataFrame,
+            hpo_study_name: str = None,
+            hpo_min_loss: float = 0.05,
+            hpo_storage: str = 'sqlite:///rex_tuning.db',
+            hpo_load_if_exists: bool = True,
+            hpo_n_trials: int = 20):
+        """
+        Tune the hyperparameters of the model using Optuna, and the fit the model
+        with the best parameters.
+        """
+        # split X into train and test
+        train_data = X.sample(frac=0.9, random_state=self.random_state)
+        test_data = X.drop(train_data.index)
+
+        # tune the model
+        regressor_args = self.tune(
+            train_data, test_data, n_trials=hpo_n_trials, study_name=hpo_study_name,
+            min_loss=hpo_min_loss, storage=hpo_storage, 
+            load_if_exists=hpo_load_if_exists)
+
+        if self.verbose and not self.silent:
+            print(f"Best params (min loss:{self.min_tunned_loss:.6f}):")
+            for k, v in regressor_args.items():
+                print(f"\t{k:<15s}: {v}")
+
+        # Set the object parameters to the best parameters found.
+        for k, v in regressor_args.items():
+            setattr(self, k, v)
+
+        # Fit the model with the best parameters.
+        self.fit(train_data)
+        
+
+#
+# Main function
+#
+
+def custom_main(experiment_name = 'custom_rex', score:bool=False, tune: bool = False):
+    from causalgraph.common import utils
+    path = "/Users/renero/phd/data/RC3/"
+    output_path = "/Users/renero/phd/output/RC3/"
+    
+    ref_graph = utils.graph_from_dot_file(f"{path}{experiment_name}.dot")
+    
+    data = pd.read_csv(f"{path}{experiment_name}.csv")
+    scaler = StandardScaler()
+    data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)
+
+    # Split the dataframe into train and test
+    train = data.sample(frac=0.9, random_state=42)
+    test = data.drop(train.index)
+
+    if score:
+        rex = utils.load_experiment(f"{experiment_name}", output_path)
+        rex.is_fitted_ = True
+        print(f"Loaded experiment {experiment_name}")
+        rex.models.score(test)
+    elif tune:
+        gbt = GBTRegressor(verbose=True)
+        gbt.tune_fit(train, hpo_study_name=experiment_name, hpo_n_trials=100)
+        print(gbt.score(test))
+
+
+if __name__ == "__main__":
+    custom_main("rex_generated_linear_6", tune=True)

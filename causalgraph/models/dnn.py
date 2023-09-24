@@ -345,8 +345,8 @@ class NNRegressor(BaseEstimator):
             training_data: pd.DataFrame,
             test_data: pd.DataFrame,
             study_name: str = None,
-            min_mse: float = 0.05,
-            storage: str = 'sqlite:///db.sqlite3',
+            min_loss: float = 0.05,
+            storage: str = 'sqlite:///rex_tuning.db',
             load_if_exists: bool = True,
             n_trials: int = 20):
         """
@@ -407,7 +407,7 @@ class NNRegressor(BaseEstimator):
                 self.models.fit(self.train_data)
 
                 # Now, measure the performance of the model with the test data.
-                mse = []
+                loss = []
                 for target in list(self.train_data.columns):
                     model = self.models.regressor[target].model
                     loader = DataLoader(
@@ -415,8 +415,8 @@ class NNRegressor(BaseEstimator):
                         batch_size=self.batch_size,
                         shuffle=False)
                     avg_loss, _, _ = self.compute_loss(model, loader)
-                    mse.append(avg_loss)
-                return np.median(mse)
+                    loss.append(avg_loss)
+                return np.median(loss)
 
             def compute_loss(
                     self,
@@ -463,7 +463,7 @@ class NNRegressor(BaseEstimator):
 
         # Callback to stop the study if the MSE is below a threshold.
         def callback(study: optuna.study.Study, trial: optuna.trial.FrozenTrial):
-            if trial.value < min_mse or study.best_value < min_mse:
+            if trial.value < min_loss or study.best_value < min_loss:
                 study.stop()
 
         if self.verbose is False:
@@ -477,13 +477,13 @@ class NNRegressor(BaseEstimator):
             Objective(training_data, test_data), n_trials=n_trials,
             show_progress_bar=(self.prog_bar & (not self.silent)), callbacks=[callback])
 
-        # Capture the best parameters and the minimum MSE obtained.
+        # Capture the best parameters and the minimum loss.
         best_trials = sorted(study.best_trials, key=lambda x: x.values[0])
         self.best_params = best_trials[0].params
         self.min_tunned_loss = best_trials[0].values[0]
 
         if self.verbose and not self.silent:
-            print(f"Best params (min MSE:{self.min_tunned_loss:.6f}):")
+            print(f"Best params (min loss:{self.min_tunned_loss:.6f}):")
             for k, v in self.best_params.items():
                 print(f"\t{k:<15s}: {v}")
 
@@ -499,11 +499,11 @@ class NNRegressor(BaseEstimator):
         return regressor_args
 
     def tune_fit(
-        self,
+            self,
             X: pd.DataFrame,
             hpo_study_name: str = None,
-            hpo_min_mse: float = 0.05,
-            hpo_storage: str = 'sqlite:///db.sqlite3',
+            hpo_min_loss: float = 0.05,
+            hpo_storage: str = 'sqlite:///rex_tuning.db',
             hpo_load_if_exists: bool = True,
             hpo_n_trials: int = 20):
         """
@@ -517,10 +517,11 @@ class NNRegressor(BaseEstimator):
         # tune the model
         regressor_args = self.tune(
             train_data, test_data, n_trials=hpo_n_trials, study_name=hpo_study_name,
-            min_mse=hpo_min_mse, storage=hpo_storage, load_if_exists=hpo_load_if_exists)
+            min_loss=hpo_min_loss, storage=hpo_storage, 
+            load_if_exists=hpo_load_if_exists)
 
         if self.verbose and not self.silent:
-            print(f"Best params (min MSE:{self.min_tunned_loss:.6f}):")
+            print(f"Best params (min loss:{self.min_tunned_loss:.6f}):")
             for k, v in regressor_args.items():
                 print(f"\t{k:<15s}: {v}")
 
@@ -536,41 +537,30 @@ class NNRegressor(BaseEstimator):
 # Main function
 #
 
-def custom_main():
+def custom_main(score:bool=False, tune: bool = False):
     from causalgraph.common import utils
     path = "/Users/renero/phd/data/RC3/"
     output_path = "/Users/renero/phd/output/RC3/"
     experiment_name = 'custom_rex'
 
     ref_graph = utils.graph_from_dot_file(f"{path}{experiment_name}.dot")
+    
     data = pd.read_csv(f"{path}{experiment_name}.csv")
     scaler = StandardScaler()
     data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)
+
     # Split the dataframe into train and test
     train = data.sample(frac=0.9, random_state=42)
     test = data.drop(train.index)
 
-    rex = utils.load_experiment(f"{experiment_name}", output_path)
-    rex.is_fitted_ = True
-    print(f"Loaded experiment {experiment_name}")
-
-    rex.models.score(test)
-
-
-def main(tune: bool = False):
-    warnings.filterwarnings("ignore", category=UserWarning)
-
-    dataset_name = 'rex_generated_polynew_1_mini'
-    data = pd.read_csv(f"~/phd/data/RC3/{dataset_name}.csv")
-    scaler = StandardScaler()
-    data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)
-
-    # split data into train and test
-    train_data = data.sample(frac=0.9, random_state=42)
-    test_data = data.drop(train_data.index)
-
-    nn = NNRegressor()  # **regressor_args)
-    nn.tune_fit(data, hpo_n_trials=10) if tune else nn.fit(data)
+    if score:
+        rex = utils.load_experiment(f"{experiment_name}", output_path)
+        rex.is_fitted_ = True
+        print(f"Loaded experiment {experiment_name}")
+        rex.models.score(test)
+    elif tune:
+        nn = NNRegressor()
+        nn.tune_fit(data, hpo_n_trials=10)
 
 
 if __name__ == "__main__":
