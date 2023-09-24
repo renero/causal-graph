@@ -70,3 +70,4 @@ tb_logs/*
 
 examples/tb_logs/*
 db.sqlite3
+*.db
