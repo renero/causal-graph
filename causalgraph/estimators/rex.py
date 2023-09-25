@@ -243,7 +243,7 @@ class Rex(BaseEstimator, ClassifierMixin):
 
         # Create a new pipeline for the prediction stages.
         prediction = Pipeline(
-            self, prog_bar=self.prog_bar, verbose=self.verbose)
+            self, prog_bar=self.prog_bar, verbose=self.verbose, silent=self.silent)
 
         # Overwrite values for prog_bar and verbosity with current pipeline
         #  values, in case predict is called from a loaded experiment

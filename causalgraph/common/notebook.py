@@ -22,7 +22,7 @@ import shap
 from causalgraph.common.utils import (graph_from_dot_file, load_experiment,
                                       save_experiment)
 from causalgraph.estimators.rex import Rex
-from causalgraph.models import GBTRegressor, NNRegressor
+# from causalgraph.models import GBTRegressor, NNRegressor
 from sklearn.preprocessing import StandardScaler
 import glob
 
@@ -53,18 +53,21 @@ class BaseExperiment:
 
     def prepare_experiment_input(self, experiment_filename):
         """
-        Loads the data and splits it into train and test, in addition to scaling it
-        It also loads the reference graph from the dot file, which has to be named
-        as the experiment file, with the .dot extension
+        - Loads the data and 
+        - splits it into train and test, 
+        - scales it
+        - loads the reference graph from the dot file, which has to be named
+          as the experiment file, with the .dot extension
         """
         self.experiment_name = path.basename(experiment_filename)
-        self.data = pd.read_csv(f"{path.join(self.input_path, self.experiment_name)}.csv")
+        self.data = pd.read_csv(
+            f"{path.join(self.input_path, self.experiment_name)}.csv")
         self.data = self.data.apply(pd.to_numeric, downcast='float')
         scaler = StandardScaler()
         self.data = pd.DataFrame(
             scaler.fit_transform(self.data), columns=self.data.columns)
-        self.train = self.data.sample(frac=self.train_size, random_state=42)
-        self.test = self.data.drop(self.train.index)
+        self.train_data = self.data.sample(frac=self.train_size, random_state=42)
+        self.test_data = self.data.drop(self.train_data.index)
 
         self.ref_graph = graph_from_dot_file(
             f"{path.join(self.input_path, self.experiment_name)}.dot")
@@ -72,8 +75,10 @@ class BaseExperiment:
         if self.verbose:
             print(
                 f"Data for {self.experiment_name}\n"
-                f"+-> Train....: {self.data.shape[0]} rows, {self.data.shape[1]} cols\n"
-                f"+-> Test.....: {self.test.shape[0]} rows, {self.data.shape[1]} cols\n"
+                f"+-> Train....: {self.data.shape[0]} rows, "
+                f"{self.data.shape[1]} cols\n"
+                f"+-> Test.....: {self.test_data.shape[0]} rows, "
+                f"{self.data.shape[1]} cols\n"
                 f"+-> Ref.graph: {self.experiment_name}.dot")
 
     def experiment_exists(self, name):
@@ -138,32 +143,29 @@ class Experiment(BaseExperiment):
         experiment_name,
         input_path="/Users/renero/phd/data/RC3/",
         output_path="/Users/renero/phd/output/RC3/",
-        train_anyway=False,
-        save_anyway=False,
         train_size: float = 0.9,
         random_state: int = 42,
         verbose=False
     ):
 
         super().__init__(
-            input_path, output_path, train_anyway, save_anyway, train_size=train_size,
+            input_path, output_path, train_size=train_size,
             random_state=random_state, verbose=verbose)
 
         self.experiment_name = experiment_name
 
-        # Decide whether to load or train the model
-        self.decide_what_to_do()
-
         # Prepare the input
         self.prepare_experiment_input(experiment_name)
 
-    def run(self, **kwargs) -> Rex:
-        if self.load_experiment:
-            rex = load_experiment(self.experiment_name, self.output_path)
-            print(f"Loaded '{self.experiment_name}' from '{self.output_path}'")
-        else:
-            rex = Rex(**kwargs)
-            rex.fit_predict(self.train, self.test, self.ref_graph)
+    def load(self) -> Rex:
+        rex = load_experiment(self.experiment_name, self.output_path)
+        print(f"Loaded '{self.experiment_name}' from '{self.output_path}'")
+        
+        return rex
+            
+    def train(self, **kwargs) -> Rex:
+        rex = Rex(**kwargs)
+        rex.fit_predict(self.train_data, self.test_data, self.ref_graph)
 
         return rex
 
