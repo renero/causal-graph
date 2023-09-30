@@ -122,16 +122,17 @@ class BaseExperiment:
             print(f"    +-> Experiment will NOT be saved.") if self.verbose else None
             self.save_experiment = False
 
-    def list_files(self) -> list:
+    def list_files(self, input_pattern, where='input') -> list:
         """
         List all the files in the input path matching the input pattern
         """
+        where = self.input_path if where == 'input' else self.output_path
         input_files = glob.glob(os.path.join(
-            self.input_path, self.input_pattern))
+            where, input_pattern))
         input_files = sorted([os.path.splitext(f)[0] for f in input_files])
 
-        assert len(self.input_files) > 0, \
-            f"No files found in {self.input_path} matching <{self.input_pattern}>"
+        assert len(input_files) > 0, \
+            f"No files found in {where} matching <{input_pattern}>"
 
         return input_files
 
@@ -157,9 +158,13 @@ class Experiment(BaseExperiment):
         # Prepare the input
         self.prepare_experiment_input(experiment_name)
 
-    def load(self) -> Rex:
-        rex = load_experiment(self.experiment_name, self.output_path)
-        print(f"Loaded '{self.experiment_name}' from '{self.output_path}'")
+    def load(self, exp_name=None) -> Rex:
+        if exp_name is not None:
+            rex = load_experiment(exp_name, self.output_path)
+            print(f"Loaded '{exp_name}' from '{self.output_path}'")
+        else:
+            rex = load_experiment(self.experiment_name, self.output_path)
+            print(f"Loaded '{self.experiment_name}' from '{self.output_path}'")
         
         return rex
             
@@ -194,60 +199,58 @@ class Experiments(BaseExperiment):
         super().__init__(
             input_path, output_path, train_anyway, save_anyway, train_size,
             random_state, verbose)
-        self.input_pattern = input_pattern
-        self.input_files = self.list_files()
+        self.input_files = self.list_files(input_pattern)
         self.experiment_name = None
         
         if self.verbose:
             print(
-                f"Found {len(self.input_files)} files matching <{self.input_pattern}>")
+                f"Found {len(self.input_files)} files matching <{input_pattern}>")
 
-    def load(self) -> dict:
+    def load(self, pattern=None) -> dict:
         """
         Loads all the experiments matching the input pattern
         """
+        if pattern is not None:
+            pickle_files = self.list_files(pattern, where='output')
+        else:
+            pickle_files = self.input_files
+        
         exp = {}
-        for filename in self.input_files:
-            self.experiment_name = path.basename(filename)
+        for input_filename, pickle_filename in zip(self.input_files, pickle_files):
+            self.experiment_name = path.basename(pickle_filename)
+            self.input_name = path.basename(input_filename)
             self.decide_what_to_do()
 
             if self.load_experiment:
                 exp[self.experiment_name] = load_experiment(
                     self.experiment_name, self.output_path)
                 exp[self.experiment_name].ref_graph = graph_from_dot_file(
-                    f"{path.join(self.input_path, self.experiment_name)}.dot")
+                    f"{path.join(self.input_path, self.input_name)}.dot")
                 if self.verbose:
                     print(f"        +-> Loaded {self.experiment_name} "
                         f"({type(exp[self.experiment_name])})")
             else:
-                print(f"No trained experiment for {filename}...") if self.verbose else None
+                print(f"No trained experiment for {pickle_filename}...") if self.verbose else None
         
         return exp
 
-    def train(self) -> list:
+    def train(self, **kwargs) -> list:
         exps = {}
         for filename in self.input_files:
             self.prepare_experiment_input(filename)
-            self.decide_what_to_do()
+            # self.decide_what_to_do()
 
-            if self.load_experiment:
-                exps[self.experiment_name] = load_experiment(
-                    self.experiment_name, self.output_path)
-                print(f"        +-> Loaded {self.experiment_name} ({type(rex)})")
-            else:
-                print(f"Training Rex on {filename}...")
-                # rex = Rex(
-                #     model_type=NNRegressor, explainer=shap.GradientExplainer,
-                #     tune_model=True, hpo_n_trials=50, hpo_study_name=f"{experiment}",
-                #     silent=True)
-                # rex.fit_predict(self.train, self.test, self.ref_graph)
+            print(f"Training Rex on {filename}...")
+            exps[self.experiment_name] = Rex(**kwargs)
+            exps[self.experiment_name].fit_predict(
+                self.train_data, self.test_data, self.ref_graph)
 
-            if self.save_experiment:
-                saved_to = "dummy"
-                # saved_to = save_experiment(
-                #     f'{self.experiment_name}', self.output_path, rex)
-                # output_files.append(saved_to)
-                print(f"\rSaved to: {saved_to}")
+            saved_to = save_experiment(
+                f'{self.experiment_name}', self.output_path, 
+                exps[self.experiment_name])
+            print(f"\rSaved to: {saved_to}")
+
+        return exps
 
 
 if __name__ == "__main__":

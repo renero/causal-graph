@@ -38,7 +38,7 @@ warnings.filterwarnings('ignore')
 
 
 # TODO:
-# - Add tuning for the GBTRegressor
+# - Update the Knowledge class to reflect what is a bad regressor (potential_parent)
 
 class Rex(BaseEstimator, ClassifierMixin):
     """ Regression with Explainability (Rex) is a causal inference discovery that

@@ -241,9 +241,9 @@ def draw_graph_subplot(
     if all(['regr_score' in G.nodes[node] for node in G.nodes]):
         reg_scores = [G.nodes[node]['regr_score'] for node in G.nodes]
         max_cmap_value = max(max(reg_scores), 1.0)
-        color_map = set_colormap(0.0, max_cmap_value, 'OrRd')
-        color_map_r = set_colormap(0.0, max_cmap_value, 'Greys_r')
-        formatting_kwargs['font_color'] = "white"
+        color_map = set_colormap(0.0, max_cmap_value, 'RdYlGn_r')
+        # color_map_r = set_colormap(0.0, max_cmap_value, 'gist_gray')
+        formatting_kwargs['font_color'] = "black"
         
         # Set with_labels to False if there is color information of each node, 
         # since I will draw the labels afterwards
@@ -255,7 +255,7 @@ def draw_graph_subplot(
         label_colors = []
         for node in G:
             node_colors.append(color_map(G.nodes[node]['regr_score']))
-            label_colors.append(color_map_r(G.nodes[node]['regr_score']))
+            # label_colors.append(color_map_r(G.nodes[node]['regr_score']))
         formatting_kwargs['node_color'] = node_colors
 
     nx.draw(G, pos=layout, edge_color=edge_colors,
@@ -263,9 +263,9 @@ def draw_graph_subplot(
     
     if formatting_kwargs['with_labels'] == False:
         for i, node in enumerate(G):
-            font_color = label_colors[i]
+            # font_color = label_colors[i]
             nx.draw_networkx_labels(
-                G, pos=layout, labels={node:node}, font_color=font_color, 
+                G, pos=layout, labels={node:node}, #font_color=font_color, 
                 font_weight=formatting_kwargs['font_weight'],
                 font_family=formatting_kwargs['font_family'],
                 horizontalalignment=formatting_kwargs['horizontalalignment'],
