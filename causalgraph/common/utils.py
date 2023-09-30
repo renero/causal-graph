@@ -194,3 +194,45 @@ def select_device(force: str = None) -> str:
         else:
             device = "cpu"
     return device
+
+
+def graph_intersection(g1: AnyGraph, g2: AnyGraph) -> AnyGraph:
+    """
+    Returns the intersection of two graphs. The intersection is defined as the
+    set of nodes and edges that are common to both graphs. The intersection is
+    performed on the nodes and edges, not on the attributes of the nodes and
+    edges.
+
+    Args:
+        g1 (networkx.DiGraph): The first graph.
+        g2 (networkx.DiGraph): The second graph.
+
+    Returns:
+        (networkx.DiGraph) The intersection of the two graphs.
+    """
+    # Get the nodes from g1 and g2, as the union of both
+    nodes = set(g1.nodes).intersection(set(g2.nodes))
+    
+    # Check if any of the graphs is empty
+    if len(nodes) == 0:
+        return nx.DiGraph()
+    
+    # Take the data from the nodes in g1 and g2, as the minimum value of both
+    first_node = list(g1.nodes)[0]
+    data_fields = g1.nodes[first_node].keys()
+    nodes_data = {}
+    for key in data_fields:
+        for n in nodes:
+            nodes_data[n] = {key: min(g1.nodes[n][key], g2.nodes[n][key])}
+        
+    # Get the edges from g1 and g2, and take only those that match completely
+    # edges = set(g1.edges).intersection(set(g2.edges))
+    edges = g1.edges & g2.edges
+    
+    # Create a new graph with the nodes, nodes_data and edges
+    g = nx.DiGraph()
+    g.add_nodes_from(nodes)
+    nx.set_node_attributes(g, nodes_data)
+    g.add_edges_from(edges)
+    
+    return g
