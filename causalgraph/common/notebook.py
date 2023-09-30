@@ -10,21 +10,21 @@ Example:
 (C) 2023 J. Renero
 """
 
-import warnings
-warnings.filterwarnings('ignore')
-
-from os import path
-import os
-import networkx as nx
-import numpy as np
-import pandas as pd
-import shap
+import glob
+from sklearn.preprocessing import StandardScaler
+from causalgraph.metrics.compare_graphs import evaluate_graph
+from causalgraph.estimators.rex import Rex
 from causalgraph.common.utils import (graph_from_dot_file, load_experiment,
                                       save_experiment)
-from causalgraph.estimators.rex import Rex
-# from causalgraph.models import GBTRegressor, NNRegressor
-from sklearn.preprocessing import StandardScaler
-import glob
+import shap
+import pandas as pd
+import numpy as np
+import networkx as nx
+import os
+from os import path
+import warnings
+
+warnings.filterwarnings('ignore')
 
 
 class BaseExperiment:
@@ -66,7 +66,8 @@ class BaseExperiment:
         scaler = StandardScaler()
         self.data = pd.DataFrame(
             scaler.fit_transform(self.data), columns=self.data.columns)
-        self.train_data = self.data.sample(frac=self.train_size, random_state=42)
+        self.train_data = self.data.sample(
+            frac=self.train_size, random_state=42)
         self.test_data = self.data.drop(self.train_data.index)
 
         self.ref_graph = graph_from_dot_file(
@@ -108,9 +109,11 @@ class BaseExperiment:
 
         if self.verbose:
             if self.load_experiment:
-                print(f"    +-> Experiment '{self.experiment_name}' will be LOADED")
+                print(
+                    f"    +-> Experiment '{self.experiment_name}' will be LOADED")
             else:
-                print(f"    +-> Experiment '{self.experiment_name}' will be TRAINED")
+                print(
+                    f"    +-> Experiment '{self.experiment_name}' will be TRAINED")
 
         self.save_experiment = True
         if self.save_experiment and not experiment_exists:
@@ -165,9 +168,9 @@ class Experiment(BaseExperiment):
         else:
             rex = load_experiment(self.experiment_name, self.output_path)
             print(f"Loaded '{self.experiment_name}' from '{self.output_path}'")
-        
+
         return rex
-            
+
     def train(self, **kwargs) -> Rex:
         rex = Rex(**kwargs)
         rex.fit_predict(self.train_data, self.test_data, self.ref_graph)
@@ -201,7 +204,7 @@ class Experiments(BaseExperiment):
             random_state, verbose)
         self.input_files = self.list_files(input_pattern)
         self.experiment_name = None
-        
+
         if self.verbose:
             print(
                 f"Found {len(self.input_files)} files matching <{input_pattern}>")
@@ -214,46 +217,69 @@ class Experiments(BaseExperiment):
             pickle_files = self.list_files(pattern, where='output')
         else:
             pickle_files = self.input_files
-        
-        exp = {}
+
+        self.experiment = {}
         for input_filename, pickle_filename in zip(self.input_files, pickle_files):
             self.experiment_name = path.basename(pickle_filename)
             self.input_name = path.basename(input_filename)
             self.decide_what_to_do()
 
             if self.load_experiment:
-                exp[self.experiment_name] = load_experiment(
+                self.experiment[self.experiment_name] = load_experiment(
                     self.experiment_name, self.output_path)
-                exp[self.experiment_name].ref_graph = graph_from_dot_file(
+                self.experiment[self.experiment_name].ref_graph = graph_from_dot_file(
                     f"{path.join(self.input_path, self.input_name)}.dot")
                 if self.verbose:
                     print(f"        +-> Loaded {self.experiment_name} "
-                        f"({type(exp[self.experiment_name])})")
+                          f"({type(self.experiment[self.experiment_name])})")
             else:
-                print(f"No trained experiment for {pickle_filename}...") if self.verbose else None
-        
-        return exp
+                print(
+                    f"No trained experiment for {pickle_filename}...") if self.verbose else None
+
+        self.is_fitted = True
+        self.names = list(self.experiment.keys())
+        self.experiments = list(self.experiment.values())
+        return self
 
     def train(self, **kwargs) -> list:
-        exps = {}
+        self.experiment = {}
         for filename in self.input_files:
             self.prepare_experiment_input(filename)
             # self.decide_what_to_do()
 
             print(f"Training Rex on {filename}...")
-            exps[self.experiment_name] = Rex(**kwargs)
-            exps[self.experiment_name].fit_predict(
+            self.experiment[self.experiment_name] = Rex(**kwargs)
+            self.experiment[self.experiment_name].fit_predict(
                 self.train_data, self.test_data, self.ref_graph)
 
             saved_to = save_experiment(
-                f'{self.experiment_name}', self.output_path, 
-                exps[self.experiment_name])
+                f'{self.experiment_name}', self.output_path,
+                self.experiment[self.experiment_name])
             print(f"\rSaved to: {saved_to}")
 
-        return exps
+        self.is_fitted = True
+        self.names = list(self.experiment.keys())
+        self.experiments = list(self.experiment.values())
+        return self
+
+    def metrics(self) -> pd.DataFrame:
+        """
+        Returns a dataframe with the metrics of all the experiments
+        """
+        assert self.is_fitted, "Experiments have not been loaded or trained yet"
+        metrics_df = pd.DataFrame()
+        metrics = [
+            evaluate_graph(
+                self.experiment[exp_name].G_shap, self.experiment[exp_name].ref_graph) \
+                    for exp_name in self.experiment.keys()
+        ]
+
+        metrics_df = pd.DataFrame(metrics)
+        return metrics_df
 
 
 if __name__ == "__main__":
     experiments = Experiments("rex_generated_linear_*.csv", verbose=False)
-    experiments.load()
-    
+    experiments.load("rex_generated_linear_*_gbt.pickle")
+    metrics = experiments.metrics()
+    print(metrics)
