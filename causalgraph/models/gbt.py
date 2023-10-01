@@ -198,7 +198,7 @@ class GBTRegressor(GradientBoostingRegressor):
             min_loss: float = 0.05,
             storage: str = "sqlite:///rex_tuning.db",
             load_if_exists: bool = True,
-            n_trials: int = 20):
+            n_trials: int = 100):
         """
         Tune the hyperparameters of the model using Optuna.
         """
@@ -221,11 +221,16 @@ class GBTRegressor(GradientBoostingRegressor):
             dataframes.
             """
 
-            def __init__(self, train_data, test_data, device='cpu'):
+            def __init__(self, train_data, test_data, device='cpu', verbose=False,
+                         silent=False, prog_bar=True):
                 self.train_data = train_data
                 self.test_data = test_data
                 self.device = device
                 self.random_state = GBTRegressor.random_state
+                self.verbose = verbose
+                self.silent = silent
+                self.prog_bar = prog_bar
+
                 
             def __call__(self, trial):
                 """
@@ -263,7 +268,9 @@ class GBTRegressor(GradientBoostingRegressor):
                     verbose=False,
                     max_leaf_nodes=self.max_leaf_nodes,
                     n_iter_no_change=self.n_iter_no_change,
-                    tol=self.tol
+                    tol=self.tol,
+                    prog_bar=self.prog_bar,
+                    silent=self.silent
                 )
                 self.models.fit(self.train_data)
                 
@@ -291,7 +298,9 @@ class GBTRegressor(GradientBoostingRegressor):
         study = optuna.create_study(
             direction='minimize', study_name=study_name, storage=storage,
             load_if_exists=load_if_exists)
-        study.optimize(Objective(training_data, test_data), n_trials=n_trials,
+        study.optimize(Objective(training_data, test_data, verbose=self.verbose,
+                                 silent=self.silent, prog_bar=self.prog_bar), 
+                       n_trials=n_trials,
                        show_progress_bar=(self.prog_bar & (not self.silent)),
                        callbacks=[callback])
         
@@ -322,7 +331,7 @@ class GBTRegressor(GradientBoostingRegressor):
             hpo_min_loss: float = 0.05,
             hpo_storage: str = 'sqlite:///rex_tuning.db',
             hpo_load_if_exists: bool = True,
-            hpo_n_trials: int = 20):
+            hpo_n_trials: int = 100):
         """
         Tune the hyperparameters of the model using Optuna, and the fit the model
         with the best parameters.
@@ -375,7 +384,7 @@ def custom_main(experiment_name = 'custom_rex', score:bool=False, tune: bool = F
         print(f"Loaded experiment {experiment_name}")
         rex.models.score(test)
     elif tune:
-        gbt = GBTRegressor(verbose=True)
+        gbt = GBTRegressor(silent=True, prog_bar=False)#verbose=True)
         gbt.tune_fit(train, hpo_study_name=experiment_name, hpo_n_trials=100)
         print(gbt.score(test))
 

@@ -242,6 +242,7 @@ class Experiments(BaseExperiment):
         return self
 
     def train(self, **kwargs) -> list:
+        save_as_pattern = kwargs.pop('save_as', None)
         self.experiment = {}
         for filename in self.input_files:
             self.prepare_experiment_input(filename)
@@ -252,9 +253,12 @@ class Experiments(BaseExperiment):
             self.experiment[self.experiment_name].fit_predict(
                 self.train_data, self.test_data, self.ref_graph)
 
+            if save_as_pattern is None:
+                save_as = self.experiment_name
+            else:
+                save_as = save_as_pattern.replace("*", self.experiment_name)
             saved_to = save_experiment(
-                f'{self.experiment_name}', self.output_path,
-                self.experiment[self.experiment_name])
+                save_as, self.output_path, self.experiment[self.experiment_name])
             print(f"\rSaved to: {saved_to}")
 
         self.is_fitted = True
