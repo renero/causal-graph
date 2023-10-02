@@ -199,7 +199,7 @@ def evaluate_graph(
         metrics["_preds"] = metrics["_gm"].copy()
     metrics["_double_for_anticausal"] = double_for_anticausal
 
-    metrics["Tp"], metrics["Tn"], metrics["Fn"], metrics["Fp"] = _conf_mat(
+    metrics["Tp"], metrics["Tn"], metrics["Fp"], metrics["Fn"] = _conf_mat(
         truth, predicted, feature_names
     )
 
@@ -399,10 +399,12 @@ def _conf_mat_directed(truth, est, feature_names):
 
     zeros = np.zeros((num_elems, num_elems))
 
-    Fp = int((np.maximum(estPositives - truePositives, zeros)).sum())
-    Fn = int((np.maximum(truePositives - estPositives, zeros)).sum())
     Tp = (np.minimum(truePositives == estPositives, truePositives)).sum()
     Tn = (truePositives == estPositives).sum() - Tp - num_elems
+    Tn = 0 if Tn < 0 else Tn
+    
+    Fp = int((np.maximum(estPositives - truePositives, zeros)).sum())
+    Fn = int((np.maximum(truePositives - estPositives, zeros)).sum())
 
     return Tp, Tn, Fn, Fp
 
