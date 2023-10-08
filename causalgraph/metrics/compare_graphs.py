@@ -406,7 +406,7 @@ def _conf_mat_directed(truth, est, feature_names):
     Fp = int((np.maximum(estPositives - truePositives, zeros)).sum())
     Fn = int((np.maximum(truePositives - estPositives, zeros)).sum())
 
-    return Tp, Tn, Fn, Fp
+    return Tp, Tn, Fp, Fn
 
 
 def _conf_mat_undirected(truth, est, feature_names):
@@ -434,7 +434,7 @@ def _conf_mat_undirected(truth, est, feature_names):
     Fn = int((np.maximum(truePositives - estPositives, zeros)).sum() / 2)
     Tn = int(((truePositives == estPositives).sum() - Tp) / 2)
 
-    return Tp, Tn, Fn, Fp
+    return Tp, Tn, Fp, Fn
 
 
 def _confusion_matrix(G, metrics):

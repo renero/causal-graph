@@ -51,7 +51,11 @@ class BaseExperiment:
         pd.set_option('display.precision', 4)
         pd.set_option('display.float_format', '{:.4f}'.format)
 
-    def prepare_experiment_input(self, experiment_filename):
+    def prepare_experiment_input(
+            self, 
+            experiment_filename, 
+            csv_filename=None, 
+            dot_filename=None):
         """
         - Loads the data and 
         - splits it into train and test, 
@@ -59,9 +63,13 @@ class BaseExperiment:
         - loads the reference graph from the dot file, which has to be named
           as the experiment file, with the .dot extension
         """
-        self.experiment_name = path.basename(experiment_filename)
-        self.data = pd.read_csv(
-            f"{path.join(self.input_path, self.experiment_name)}.csv")
+        self.experiment_name = path.splitext(path.basename(experiment_filename))[0]
+        if csv_filename is None:
+            csv_filename = f"{path.join(self.input_path, self.experiment_name)}.csv"
+        if dot_filename is None:
+            dot_filename = f"{path.join(self.input_path, self.experiment_name)}.dot"
+        
+        self.data = pd.read_csv(csv_filename)
         self.data = self.data.apply(pd.to_numeric, downcast='float')
         scaler = StandardScaler()
         self.data = pd.DataFrame(
@@ -70,8 +78,7 @@ class BaseExperiment:
             frac=self.train_size, random_state=42)
         self.test_data = self.data.drop(self.train_data.index)
 
-        self.ref_graph = graph_from_dot_file(
-            f"{path.join(self.input_path, self.experiment_name)}.dot")
+        self.ref_graph = graph_from_dot_file(dot_filename)
 
         if self.verbose:
             print(
@@ -80,7 +87,8 @@ class BaseExperiment:
                 f"{self.data.shape[1]} cols\n"
                 f"+-> Test.....: {self.test_data.shape[0]} rows, "
                 f"{self.data.shape[1]} cols\n"
-                f"+-> Ref.graph: {self.experiment_name}.dot")
+                f"+-> CSV.data.: {csv_filename}\n"
+                f"+-> Ref.graph: {dot_filename}")
 
     def experiment_exists(self, name):
         """Checks whether the experiment exists in the output path"""
@@ -137,7 +145,7 @@ class BaseExperiment:
         assert len(input_files) > 0, \
             f"No files found in {where} matching <{input_pattern}>"
 
-        return input_files
+        return list(set(input_files))
 
 
 class Experiment(BaseExperiment):
@@ -145,6 +153,8 @@ class Experiment(BaseExperiment):
     def __init__(
         self,
         experiment_name,
+        csv_filename: str = None,
+        dot_filename: str = None,
         input_path="/Users/renero/phd/data/RC3/",
         output_path="/Users/renero/phd/output/RC3/",
         train_size: float = 0.9,
@@ -155,35 +165,30 @@ class Experiment(BaseExperiment):
         super().__init__(
             input_path, output_path, train_size=train_size,
             random_state=random_state, verbose=verbose)
-
-        self.experiment_name = experiment_name
-
+        
         # Prepare the input
-        self.prepare_experiment_input(experiment_name)
+        self.prepare_experiment_input(experiment_name, csv_filename, dot_filename)
 
     def load(self, exp_name=None) -> Rex:
         if exp_name is not None:
-            rex = load_experiment(exp_name, self.output_path)
+            self.rex = load_experiment(exp_name, self.output_path)
             print(f"Loaded '{exp_name}' from '{self.output_path}'")
         else:
-            rex = load_experiment(self.experiment_name, self.output_path)
+            self.rex = load_experiment(self.experiment_name, self.output_path)
             print(f"Loaded '{self.experiment_name}' from '{self.output_path}'")
 
-        return rex
+        return self
 
-    def train(self, **kwargs) -> Rex:
-        rex = Rex(**kwargs)
-        rex.fit_predict(self.train_data, self.test_data, self.ref_graph)
+    def fit(self, **kwargs) -> Rex:
+        self.rex = Rex(name=self.experiment_name, **kwargs)
+        self.rex.fit_predict(self.train_data, self.test_data, self.ref_graph)
 
-        return rex
+        return self
 
-    def save(self, rex: Rex):
-        if self.save_experiment:
-            where_to = save_experiment(
-                self.experiment_name, self.output_path, rex)
-            print(f"Saved '{self.experiment_name}' to '{where_to}'")
-        else:
-            print(f"Experiment '{self.experiment_name}' was not saved")
+    def save(self):
+        where_to = save_experiment(
+            self.experiment_name, self.output_path, self.rex)
+        print(f"Saved '{self.experiment_name}' to '{where_to}'")
 
 
 class Experiments(BaseExperiment):
@@ -241,22 +246,25 @@ class Experiments(BaseExperiment):
         self.experiments = list(self.experiment.values())
         return self
 
-    def train(self, **kwargs) -> list:
-        save_as_pattern = kwargs.pop('save_as', None)
+    def fit(self, save_as_pattern=None, **kwargs) -> list:
         self.experiment = {}
         for filename in self.input_files:
             self.prepare_experiment_input(filename)
-            # self.decide_what_to_do()
-
-            print(f"Training Rex on {filename}...")
-            self.experiment[self.experiment_name] = Rex(**kwargs)
-            self.experiment[self.experiment_name].fit_predict(
-                self.train_data, self.test_data, self.ref_graph)
-
             if save_as_pattern is None:
                 save_as = self.experiment_name
             else:
                 save_as = save_as_pattern.replace("*", self.experiment_name)
+
+            if self.experiment_exists(save_as) and not self.train_anyway:
+                print(f"Experiment {save_as} already exists, skipping...")
+                continue
+            
+            print(f"Training Rex on {filename}...")
+            self.experiment[self.experiment_name] = Rex(
+                name=self.experiment_name, **kwargs)
+            self.experiment[self.experiment_name].fit_predict(
+                self.train_data, self.test_data, self.ref_graph)
+                
             saved_to = save_experiment(
                 save_as, self.output_path, self.experiment[self.experiment_name])
             print(f"\rSaved to: {saved_to}")

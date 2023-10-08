@@ -70,8 +70,8 @@ def test_different_nodes_est_more_connections():
 
     assert tp == 2
     assert tn == 9
-    assert fp == 1
-    assert fn == 0
+    assert fp == 0
+    assert fn == 1
 
 # Two graphs with different nodes (truth has more connection) are compared.
 def test_different_nodes_truth_more_connections():
@@ -88,9 +88,9 @@ def test_different_nodes_truth_more_connections():
     tp, tn, fn, fp = _conf_mat_directed(truth, est, feature_names)
 
     assert tp == 2
+    assert fp == 1
     assert tn == 9
-    assert fn == 1
-    assert fp == 0
+    assert fn == 0
 
 
 # Two graphs with one node and no edges are compared.

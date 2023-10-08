@@ -63,8 +63,9 @@ class Rex(BaseEstimator, ClassifierMixin):
 
     def __init__(
             self,
+            name: str,
             model_type: str = "nn",
-            explainer:str = "explainer",
+            explainer:str = "gradient",
             tune_model: bool = False,
             correlation_th: float = None,
             corr_method: str = 'spearman',
@@ -129,8 +130,12 @@ class Rex(BaseEstimator, ClassifierMixin):
                 pdf_filename: The filename for the pdf file where final comparison will
                     be saved. Default is None, producing no pdf file.
         """
+        self.name = name
+        self.hpo_study_name = kwargs.get('hpo_study_name', self.name)
         self.model_type = NNRegressor if model_type == "nn" else GBTRegressor
         self.explainer = explainer
+        self._check_model_and_explainer(model_type, explainer)
+        
         self.tune_model = tune_model
         self.correlation_th = correlation_th
         self.corr_method = corr_method
@@ -158,6 +163,17 @@ class Rex(BaseEstimator, ClassifierMixin):
                             
         self._fit_desc = "Running Causal Discovery pipeline"
         os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+
+    def _check_model_and_explainer(self, model_type, explainer):
+        """ Check that the explainer is supported for the model type. """
+        if (model_type == "nn" and explainer != "gradient"):
+            print(
+                f"WARNING: SHAP '{explainer}' not supported for model '{model_type}'. "
+                f"Using 'gradient' instead.")
+        if (model_type == "gbt" and explainer != "explainer"):
+            print(
+                f"WARNING: SHAP '{explainer}' not supported for model '{model_type}'. "
+                f"Using 'explainer' instead.")
 
     def _more_tags(self):
         return {
@@ -245,7 +261,10 @@ class Rex(BaseEstimator, ClassifierMixin):
             ('G_shap', 'shaps.predict'),
             ('indep', GraphIndependence, {'base_graph': 'G_shap'}),
             ('G_indep', 'indep.fit_predict'),
-            ('G_final', 'shaps.adjust', {'graph': 'G_indep'})
+            ('G_final', 'shaps.adjust', {'graph': 'G_indep'}),
+            ('metrics_shap', 'score', {'ref_graph': ref_graph, 'predicted_graph': 'G_shap'}),
+            ('metrics_indep', 'score', {'ref_graph': ref_graph, 'predicted_graph': 'G_indep'}),
+            ('metrics_final', 'score', {'ref_graph': ref_graph, 'predicted_graph': 'G_final'})
         ]
         prediction.run(steps, "Predicting graph")
         if '\\n' in self.G_final.nodes:
@@ -503,11 +522,10 @@ def custom_main(dataset_name,
     test = data.drop(train.index)
 
     # rex = Rex(model_type="gbt")
-    rex = Rex(
-        model_type="nn", explainer="gradient",
-        correlation_th=0.9, prog_bar=False, verbose=True
-    )
+    rex = Rex(name=dataset_name)
     rex.fit_predict(train, test, ref_graph)
+    where_to = save_experiment(rex.name, output_path, rex)
+    print(f"Saved '{rex.name}' to '{where_to}'")
     
     # rex = load_experiment(dataset_name, output_path)
     
