@@ -63,8 +63,8 @@ class Rex(BaseEstimator, ClassifierMixin):
 
     def __init__(
             self,
-            model_type: BaseEstimator = NNRegressor,
-            explainer=shap.Explainer,
+            model_type: str = "nn",
+            explainer:str = "explainer",
             tune_model: bool = False,
             correlation_th: float = None,
             corr_method: str = 'spearman',
@@ -88,9 +88,12 @@ class Rex(BaseEstimator, ClassifierMixin):
         """
         Arguments:
         ----------
-            model_type (BaseEstimator): The type of model to use. Either NNRegressor 
-                or SKLearn GradientBoostingRegressor.
-            explainer (shap.Explainer): The explainer to use for the shap values.
+            model_type (str): The type of model to use. Either "nn" for MLP
+                or "gbt" for GradientBoostingRegressor.
+            explainer (str): The explainer to use for the shap values. The default
+                values is "explainer", which uses the shap.Explainer class. Other 
+                options are "gradient", which uses the shap.GradientExplainer class,
+                and "kernel", which uses the shap.KernelExplainer class.
             tune_model (bool): Whether to tune the model for HPO. Default is False.
             correlation_th (float): The threshold for the correlation. Default is None.
             corr_method (str): The method to use for the correlation.
@@ -126,7 +129,7 @@ class Rex(BaseEstimator, ClassifierMixin):
                 pdf_filename: The filename for the pdf file where final comparison will
                     be saved. Default is None, producing no pdf file.
         """
-        self.model_type = model_type
+        self.model_type = NNRegressor if model_type == "nn" else GBTRegressor
         self.explainer = explainer
         self.tune_model = tune_model
         self.correlation_th = correlation_th
@@ -150,24 +153,11 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.dpi = dpi
         self.pdf_filename = pdf_filename
 
-        self._get_param_values_from_kwargs(self.model_type, kwargs)
-        self._get_param_values_from_kwargs(ShapEstimator, kwargs)
-
+        for k, v in kwargs.items():
+                    setattr(self, k, v)
+                            
         self._fit_desc = "Running Causal Discovery pipeline"
         os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-
-    def _get_param_values_from_kwargs(self, object_attribute, kwargs):
-        # Check if any of the arguments required by Regressor (model_type) are
-        # present in the kwargs. If so, take them as a property of the class.
-        # arguments = inspect.signature(object_attribute.__init__).parameters
-        # constructor_parameters = {
-        #     arg: arguments[arg].default for arg in arguments.keys()}
-        # constructor_parameters.pop('self', None)
-        # for param in constructor_parameters.keys():
-        #     if param in kwargs:
-        #         setattr(self, param, kwargs[param])
-        for k, v in kwargs.items():
-            setattr(self, k, v)
 
     def _more_tags(self):
         return {
@@ -512,14 +502,14 @@ def custom_main(dataset_name,
     train = data.sample(frac=0.9, random_state=42)
     test = data.drop(train.index)
 
-    # rex = Rex(model_type=GBTRegressor, explainer=shap.Explainer)
-    # rex = Rex(
-    #     model_type=NNRegressor, explainer=shap.GradientExplainer,
-    #     correlation_th=0.9, prog_bar=False, verbose=True
-    # )
-    # rex.fit_predict(train, test, ref_graph)
+    # rex = Rex(model_type="gbt")
+    rex = Rex(
+        model_type="nn", explainer="gradient",
+        correlation_th=0.9, prog_bar=False, verbose=True
+    )
+    rex.fit_predict(train, test, ref_graph)
     
-    rex = load_experiment(dataset_name, output_path)
+    # rex = load_experiment(dataset_name, output_path)
     
     print(rex.score(ref_graph, 'shap'))
     rex.plot_dags(rex.G_shap, ref_graph)

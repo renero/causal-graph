@@ -4,15 +4,13 @@ This is a module to be used as a reference for building other modules
 from collections import defaultdict
 import math
 import types
-import warnings
 from dataclasses import dataclass
-from typing import List, Union
+from typing import Union
 
 import matplotlib as mpl
 import networkx as nx
 import numpy as np
 import pandas as pd
-import seaborn as sns
 import shap
 import statsmodels.api as sm
 import statsmodels.stats.api as sms
@@ -29,7 +27,6 @@ from tqdm.auto import tqdm
 
 from causalgraph.common import *
 from causalgraph.common import utils
-from causalgraph.common.utils import graph_from_dot_file, load_experiment
 from causalgraph.independence.edge_orientation import get_edge_orientation
 from causalgraph.independence.feature_selection import select_features
 from causalgraph.explainability.hierarchies import Hierarchies
@@ -63,7 +60,7 @@ class ShapEstimator(BaseEstimator):
 
     def __init__(
             self,
-            explainer=shap.Explainer,
+            explainer: str = "explainer",
             models: BaseEstimator = None,
             correlation_th: float = None,
             method: str = 'cluster',
@@ -96,7 +93,7 @@ class ShapEstimator(BaseEstimator):
         self.silent = silent
         self.on_gpu = on_gpu
 
-        self._fit_desc = f"Running SHAP explainer ({self.explainer.__name__})"
+        self._fit_desc = f"Running SHAP explainer ({self.explainer})"
         self._pred_desc = "Building graph skeleton"
 
     def __repr__(self):
@@ -245,23 +242,27 @@ class ShapEstimator(BaseEstimator):
         shap.Explainer
             The SHAP explainer.
         """
-        if self.explainer == shap.KernelExplainer:
-            self.shap_explainer[target_name] = self.explainer(
+        if self.explainer == "kernel":
+            self.shap_explainer[target_name] = shap.KernelExplainer(
                     model.predict, X_train)
             self.shap_values[target_name] = self.shap_explainer[target_name].\
                     shap_values(X_test)[0]
-        elif self.explainer == shap.GradientExplainer:
+        elif self.explainer == "gradient":
             X_train_tensor = torch.from_numpy(X_train).float()
             X_test_tensor = torch.from_numpy(X_test).float()
-            self.shap_explainer[target_name] = self.explainer(
+            self.shap_explainer[target_name] = shap.GradientExplainer(
                     model.to(self.device), X_train_tensor.to(self.device))
             self.shap_values[target_name] = self.shap_explainer[target_name](
                     X_test_tensor.to(self.device)).values
-        else:
-            self.shap_explainer[target_name] = self.explainer(
+        elif self.explainer == "explainer":
+            self.shap_explainer[target_name] = shap.Explainer(
                     model.predict, X_train)
             explanation = self.shap_explainer[target_name](X_test)
             self.shap_values[target_name] = explanation.values
+        else:
+            raise ValueError(
+                f"Unknown explainer: {self.explainer}. "
+                f"Please select one of: kernel, gradient, explainer.")
 
     def _add_zeroes(self, target, correlated_features):
         features = [f for f in self.feature_names if f != target]
