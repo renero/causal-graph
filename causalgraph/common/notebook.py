@@ -202,7 +202,7 @@ class Experiments(BaseExperiment):
             save_anyway=False,
             train_size: float = 0.9,
             random_state: int = 42,
-            verbose=False):
+            verbose=True):
 
         super().__init__(
             input_path, output_path, train_anyway, save_anyway, train_size,
@@ -274,20 +274,6 @@ class Experiments(BaseExperiment):
         self.experiments = list(self.experiment.values())
         return self
 
-    def metrics(self) -> pd.DataFrame:
-        """
-        Returns a dataframe with the metrics of all the experiments
-        """
-        assert self.is_fitted, "Experiments have not been loaded or trained yet"
-        metrics_df = pd.DataFrame()
-        metrics = [
-            evaluate_graph(
-                self.experiment[exp_name].G_shap, self.experiment[exp_name].ref_graph) \
-                    for exp_name in self.experiment.keys()
-        ]
-
-        metrics_df = pd.DataFrame(metrics)
-        return metrics_df
 
 
 if __name__ == "__main__":

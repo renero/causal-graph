@@ -131,7 +131,7 @@ class Rex(BaseEstimator, ClassifierMixin):
                     be saved. Default is None, producing no pdf file.
         """
         self.name = name
-        self.hpo_study_name = kwargs.get('hpo_study_name', self.name)
+        self.hpo_study_name = kwargs.get('hpo_study_name', f"{self.name}_{model_type}")
         self.model_type = NNRegressor if model_type == "nn" else GBTRegressor
         self.explainer = explainer
         self._check_model_and_explainer(model_type, explainer)
