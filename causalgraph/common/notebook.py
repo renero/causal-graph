@@ -145,7 +145,7 @@ class BaseExperiment:
         assert len(input_files) > 0, \
             f"No files found in {where} matching <{input_pattern}>"
 
-        return list(set(input_files))
+        return sorted(list(set(input_files)))
 
 
 class Experiment(BaseExperiment):
@@ -172,10 +172,12 @@ class Experiment(BaseExperiment):
     def load(self, exp_name=None) -> Rex:
         if exp_name is not None:
             self.rex = load_experiment(exp_name, self.output_path)
-            print(f"Loaded '{exp_name}' from '{self.output_path}'")
+            if self.verbose:
+                print(f"Loaded '{exp_name}' from '{self.output_path}'")
         else:
             self.rex = load_experiment(self.experiment_name, self.output_path)
-            print(f"Loaded '{self.experiment_name}' from '{self.output_path}'")
+            if self.verbose:
+                print(f"Loaded '{self.experiment_name}' from '{self.output_path}'")
 
         return self
 
