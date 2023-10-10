@@ -43,6 +43,8 @@ class Knowledge:
         self.feature_names = rex.feature_names
         self.scoring = rex.models.scoring
         self.ref_graph = ref_graph
+        self.G_shap = rex.G_shap
+        self.root_causes = rex.root_causes
         
         self.correlation_th = rex.correlation_th
         if self.correlation_th is not None:
@@ -64,47 +66,47 @@ class Knowledge:
     def data(self):
         """Returns a dataframe with the knowledge about each edge in the graph"""
         rows = []
-        self._compute_regression_outliers()
-        for target in self.feature_names:
-            for feature in self.feature_names:
-                if target == feature:
+        # self._compute_regression_outliers()
+        for origin in self.feature_names:
+            for target in self.feature_names:
+                if origin == target:
                     continue
 
                 if self.correlation_th is not None:
-                    if feature in self.correlated_features[target]:
+                    if target in self.correlated_features[origin]:
                         continue
 
                 # all_targets = [o for o in self.feature_names if o != feature]
                 # target_pos = all_targets.index(target)
                 if self.correlation_th is not None:
                     all_features = [f for f in self.feature_names if (
-                        f != target) and (f not in self.correlated_features[target])]
+                        f != origin) and (f not in self.correlated_features[origin])]
                 else:
-                    all_features = [f for f in self.feature_names if f != target]
-                feature_pos = all_features.index(feature)
+                    all_features = [f for f in self.feature_names if f != origin]
+                feature_pos = all_features.index(target)
 
-                sd = self.shaps.shap_discrepancies[target][feature]
-                pi = self.pi.pi[target]['importances_mean'][feature_pos]
+                sd = self.shaps.shap_discrepancies[origin][target]
+                pi = self.pi.pi[origin]['importances_mean'][feature_pos]
 
                 b0_s, beta1_s = sd.shap_model.params[0], sd.shap_model.params[1]
                 b0_y, beta1_y = sd.parent_model.params[0], sd.parent_model.params[1]
                 shap_slope = math.atan(beta1_s)*self.K
                 parent_slope = math.atan(beta1_y)*self.K
                 rows.append({
-                    'origin': target,
-                    'target': feature,
-                    'ref_edge': int((target, feature) in self.ref_graph.edges()),
-                    'correlation': self.hierarchies.correlations[target][feature],
+                    'origin': origin,
+                    'target': target,
+                    'ref_edge': int((origin, target) in self.ref_graph.edges()),
+                    'correlation': self.hierarchies.correlations[origin][target],
                     'shap_correlation': sd.shap_correlation,
                     'KS_pval': sd.ks_pvalue,
-                    'shap_edge': int(target in self.shaps.parents[feature]),
+                    'shap_edge': int(origin in set(self.G_shap.predecessors(target))),
                     'shap_skedastic_pval': sd.shap_p_value,
                     'parent_skedastic_pval': sd.parent_p_value,
-                    'mean_shap': self.shaps.shap_mean_values[target][feature_pos],
+                    'mean_shap': self.shaps.shap_mean_values[origin][feature_pos],
                     'mean_pi': pi,
                     'slope_shap': shap_slope,
                     'slope_target': parent_slope,
-                    'potential_root': int(target in self.regression_outliers)
+                    'potential_root': int(origin in self.root_causes)
                 })
         self.results = pd.DataFrame.from_dict(rows)
         return self.results

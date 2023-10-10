@@ -29,6 +29,7 @@ from causalgraph.common.utils import (graph_from_dot_file, load_experiment,
 from causalgraph.estimators.knowledge import Knowledge
 from causalgraph.explainability import (Hierarchies, PermutationImportance,
                                         ShapEstimator)
+from causalgraph.explainability.regression_quality import RegQuality
 from causalgraph.independence.graph_independence import GraphIndependence
 from causalgraph.metrics.compare_graphs import evaluate_graph
 from causalgraph.models import GBTRegressor, NNRegressor
@@ -264,7 +265,9 @@ class Rex(BaseEstimator, ClassifierMixin):
             ('G_final', 'shaps.adjust', {'graph': 'G_indep'}),
             ('metrics_shap', 'score', {'ref_graph': ref_graph, 'predicted_graph': 'G_shap'}),
             ('metrics_indep', 'score', {'ref_graph': ref_graph, 'predicted_graph': 'G_indep'}),
-            ('metrics_final', 'score', {'ref_graph': ref_graph, 'predicted_graph': 'G_final'})
+            ('metrics_final', 'score', {'ref_graph': ref_graph, 'predicted_graph': 'G_final'}),
+            ('root_causes', 'compute_regression_quality'),
+            ('learnings', 'summarize_knowledge', {'ref_graph': ref_graph})
         ]
         prediction.run(steps, "Predicting graph")
         if '\\n' in self.G_final.nodes:
@@ -272,8 +275,8 @@ class Rex(BaseEstimator, ClassifierMixin):
 
         # If a reference graph is provided, compute the metrics for the predicted
         # graph against the reference graph.
-        if ref_graph is not None:
-            self.knowledge(ref_graph)
+        # if ref_graph is not None:
+        #     self.knowledge(ref_graph)
 
         return self.G_final
 
@@ -338,7 +341,15 @@ class Rex(BaseEstimator, ClassifierMixin):
 
         return evaluate_graph(ref_graph, pred_graph, self.feature_names)
 
-    def knowledge(self, ref_graph: nx.DiGraph):
+    def compute_regression_quality(self):
+        """
+        Compute the regression quality for each feature in the dataset.
+        """
+        root_causes = RegQuality.predict(self.models.scoring)
+        root_causes = set([self.feature_names[i] for i in root_causes])
+        return root_causes
+        
+    def summarize_knowledge(self, ref_graph: nx.DiGraph):
         """
         Returns a dataframe with the knowledge about each edge in the graph
         The dataframe is obtained from the Knowledge class.
@@ -347,9 +358,12 @@ class Rex(BaseEstimator, ClassifierMixin):
         -----------
             ref_graph (nx.DiGraph): The reference graph, or ground truth.
         """
+        if ref_graph is None:
+            return None
+        
         K = Knowledge(self, ref_graph)
-        self.learnings = K.data()
-        return self.learnings
+        return K.data()
+        # return self.learnings
 
     def __repr__(self):
         forbidden_attrs = [
