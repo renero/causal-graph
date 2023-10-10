@@ -50,23 +50,9 @@ class Knowledge:
         if self.correlation_th is not None:
             self.correlated_features = self.hierarchies.correlated_features
 
-    def _compute_regression_outliers(self):
-        """
-        Determine what features are outliers in the regression, according to their
-        score with a test set after fitting the model. The criteria to determine
-        whether a feature is an outlier is whether its score is greater than 2.5
-        times the interquartile range (IQR).
-        """
-        iqr = np.quantile(self.scoring, 0.75) - np.quantile(self.scoring, 0.25)
-        outliers_indices = np.where(
-            np.abs(self.scoring - np.median(self.scoring)) > 1.5*iqr)
-        self.regression_outliers = [self.feature_names[i]
-                                    for i in outliers_indices[0]]
-
     def data(self):
         """Returns a dataframe with the knowledge about each edge in the graph"""
         rows = []
-        # self._compute_regression_outliers()
         for origin in self.feature_names:
             for target in self.feature_names:
                 if origin == target:
@@ -76,8 +62,6 @@ class Knowledge:
                     if target in self.correlated_features[origin]:
                         continue
 
-                # all_targets = [o for o in self.feature_names if o != feature]
-                # target_pos = all_targets.index(target)
                 if self.correlation_th is not None:
                     all_features = [f for f in self.feature_names if (
                         f != origin) and (f not in self.correlated_features[origin])]

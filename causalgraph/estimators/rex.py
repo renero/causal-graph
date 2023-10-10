@@ -273,11 +273,6 @@ class Rex(BaseEstimator, ClassifierMixin):
         if '\\n' in self.G_final.nodes:
             self.G_final.remove_node('\\n')
 
-        # If a reference graph is provided, compute the metrics for the predicted
-        # graph against the reference graph.
-        # if ref_graph is not None:
-        #     self.knowledge(ref_graph)
-
         return self.G_final
 
     def fit_predict(
@@ -363,7 +358,6 @@ class Rex(BaseEstimator, ClassifierMixin):
         
         K = Knowledge(self, ref_graph)
         return K.data()
-        # return self.learnings
 
     def __repr__(self):
         forbidden_attrs = [
