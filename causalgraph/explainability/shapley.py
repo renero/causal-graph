@@ -858,7 +858,7 @@ def custom_main(experiment_name):
     # Split the dataframe into train and test
     train = data.sample(frac=0.9, random_state=42)
     test = data.drop(train.index)
-    rex = utils.load_experiment(f"{experiment_name}", output_path)
+    rex = utils.load_experiment(f"{experiment_name}_nn", output_path)
     rex.is_fitted_ = True
     print(f"Loaded experiment {experiment_name}")
 
@@ -867,4 +867,4 @@ def custom_main(experiment_name):
 
 
 if __name__ == "__main__":
-    custom_main('custom_rex')
+    custom_main('rex_generated_linear_1')

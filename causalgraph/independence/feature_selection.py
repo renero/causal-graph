@@ -64,12 +64,16 @@ def select_features(
 
     """
     shift = 1 if strict else 0
-    feature_order = np.argsort(np.sum(np.abs(values), axis=0))
-    mean_shap_values = np.abs(values).mean(0)
-    sorted_impact_values = [mean_shap_values[idx] for idx in feature_order]
+    if len(values.shape) > 1:
+        feature_order = np.argsort(np.sum(np.abs(values), axis=0))
+        mean_values = np.abs(values).mean(0)
+    else:
+        feature_order = np.argsort(np.abs(values))
+        mean_values = np.abs(values)
+    sorted_impact_values = [mean_values[idx] for idx in feature_order]
 
     # In some cases, the mean SHAP values are 0. We return an empty list in that case.
-    if np.all(mean_shap_values < min_impact):
+    if np.all(mean_values < min_impact):
         return []
 
     if tolerance is not None:
@@ -81,9 +85,13 @@ def select_features(
     if descending:
         sorted_impact_values = sorted_impact_values[::-1]
     if verbose:
-        print("  Sum SHAP values....:", end="")
-        print(','.join([f"({f}:{s:.03f})" for f, s in zip(
-            feature_names, np.sum(np.abs(values), axis=0))]))
+        print("  Sum values.........:", end="")
+        if len(values.shape) > 1:
+            print(','.join([f"({f}:{s:.03f})" for f, s in zip(
+                feature_names, np.sum(np.abs(values), axis=0))]))
+        else:
+            print(','.join([f"({f}:{s:.03f})" for f, s in zip(
+                feature_names, np.abs(values))]))
         print(
             f"  Feature_order......: {','.join([f'{feature_names[i]}' for i in feature_order])}\n"
             f"  sorted_mean_values.: {','.join([f'{x:.6f}' for x in sorted_impact_values])}")
@@ -122,7 +130,7 @@ def select_features(
         print(f"  Limit_idx(cut-off).: {limit_idx}")
         print(f"  Selected_features..: {selected_features}")
     if return_shaps:
-        return selected_features, list(reversed(sorted(mean_shap_values)[limit_idx:]))
+        return selected_features, list(reversed(sorted(mean_values)[limit_idx:]))
 
     return selected_features
 

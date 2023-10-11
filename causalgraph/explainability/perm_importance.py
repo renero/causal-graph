@@ -13,6 +13,7 @@ from causalgraph.common import tqdm_params, utils
 from causalgraph.common.plot import subplots
 from causalgraph.models._models import MLPModel
 from causalgraph.explainability.hierarchies import Hierarchies
+from causalgraph.independence.feature_selection import select_features
 
 
 class PermutationImportance(BaseEstimator):
@@ -135,7 +136,7 @@ class PermutationImportance(BaseEstimator):
             **tqdm_params(self._fit_desc, self.prog_bar, silent=self.silent))
 
         # If me must exclude features due to correlation, we must do it before
-        # computing the base loss        
+        # computing the base loss
         if self.correlation_th:
             self.corr_matrix = Hierarchies.compute_correlation_matrix(X)
             self.correlated_features = Hierarchies.compute_correlated_features(
@@ -148,7 +149,7 @@ class PermutationImportance(BaseEstimator):
         for target_name in self.feature_names:
             pbar.refresh()
             X = X_original.copy()
-             
+
             # if correlation_th is not None then, remove features that are highly
             # correlated with the target, at each step of the loop
             if self.correlation_th is not None:
@@ -157,7 +158,7 @@ class PermutationImportance(BaseEstimator):
                     if self.verbose:
                         print("REMOVED CORRELATED FEATURES: ",
                               self.correlated_features[target_name])
-            
+
             print(f"Feature: {target_name} ", end="") if self.verbose else None
 
             regressor = self.regressors[target_name]
@@ -168,14 +169,15 @@ class PermutationImportance(BaseEstimator):
                 random_state=self.random_state)
 
             if self.correlation_th is not None:
-                self._add_zeroes(target_name, self.correlated_features[target_name])
+                self._add_zeroes(
+                    target_name, self.correlated_features[target_name])
 
             self.all_pi.append(self.pi[target_name]['importances_mean'])
 
             pbar.update(1)
-            
+
         pbar.close()
-        
+
         self.all_pi = np.array(self.all_pi).flatten()
         self.mean_pi_threshold = np.quantile(
             self.all_pi, self.mean_pi_percentile)
@@ -202,11 +204,14 @@ class PermutationImportance(BaseEstimator):
 
         self.all_pi = []
         self.pi = dict()
+        self.connections = dict()
+
         num_vars = len(self.feature_names)
         for target in self.feature_names:
             pbar.refresh()
             regressor = self.regressors[target]
             model = regressor.model
+            candidate_causes = [f for f in self.feature_names if f != target]
             if self.verbose:
                 print(
                     f"Target: {target} (base loss: {self.base_loss[target]:.6f})")
@@ -214,50 +219,28 @@ class PermutationImportance(BaseEstimator):
             # Create the dictionary to store the permutation importance, same way
             # as the sklearn implementation
             self.pi[target] = dict()
-            self.pi[target]['importances_mean'] = []
-            self.pi[target]['importances_std'] = []
-
             if self.correlation_th is not None:
-                num_vars = len(self.feature_names) - len(self.correlated_features[target])
+                num_vars = len(self.feature_names) - \
+                    len(self.correlated_features[target])
+                # Filter out features that are highly correlated with the target
+                candidate_causes = [f for f in candidate_causes \
+                    if f not in self.correlated_features[target]]
 
             # Compute the permutation importance for each feature
-            for shuffle_col in range(num_vars-1):
-                feature = regressor.columns[shuffle_col]
-                print(
-                    f"+-> Feature: {feature} ", end="") if self.verbose else None
-
-                _, _, losses = self._compute_loss_shuffling_column(
-                    model, regressor.train_loader, shuffle_col=shuffle_col)
-
-                axis = 1 if self.n_repeats > 1 else 0
-                perm_importances = np.mean(losses, axis=axis) - self.base_loss[target]
-
-                self.pi[target]['importances_mean'].append(
-                    np.mean(perm_importances))
-                if self.n_repeats > 1:
-                    self.pi[target]['importances_std'].append(
-                        np.std(perm_importances))
-                else:
-                    self.pi[target]['importances_std'].append(
-                        np.abs(np.std(losses) - self.base_loss[target]))
-
-                if self.verbose:
-                    print(
-                        f"Perm.imp.: {self.pi[target]['importances_mean'][-1]:.6f} "
-                        f"+/- {self.pi[target]['importances_std'][-1]:.6f}")
+            self.pi[target]['importances_mean'], self.pi[target]['importances_std'] = \
+                self._compute_perm_imp(target, regressor, model, num_vars)
 
             pbar.update(1)
-
-            # Convert the lists to numpy arrays
-            self.pi[target]['importances_mean'] = np.array(
-                self.pi[target]['importances_mean'])
-            self.pi[target]['importances_std'] = np.array(
-                self.pi[target]['importances_std'])
 
             if self.correlation_th is not None:
                 self._add_zeroes(target, self.correlated_features[target])
 
             self.all_pi.append(self.pi[target]['importances_mean'])
+
+            self.connections[target] = select_features(
+                values=self.pi[target]['importances_mean'],
+                feature_names=candidate_causes,
+                verbose=self.verbose)
 
         pbar.close()
 
@@ -266,6 +249,58 @@ class PermutationImportance(BaseEstimator):
             self.all_pi, self.mean_pi_percentile)
 
         return self.pi
+
+    def _compute_perm_imp(self, target, regressor, model, num_vars):
+        """
+        Compute the permutation importance for each feature, for a given target
+        variable.
+
+        Parameters:
+        -----------
+        target: str
+            The target variable to compute the permutation importance for.
+        regressor: MLPModel
+            The regressor to compute the permutation importance for.
+        model: torch.nn.Module
+            The model to compute the permutation importance for.
+        num_vars: int
+            The number of variables to compute the permutation importance for.
+
+        Returns:
+        --------
+        importances_mean: np.ndarray
+            The mean permutation importance for each feature.
+        importances_std: np.ndarray
+            The standard deviation of the permutation importance for each feature.
+        """
+        importances_mean = []
+        importances_std = []
+        for shuffle_col in range(num_vars-1):
+            feature = regressor.columns[shuffle_col]
+            print(
+                f"+-> Feature: {feature} ", end="") if self.verbose else None
+
+            _, _, losses = self._compute_loss_shuffling_column(
+                model, regressor.train_loader, shuffle_col=shuffle_col)
+
+            axis = 1 if self.n_repeats > 1 else 0
+            perm_importances = np.mean(
+                losses, axis=axis) - self.base_loss[target]
+
+            importances_mean.append(
+                np.mean(perm_importances))
+            if self.n_repeats > 1:
+                importances_std.append(np.std(perm_importances))
+            else:
+                importances_std.append(
+                    np.abs(np.std(losses) - self.base_loss[target]))
+
+            if self.verbose:
+                print(
+                    f"Perm.imp.: {importances_mean[-1]:.6f} "
+                    f"+/- {importances_std[-1]:.6f}")
+
+        return np.array(importances_mean), np.array(importances_std)
 
     def _add_zeroes(self, target, correlated_features):
         """
@@ -458,7 +493,8 @@ if __name__ == "__main__":
     print(f"Loaded experiment {experiment_name}")
 
     #  Run the permutation importance algorithm
-    pi = PermutationImportance(rex.models, n_repeats=10, prog_bar=False, verbose=True)
+    pi = PermutationImportance(
+        rex.models, n_repeats=10, prog_bar=False, verbose=True)
     pi.fit(data)
     pi.predict()
     pi.plot(fig_size=(7, 5))
