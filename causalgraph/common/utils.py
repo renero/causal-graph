@@ -236,3 +236,17 @@ def graph_intersection(g1: AnyGraph, g2: AnyGraph) -> AnyGraph:
     g.add_edges_from(edges)
     
     return g
+
+def graph_union(g1: AnyGraph, g2: AnyGraph) -> AnyGraph:
+    """ 
+    Returns the union of two graphs. The union is defined as the set of nodes and 
+    edges that are in both graphs. The union is performed on the nodes and edges,
+    not on the attributes of the nodes and edges.
+    """
+    nodes = set(g1.nodes).union(set(g2.nodes))
+    g = nx.DiGraph()
+    g.add_nodes_from(nodes)
+    g.add_edges_from(g1.edges)
+    g.add_edges_from(g2.edges)
+
+    return g

@@ -322,7 +322,7 @@ class ShapEstimator(BaseEstimator):
         pbar.update(1)
         pbar.refresh()
 
-        self.parents = dict()
+        self.connections = dict()
         for target in self.feature_names:
             candidate_causes = [
                 f for f in self.feature_names if f != target]
@@ -335,7 +335,7 @@ class ShapEstimator(BaseEstimator):
             print(
                 f"Selecting features for target {target}...") if self.verbose else None
             
-            self.parents[target] = select_features(
+            self.connections[target] = select_features(
                 values=self.shap_values[target],
                 feature_names=candidate_causes,
                 method=self.method,
@@ -349,13 +349,13 @@ class ShapEstimator(BaseEstimator):
 
         G_shap_unoriented = nx.Graph()
         for target in self.feature_names:
-            for parent in self.parents[target]:
+            for peer in self.connections[target]:
                 # Add edges ONLY between nodes where SHAP recognizes both directions
                 if self.reciprocity:
-                    if target in self.parents[parent]:
-                        G_shap_unoriented.add_edge(target, parent)
+                    if target in self.connections[peer]:
+                        G_shap_unoriented.add_edge(target, peer)
                 else:
-                    G_shap_unoriented.add_edge(target, parent)
+                    G_shap_unoriented.add_edge(target, peer)
 
         pbar.update(1)
         pbar.refresh()
@@ -741,7 +741,7 @@ class ShapEstimator(BaseEstimator):
         else:
             feature_names = [
                 f for f in self.feature_names if f != target_name]
-        selected_features = [parent for parent in self.parents[target_name]]
+        selected_features = [parent for parent in self.connections[target_name]]
 
         y_pos = np.arange(len(feature_inds))
         ax.grid(True, axis='x')
