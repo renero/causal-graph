@@ -223,10 +223,12 @@ class Rex(BaseEstimator, ClassifierMixin):
             ('hierarchies.fit'),
             ('models', self.model_type),
             (fit_step),
+            ('models.score', {'X': X}),
+            ('root_causes', 'compute_regression_quality'),
             ('shaps', ShapEstimator, {'models': 'models'}),
             ('shaps.fit'),
             ('pi', PermutationImportance, {'models': 'models'}),
-            ('pi.fit_predict', {'X': self.X}),
+            ('pi.fit_predict', {'X': self.X, 'root_causes': 'root_causes'}),
         ]
         pipeline.run(steps, self._fit_desc)
         self.is_fitted_ = True
@@ -258,15 +260,14 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.shaps.verbose = self.verbose
 
         steps = [
-            ('models.score', {'X': X}),
-            ('G_shap', 'shaps.predict'),
+            ('G_shap', 'shaps.predict', {'root_causes': 'root_causes'}),
+            ('G_pi', 'pi.predict', {'root_causes': 'root_causes'}),
             ('indep', GraphIndependence, {'base_graph': 'G_shap'}),
             ('G_indep', 'indep.fit_predict'),
             ('G_final', 'shaps.adjust', {'graph': 'G_indep'}),
             ('metrics_shap', 'score', {'ref_graph': ref_graph, 'predicted_graph': 'G_shap'}),
             ('metrics_indep', 'score', {'ref_graph': ref_graph, 'predicted_graph': 'G_indep'}),
             ('metrics_final', 'score', {'ref_graph': ref_graph, 'predicted_graph': 'G_final'}),
-            ('root_causes', 'compute_regression_quality'),
             ('learnings', 'summarize_knowledge', {'ref_graph': ref_graph})
         ]
         prediction.run(steps, "Predicting graph")
@@ -326,6 +327,8 @@ class Rex(BaseEstimator, ClassifierMixin):
                 pred_graph = self.G_final
             elif predicted_graph == 'shap':
                 pred_graph = self.G_shap
+            elif predicted_graph == 'pi':
+                pred_graph = self.G_pi
             elif predicted_graph == 'indep':
                 pred_graph = self.G_indep
             else:
@@ -520,7 +523,7 @@ class Rex(BaseEstimator, ClassifierMixin):
 
 def custom_main(dataset_name, 
           input_path="/Users/renero/phd/data/RC3/",
-          output_path="/Users/renero/phd/output/RC3/"):
+          output_path="/Users/renero/phd/output/RC3/", save=False):
 
     ref_graph = graph_from_dot_file(f"{input_path}{dataset_name}.dot")
     data = pd.read_csv(f"{input_path}{dataset_name}.csv")
@@ -532,14 +535,16 @@ def custom_main(dataset_name,
     # rex = Rex(model_type="gbt")
     rex = Rex(name=dataset_name)
     rex.fit_predict(train, test, ref_graph)
-    where_to = save_experiment(rex.name, output_path, rex)
-    print(f"Saved '{rex.name}' to '{where_to}'")
+    if save:
+        where_to = save_experiment(rex.name, output_path, rex)
+        print(f"Saved '{rex.name}' to '{where_to}'")
     
     # rex = load_experiment(dataset_name, output_path)
     
     print(rex.score(ref_graph, 'shap'))
     rex.plot_dags(rex.G_shap, ref_graph)
+    rex.plot_dags(rex.pi.G_pi, ref_graph)
 
 
 if __name__ == "__main__":
-    custom_main('rex_generated_polynew_1')
+    custom_main('rex_generated_polynomial_1')

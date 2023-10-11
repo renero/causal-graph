@@ -16,6 +16,8 @@ import pydot as pydot
 import pydotplus
 import torch
 
+from causalgraph.independence.edge_orientation import get_edge_orientation
+
 
 AnyGraph = Union[nx.Graph, nx.DiGraph]
 
@@ -237,6 +239,7 @@ def graph_intersection(g1: AnyGraph, g2: AnyGraph) -> AnyGraph:
     
     return g
 
+
 def graph_union(g1: AnyGraph, g2: AnyGraph) -> AnyGraph:
     """ 
     Returns the union of two graphs. The union is defined as the set of nodes and 
@@ -250,3 +253,87 @@ def graph_union(g1: AnyGraph, g2: AnyGraph) -> AnyGraph:
     g.add_edges_from(g2.edges)
 
     return g
+
+
+def digraph_from_connected_features(
+        X,
+        feature_names,
+        models,
+        connections, 
+        root_causes,
+        reciprocity=True,
+        iters=10, 
+        verbose=False):
+    """
+    Builds a directed graph from a set of features and their connections. The
+    connections are determined by the SHAP values of the features. The
+    orientation of the edges is determined by the causal direction of the
+    features. The orientation is determined by the method of edge orientation
+    defined in the independence module.
+    
+    Parameters:
+    -----------
+    X (numpy.ndarray): The input data.
+    feature_names (list): The list of feature names.
+    models (obj): The model used to explain the data.
+    connections (dict): The dictionary of connections between features. The
+        dictionary is of the form {'feature1': ['feature2', 'feature3'], ...}
+    root_causes (list): The list of root causes. The root causes are the
+        features that are not caused by any other feature.
+    reciprocity (bool): If True, then the edges are oriented only if the
+        direction is reciprocal. If False, then the edges are oriented
+        regardless of the reciprocity.
+    iters (int): The number of iterations to be used by the independence
+        module to determine the orientation of the edges.
+    verbose (bool): If True, then the function prints information about the
+        orientation of the edges.
+        
+    Returns:
+    --------
+    networkx.DiGraph: The directed graph with the nodes and edges determined
+        by the connections and the orientation determined by the independence
+        module.
+    
+    """
+    unoriented_graph = nx.Graph()
+    for target in feature_names:
+        for peer in connections[target]:
+            # Add edges ONLY between nodes where SHAP recognizes both directions
+            if reciprocity:
+                if target in connections[peer]:
+                    unoriented_graph.add_edge(target, peer)
+            else:
+                unoriented_graph.add_edge(target, peer)
+
+    dag = nx.DiGraph()
+    # Add regression mean score to each node
+    for i, feature in enumerate(feature_names):
+        dag.add_node(feature)
+        dag.nodes[feature]['regr_score'] = models.scoring[i]
+    
+    # Determine edge orientation for each edge
+    for u, v in unoriented_graph.edges():
+        orientation = get_edge_orientation(
+            X, u, v, iters=iters, method="gpr", verbose=verbose)
+        if orientation == +1:
+            dag.add_edge(u, v)
+        elif orientation == -1:
+            dag.add_edge(v, u)
+        else:
+            pass
+        
+    # Apply a simple fix: if quality of regression for a feature is poor, then
+    # that feature can be considered a root or parent node. Therefore, we cannot
+    # have an edge pointing to that node.
+    changes = []
+    for parent_node in root_causes:
+        print(f"Checking parent node {parent_node}...") if verbose else None
+        for cause, effect in dag.edges():
+            if effect == parent_node:
+                print(f"Reverting edge {cause} -> {effect}") if verbose else None
+                changes.append((cause, effect))
+    for cause, effect in changes:
+        dag.remove_edge(cause, effect)
+        dag.add_edge(effect, cause)
+    
+    return dag

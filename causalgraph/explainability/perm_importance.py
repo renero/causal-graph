@@ -56,6 +56,7 @@ class PermutationImportance(BaseEstimator):
             Whether to display anything or not.
         """
         super().__init__()
+        self.models = models
         self.regressors = models.regressor
         self.correlation_th = correlation_th
         self.n_repeats = n_repeats
@@ -185,14 +186,14 @@ class PermutationImportance(BaseEstimator):
 
         return self
 
-    def predict(self, X=None, y=None):
+    def predict(self, X=None, root_causes=None):
         first_key = self.feature_names[0]
         if isinstance(self.regressors[first_key], MLPModel):
-            return self._predict_pytorch()
+            return self._predict_pytorch(X, root_causes)
         #  SKLearn models don't have a predict stage for permutation importance.
         return self.pi
 
-    def _predict_pytorch(self):
+    def _predict_pytorch(self, X, root_causes):
         """
         Predict the permutation importance for each feature, for each target, 
         under the PyTorch implementation of the algorithm.
@@ -243,6 +244,10 @@ class PermutationImportance(BaseEstimator):
                 verbose=self.verbose)
 
         pbar.close()
+        
+        self.G_pi = utils.digraph_from_connected_features(
+            X, self.feature_names, self.models, self.connections, root_causes,
+            reciprocity=True, iters=10, verbose=self.verbose)        
 
         self.all_pi = np.array(self.all_pi).flatten()
         self.mean_pi_threshold = np.quantile(
@@ -314,18 +319,18 @@ class PermutationImportance(BaseEstimator):
             self.pi[target]['importances_std'] = np.insert(
                 self.pi[target]['importances_std'], correlated_feature_position, 0.)
 
-    def fit_predict(self, X, y=None):
+    def fit_predict(self, X, root_causes):
         self._obtain_correlation_info(X)
 
         first_key = self.feature_names[0]
         if isinstance(self.regressors[first_key], MLPModel):
-            return self._fit_predict_pytorch()
+            return self._fit_predict_pytorch(X, root_causes)
         else:
             return self._fit_predict_sklearn(X)
 
-    def _fit_predict_pytorch(self):
+    def _fit_predict_pytorch(self, X, root_causes):
         self._fit_pytorch()
-        return self._predict_pytorch()
+        return self._predict_pytorch(X, root_causes)
 
     def _fit_predict_sklearn(self, X):
         self._fit_sklearn(X)
@@ -496,6 +501,6 @@ if __name__ == "__main__":
     pi = PermutationImportance(
         rex.models, n_repeats=10, prog_bar=False, verbose=True)
     pi.fit(data)
-    pi.predict()
+    pi.predict(data, rex.root_causes)
     pi.plot(fig_size=(7, 5))
     plt.show()

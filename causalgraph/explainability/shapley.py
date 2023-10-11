@@ -27,10 +27,8 @@ from tqdm.auto import tqdm
 
 from causalgraph.common import *
 from causalgraph.common import utils
-from causalgraph.independence.edge_orientation import get_edge_orientation
 from causalgraph.independence.feature_selection import select_features
 from causalgraph.explainability.hierarchies import Hierarchies
-from causalgraph.explainability.regression_quality import RegQuality
 
 
 AnyGraph = Union[nx.DiGraph, nx.Graph]
@@ -304,7 +302,7 @@ class ShapEstimator(BaseEstimator):
 
         return X_train, X_test
 
-    def predict(self, X):
+    def predict(self, X, root_causes):
         """
         Builds a causal graph from the shap values using a selection mechanism based
         on clustering, knee or abrupt methods.
@@ -313,7 +311,7 @@ class ShapEstimator(BaseEstimator):
         check_is_fitted(self, 'is_fitted_')
 
         pbar = tqdm(
-            total=4, **tqdm_params(
+            total=3, **tqdm_params(
                 "Building graph from SHAPs", self.prog_bar, silent=self.silent))
         pbar.refresh()
 
@@ -347,59 +345,15 @@ class ShapEstimator(BaseEstimator):
         pbar.update(1)
         pbar.refresh()
 
-        G_shap_unoriented = nx.Graph()
-        for target in self.feature_names:
-            for peer in self.connections[target]:
-                # Add edges ONLY between nodes where SHAP recognizes both directions
-                if self.reciprocity:
-                    if target in self.connections[peer]:
-                        G_shap_unoriented.add_edge(target, peer)
-                else:
-                    G_shap_unoriented.add_edge(target, peer)
-
-        pbar.update(1)
-        pbar.refresh()
-
-        if self.verbose:
-            print("Determining edge directions...")
-        G_shap = nx.DiGraph()
-        
-        # Add regression mean score to each node
-        for i, feature in enumerate(self.feature_names):
-            G_shap.add_node(feature)
-            G_shap.nodes[feature]['regr_score'] = self.models.scoring[i]
-        
-        # Determine edge orientation for each edge
-        for u, v in G_shap_unoriented.edges():
-            orientation = get_edge_orientation(
-                X, u, v, iters=self.iters, method="gpr", verbose=self.verbose)
-            if orientation == +1:
-                G_shap.add_edge(u, v)
-            elif orientation == -1:
-                G_shap.add_edge(v, u)
-            else:
-                pass
-            
-        # Apply a simple fix: if quality of regression for a feature is poor, then
-        # that feature can be considered a root or parent node. Therefore, we cannot
-        # have an edge pointing to that node.
-        parent_idx = RegQuality.predict(self.models.scoring)
-        changes = []
-        for idx in parent_idx:
-            parent_node = self.feature_names[idx]
-            print(f"Checking parent node {parent_node}...") if self.verbose else None
-            for cause, effect in G_shap.edges():
-                if effect == parent_node:
-                    print(f"Reverting edge {cause} -> {effect}") if self.verbose else None
-                    changes.append((cause, effect))
-        for cause, effect in changes:
-            G_shap.remove_edge(cause, effect)
-            G_shap.add_edge(effect, cause)
+        G_shap = utils.digraph_from_connected_features(
+            X, self.feature_names, self.models, self.connections, root_causes,
+            reciprocity=True, iters=10, verbose=self.verbose)
 
         pbar.update(1)
         pbar.close()
 
         return G_shap
+
 
     def adjust(
             self,
@@ -862,7 +816,7 @@ def custom_main(experiment_name):
     rex.is_fitted_ = True
     print(f"Loaded experiment {experiment_name}")
 
-    rex.shaps.predict(test)
+    rex.shaps.predict(test, rex.root_causes)
     
 
 
