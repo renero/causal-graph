@@ -110,7 +110,7 @@ class PermutationImportance(BaseEstimator):
             regressor = self.regressors[feature]
             model = regressor.model.to(self.device)
 
-            avg_loss, std_loss, _ = self._compute_loss(
+            avg_loss, std_loss, _ = self._compute_loss_shuffling_column(
                 model, regressor.train_loader)
             self.base_loss[feature] = avg_loss
             self.base_std[feature] = std_loss
@@ -218,9 +218,6 @@ class PermutationImportance(BaseEstimator):
             self.pi[target]['importances_std'] = []
 
             if self.correlation_th is not None:
-                # corr_features = list(
-                #     self.corr_matrix[(self.corr_matrix[target] > self.correlation_th)
-                #                      & (self.corr_matrix[target] < 1.0)].index)
                 num_vars = len(self.feature_names) - len(self.correlated_features[target])
 
             # Compute the permutation importance for each feature
@@ -229,12 +226,11 @@ class PermutationImportance(BaseEstimator):
                 print(
                     f"+-> Feature: {feature} ", end="") if self.verbose else None
 
-                _, _, losses = self._compute_loss(
+                _, _, losses = self._compute_loss_shuffling_column(
                     model, regressor.train_loader, shuffle_col=shuffle_col)
 
                 axis = 1 if self.n_repeats > 1 else 0
-                perm_importances = np.mean(
-                    losses, axis=axis) - self.base_loss[target]
+                perm_importances = np.mean(losses, axis=axis) - self.base_loss[target]
 
                 self.pi[target]['importances_mean'].append(
                     np.mean(perm_importances))
@@ -252,6 +248,7 @@ class PermutationImportance(BaseEstimator):
 
             pbar.update(1)
 
+            # Convert the lists to numpy arrays
             self.pi[target]['importances_mean'] = np.array(
                 self.pi[target]['importances_mean'])
             self.pi[target]['importances_std'] = np.array(
@@ -299,7 +296,7 @@ class PermutationImportance(BaseEstimator):
         self._fit_sklearn(X)
         return self.pi
 
-    def _compute_loss(
+    def _compute_loss_shuffling_column(
             self,
             model: torch.nn.Module,
             dataloader: torch.utils.data.DataLoader,
@@ -451,19 +448,17 @@ class PermutationImportance(BaseEstimator):
 if __name__ == "__main__":
     path = "/Users/renero/phd/data/RC3/"
     output_path = "/Users/renero/phd/output/RC3/"
-    experiment_name = 'custom_rex'
+    experiment_name = 'rex_generated_polynomial_1'
 
     ref_graph = utils.graph_from_dot_file(f"{path}{experiment_name}.dot")
     data = pd.read_csv(f"{path}{experiment_name}.csv")
     scaler = StandardScaler()
     data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)
-    rex = utils.load_experiment(f"{experiment_name}", output_path)
+    rex = utils.load_experiment(f"{experiment_name}_nn", output_path)
     print(f"Loaded experiment {experiment_name}")
 
     #  Run the permutation importance algorithm
-    pi = PermutationImportance(
-        rex.models, n_repeats=10,
-        correlation_th=0.3, prog_bar=False, verbose=True)
+    pi = PermutationImportance(rex.models, n_repeats=10, prog_bar=False, verbose=True)
     pi.fit(data)
     pi.predict()
     pi.plot(fig_size=(7, 5))

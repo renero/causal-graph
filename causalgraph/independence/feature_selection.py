@@ -32,9 +32,10 @@ def select_features(
         verbose=False) -> List[str]:
     """
     Sort the values and select those before (strict) the point of max. curvature,
-    according to the Knee algorithm. If strict is False, the point of max curv. is also 
-    selected. When the method is 'abrupt' the selection method is based on taking
-    only those feature up-to (down-to) a certain percentage of change in their values.
+    according to the selected algorithm. If strict is False, the point of max curv. 
+    is also selected. When the method is 'abrupt' the selection method is based on 
+    taking only those feature up-to (down-to) a certain percentage of change in their 
+    values.
 
     Arguments:
         - values (np.ndarray): The values for each of the features. This can 
