@@ -213,7 +213,7 @@ def format_graph(
                     G[u][v]['color'] = missing_color
                     G[u][v]['width'] = 1.0
                     G[u][v]['style'] = '--'
-                    G[u][v]['alpha'] = 0.6
+                    G[u][v]['alpha'] = 0.5
     return G
 
 
@@ -272,7 +272,7 @@ def draw_graph_subplot(
             width=widths, style=styles, **formatting_kwargs, ax=ax)
     
     if formatting_kwargs['with_labels'] == False:
-        for i, node in enumerate(G):
+        for _, node in enumerate(G):
             # font_color = label_colors[i]
             nx.draw_networkx_labels(
                 G, pos=layout, labels={node:node}, #font_color=font_color, 

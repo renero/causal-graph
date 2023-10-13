@@ -469,6 +469,8 @@ class Rex(BaseEstimator, ClassifierMixin):
     def plot_dag(
             dag: nx.DiGraph,
             reference: nx.DiGraph = None,
+            title: str = None,
+            ax: plt.Axes = None,
             figsize: Tuple[int, int] = (5, 5),
             dpi: int = 75,
             save_to_pdf: str = None,
@@ -506,71 +508,37 @@ class Rex(BaseEstimator, ClassifierMixin):
             for missing in set(list(Gt.nodes)) - set(list(G.nodes)):
                 G.add_node(missing)
             G = plot.format_graph(
-                G, Gt, inv_color="orange", wrong_color="red", missing_color="grey")
+                G, Gt, inv_color="orange", wrong_color="red", missing_color="lightgrey")
         else:
             G = plot.format_graph(G)
 
         ref_layout = None
         plot.setup_plot(dpi=dpi)
-        f, ax = plt.subplots(ncols=ncols, figsize=figsize)
+        if ax is None:
+            f, axis = plt.subplots(ncols=ncols, figsize=figsize)
+        else:
+            axis=ax
         if save_to_pdf is not None:
             with PdfPages(save_to_pdf) as pdf:
                 if reference:
                     ref_layout = nx.drawing.nx_agraph.graphviz_layout(
                         Gt, prog="dot")
                 plot.draw_graph_subplot(
-                    G, layout=ref_layout, title=None, ax=ax, **plot.formatting_kwargs)
+                    G, layout=ref_layout, title=title, ax=axis, **plot.formatting_kwargs)
                 pdf.savefig(f, bbox_inches='tight', pad_inches=0)
                 plt.close()
         else:
             if reference:
                 ref_layout = nx.drawing.nx_agraph.graphviz_layout(Gt, prog="dot")
+            else:
+                ref_layout = nx.drawing.nx_agraph.graphviz_layout(G, prog="dot")
+
             plot.draw_graph_subplot(
-                G, layout=ref_layout, ax=ax, title=None, **plot.formatting_kwargs)
-            plt.show()
+                G, layout=ref_layout, ax=axis, title=title, **plot.formatting_kwargs)
+            
+            if ax is None:
+                plt.show()
 
-    @staticmethod
-    def _plot_dag(
-            dag: nx.DiGraph,
-            figsize: Tuple[int, int] = (5, 5),
-            dpi: int = 75,
-            save_to_pdf: str = None,
-            **kwargs):
-        """
-        Plot a DAG without formatting edges.
-
-        Parameters:
-        -----------
-        dag: The DAG to plot.
-        figsize: The size of the figure.
-        **kwargs: Additional arguments to format the graphs:
-            - "node_size": 500
-            - "node_color": 'white'
-            - "edgecolors": "black"
-            - "font_family": "monospace"
-            - "horizontalalignment": "center"
-            - "verticalalignment": "center_baseline"
-            - "with_labels": True
-        """
-        # Overwrite formatting_kwargs with kwargs if they are provided
-        plot.formatting_kwargs.update(kwargs)
-
-        G = nx.DiGraph()
-        G.add_edges_from(dag.edges())
-        G = plot.format_graph(G)
-        ref_layout = nx.drawing.nx_agraph.graphviz_layout(G, prog="dot")
-
-        plot.setup_plot(dpi=dpi)
-        f, ax = plt.subplots(figsize=figsize)
-        if save_to_pdf is not None:
-            with PdfPages(save_to_pdf) as pdf:
-                plot.draw_graph_subplot(G, layout=ref_layout,
-                                    title=None, ax=ax, **plot.formatting_kwargs)
-                pdf.savefig(f, bbox_inches='tight', pad_inches=0)
-                plt.close()
-        else:
-            plot.draw_graph_subplot(G, layout=ref_layout, title=None,
-                                ax=ax, **plot.formatting_kwargs)
 
     def plot_shap_discrepancies(self, target_name: str, **kwargs):
         assert self.is_fitted_, "Model not fitted yet"
