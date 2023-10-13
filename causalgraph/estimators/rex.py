@@ -228,7 +228,7 @@ class Rex(BaseEstimator, ClassifierMixin):
             ('shaps', ShapEstimator, {'models': 'models'}),
             ('shaps.fit'),
             ('pi', PermutationImportance, {'models': 'models'}),
-            ('pi.fit_predict', {'X': self.X, 'root_causes': 'root_causes'}),
+            ('pi.fit'),
         ]
         pipeline.run(steps, self._fit_desc)
         self.is_fitted_ = True
@@ -468,6 +468,70 @@ class Rex(BaseEstimator, ClassifierMixin):
     @staticmethod
     def plot_dag(
             dag: nx.DiGraph,
+            reference: nx.DiGraph = None,
+            figsize: Tuple[int, int] = (10, 5),
+            dpi: int = 75,
+            save_to_pdf: str = None,
+            **kwargs):
+        """
+        Compare two graphs using dot.
+
+        Parameters:
+        -----------
+        reference: The reference DAG.
+        dag: The DAG to compare.
+        names: The names of the reference graph and the dag.
+        figsize: The size of the figure.
+        **kwargs: Additional arguments to format the graphs:
+            - "node_size": 500
+            - "node_color": 'white'
+            - "edgecolors": "black"
+            - "font_family": "monospace"
+            - "horizontalalignment": "center"
+            - "verticalalignment": "center_baseline"
+            - "with_labels": True
+        """
+        ncols = 1
+
+        # Overwrite formatting_kwargs with kwargs if they are provided
+        plot.formatting_kwargs.update(kwargs)
+
+        G = nx.DiGraph()
+        G.add_nodes_from(dag.nodes(data=True))
+        G.add_edges_from(dag.edges())
+        if reference:
+            # Clean up reference graph for inconsistencies along the DOT conversion
+            # and add potential missing nodes to the predicted graph.
+            Gt = plot.cleanup_graph(reference.copy())
+            for missing in set(list(Gt.nodes)) - set(list(G.nodes)):
+                G.add_node(missing)
+            G = plot.format_graph(
+                G, Gt, inv_color="orange", wrong_color="red", missing_color="grey")
+        else:
+            G = plot.format_graph(G)
+
+        ref_layout = None
+        plot.setup_plot(dpi=dpi)
+        f, ax = plt.subplots(ncols=ncols, figsize=figsize)
+        if save_to_pdf is not None:
+            with PdfPages(save_to_pdf) as pdf:
+                if reference:
+                    ref_layout = nx.drawing.nx_agraph.graphviz_layout(
+                        Gt, prog="dot")
+                plot.draw_graph_subplot(
+                    G, layout=ref_layout, title=None, ax=ax, **plot.formatting_kwargs)
+                pdf.savefig(f, bbox_inches='tight', pad_inches=0)
+                plt.close()
+        else:
+            if reference:
+                ref_layout = nx.drawing.nx_agraph.graphviz_layout(Gt, prog="dot")
+            plot.draw_graph_subplot(
+                G, layout=ref_layout, ax=ax, **plot.formatting_kwargs)
+            plt.show()
+
+    @staticmethod
+    def _plot_dag(
+            dag: nx.DiGraph,
             figsize: Tuple[int, int] = (5, 5),
             dpi: int = 75,
             save_to_pdf: str = None,
@@ -523,7 +587,10 @@ class Rex(BaseEstimator, ClassifierMixin):
 
 def custom_main(dataset_name, 
           input_path="/Users/renero/phd/data/RC3/",
-          output_path="/Users/renero/phd/output/RC3/", save=False):
+          output_path="/Users/renero/phd/output/RC3/", 
+          tune_model: bool = False,
+          model_type="mlp", explainer="gradient",
+          save=False):
 
     ref_graph = graph_from_dot_file(f"{input_path}{dataset_name}.dot")
     data = pd.read_csv(f"{input_path}{dataset_name}.csv")
@@ -533,7 +600,9 @@ def custom_main(dataset_name,
     test = data.drop(train.index)
 
     # rex = Rex(model_type="gbt")
-    rex = Rex(name=dataset_name)
+    rex = Rex(
+        name=dataset_name, tune_model=tune_model, 
+        model_type=model_type, explainer=explainer)
     rex.fit_predict(train, test, ref_graph)
     if save:
         where_to = save_experiment(rex.name, output_path, rex)
@@ -543,8 +612,9 @@ def custom_main(dataset_name,
     
     print(rex.score(ref_graph, 'shap'))
     rex.plot_dags(rex.G_shap, ref_graph)
-    rex.plot_dags(rex.pi.G_pi, ref_graph)
+    rex.plot_dags(rex.G_pi, ref_graph)
 
 
 if __name__ == "__main__":
-    custom_main('rex_generated_polynomial_1')
+    custom_main('rex_generated_gp_mix_1', model_type="gbt", explainer="explainer", 
+                tune_model=True, save=True)

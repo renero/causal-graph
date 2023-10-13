@@ -2,6 +2,7 @@ from typing import Tuple
 
 import numpy as np
 import pandas as pd
+import networkx as nx
 from sklearn.preprocessing import StandardScaler
 import torch
 from matplotlib import pyplot as plt
@@ -160,7 +161,7 @@ class PermutationImportance(BaseEstimator):
                         print("REMOVED CORRELATED FEATURES: ",
                               self.correlated_features[target_name])
 
-            print(f"Feature: {target_name} ", end="") if self.verbose else None
+            # print(f"Feature: {target_name} ", end="") if self.verbose else None
 
             regressor = self.regressors[target_name]
             y = X[target_name]
@@ -190,10 +191,11 @@ class PermutationImportance(BaseEstimator):
         first_key = self.feature_names[0]
         if isinstance(self.regressors[first_key], MLPModel):
             return self._predict_pytorch(X, root_causes)
-        #  SKLearn models don't have a predict stage for permutation importance.
-        return self.pi
 
-    def _predict_pytorch(self, X, root_causes):
+        #  SKLearn models don't have a predict stage for permutation importance.
+        return self._predict_sklearn(X, root_causes)
+
+    def _predict_pytorch(self, X, root_causes) -> nx.DiGraph:
         """
         Predict the permutation importance for each feature, for each target, 
         under the PyTorch implementation of the algorithm.
@@ -224,8 +226,8 @@ class PermutationImportance(BaseEstimator):
                 num_vars = len(self.feature_names) - \
                     len(self.correlated_features[target])
                 # Filter out features that are highly correlated with the target
-                candidate_causes = [f for f in candidate_causes \
-                    if f not in self.correlated_features[target]]
+                candidate_causes = [f for f in candidate_causes
+                                    if f not in self.correlated_features[target]]
 
             # Compute the permutation importance for each feature
             self.pi[target]['importances_mean'], self.pi[target]['importances_std'] = \
@@ -244,16 +246,42 @@ class PermutationImportance(BaseEstimator):
                 verbose=self.verbose)
 
         pbar.close()
-        
+
         self.G_pi = utils.digraph_from_connected_features(
             X, self.feature_names, self.models, self.connections, root_causes,
-            reciprocity=True, iters=10, verbose=self.verbose)        
+            reciprocity=True, iters=10, verbose=self.verbose)
 
         self.all_pi = np.array(self.all_pi).flatten()
         self.mean_pi_threshold = np.quantile(
             self.all_pi, self.mean_pi_percentile)
 
-        return self.pi
+        return self.G_pi
+    
+    def _predict_sklearn(self, X, root_causes) -> nx.DiGraph:
+        """
+        Predict the permutation importance for each feature, for each target, 
+        under the PyTorch implementation of the algorithm.
+        """
+        print("Computing permutation loss (SKLearn)") if self.verbose else None
+
+        self.connections = dict()
+        for target in self.feature_names:
+            print(f"Target: {target} ") if self.verbose else None
+            candidate_causes = [f for f in self.feature_names if f != target]
+            self.connections[target] = select_features(
+                values=self.pi[target]['importances_mean'],
+                feature_names=candidate_causes,
+                verbose=self.verbose)
+
+        self.G_pi = utils.digraph_from_connected_features(
+            X, self.feature_names, self.models, self.connections, root_causes,
+            reciprocity=True, iters=10, verbose=self.verbose)
+
+        self.all_pi = np.array(self.all_pi).flatten()
+        self.mean_pi_threshold = np.quantile(
+            self.all_pi, self.mean_pi_percentile)
+
+        return self.G_pi
 
     def _compute_perm_imp(self, target, regressor, model, num_vars):
         """
@@ -467,10 +495,11 @@ class PermutationImportance(BaseEstimator):
             fig, ax = plt.subplots(1, 1, figsize=figsize_)
 
         sorted_idx = self.pi[target]['importances_mean'].argsort()
-        ax.barh(np.array(feature_names)[sorted_idx.astype(int)],
-                self.pi[target]['importances_mean'][sorted_idx],
-                xerr=self.pi[target]['importances_std'][sorted_idx],
-                align='center', alpha=0.5)
+        ax.barh(
+            np.array(feature_names)[sorted_idx.astype(int)],
+            self.pi[target]['importances_mean'][sorted_idx],
+            xerr=self.pi[target]['importances_std'][sorted_idx],
+            align='center', alpha=0.5)
 
         xlims = ax.get_xlim()
         if xlims[1] < self.mean_pi_threshold:
@@ -479,7 +508,7 @@ class PermutationImportance(BaseEstimator):
         ax.axvline(
             x=self.mean_pi_threshold, color='red', linestyle='--', linewidth=0.5)
 
-        ax.set_title(f"Perm.Imp. {target}")
+        ax.set_title(f"Perm.Imp.{target}: {','.join(self.connections[target])}")
         fig = ax.figure if fig is None else fig
 
         return fig
@@ -488,13 +517,13 @@ class PermutationImportance(BaseEstimator):
 if __name__ == "__main__":
     path = "/Users/renero/phd/data/RC3/"
     output_path = "/Users/renero/phd/output/RC3/"
-    experiment_name = 'rex_generated_polynomial_1'
+    experiment_name = 'rex_generated_gp_mix_1'
 
     ref_graph = utils.graph_from_dot_file(f"{path}{experiment_name}.dot")
     data = pd.read_csv(f"{path}{experiment_name}.csv")
     scaler = StandardScaler()
     data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)
-    rex = utils.load_experiment(f"{experiment_name}_nn", output_path)
+    rex = utils.load_experiment(f"{experiment_name}_gbt", output_path)
     print(f"Loaded experiment {experiment_name}")
 
     #  Run the permutation importance algorithm

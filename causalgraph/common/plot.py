@@ -180,7 +180,9 @@ def format_graph(
         Gt: nx.DiGraph = None,
         ok_color="green",
         inv_color="lightgreen",
-        wrong_color="black") -> nx.DiGraph:
+        wrong_color="black",
+        missing_color="grey"
+    ) -> nx.DiGraph:
     if Gt is None:
         for u, v in G.edges():
             G[u][v]['color'] = "black"
@@ -194,16 +196,23 @@ def format_graph(
                 G[u][v]['width'] = 3.0
                 G[u][v]['style'] = 'solid'
                 G[u][v]['alpha'] = 1.0
-            elif Gt.has_edge(v, u):
+            elif Gt.has_edge(v, u):           # The edge exists, but reversed
                 G[u][v]['color'] = inv_color
                 G[u][v]['width'] = 2.0
                 G[u][v]['style'] = 'solid'
                 G[u][v]['alpha'] = 0.8
-            else:
+            else:                             # The edge does not exist
                 G[u][v]['color'] = wrong_color
                 G[u][v]['width'] = 1.0
                 G[u][v]['style'] = '--'
                 G[u][v]['alpha'] = 0.6
+        if missing_color is not None:
+            for u, v in Gt.edges():
+                if not G.has_edge(u, v) and not G.has_edge(v, u):
+                    G[u][v]['color'] = missing_color
+                    G[u][v]['width'] = 1.0
+                    G[u][v]['style'] = '--'
+                    G[u][v]['alpha'] = 0.6
     return G
 
 

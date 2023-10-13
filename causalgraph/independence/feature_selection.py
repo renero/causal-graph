@@ -184,13 +184,23 @@ def cluster_change(X: List, verbose: bool = False):
             the last element of the array is returned.
     """
     X = np.array(X).reshape(-1, 1)
+    X_safe = X.copy()
+    X_safe[X_safe == 0.0] = 1e-06
+    
     pairwise_distances = euclidean_distances(X)[0,]
     pairwise_distances = np.diff(pairwise_distances)
     pairwise_distances = np.sort(pairwise_distances)[::-1]
 
+    # Safety check: if any of the values in pairwise_distances is 0, add 1e-06
+    pairwise_distances[pairwise_distances == 0.0] = 1e-06
+
     n_clusters_ = 0
     while n_clusters_ <= 1 and len(pairwise_distances) > 0:
-        max_distance = pairwise_distances.max()
+        max_distance = pairwise_distances.max() + 1e-06
+
+        # Safety check
+        max_distance = 0.001 if max_distance <= 0.0 else max_distance
+
         if verbose:
             print(f"  pairwise_distances.: {pairwise_distances}")
             print(f"  max_distance.......: {max_distance:.4f}")
@@ -202,7 +212,7 @@ def cluster_change(X: List, verbose: bool = False):
         n_noise_ = list(labels).count(-1)
         if n_clusters_ <= 1:
             if verbose:
-                print("  +-> Only 1 cluster generated. Increasing min_distance.")
+                print("  +-> Only 1 cluster generated. Increasing max_distance.")
             pairwise_distances = pairwise_distances[1:]
 
     if pairwise_distances.size == 0:
@@ -217,7 +227,7 @@ def cluster_change(X: List, verbose: bool = False):
                 f"  +-> Labels: {labels}")
 
     winner_label = n_clusters_ - 1
-    samples_in_winner_cluster = np.argwhere(X[labels != winner_label])
+    samples_in_winner_cluster = np.argwhere(X_safe[labels != winner_label])
     return samples_in_winner_cluster[:, 0][-1]+1
 
 
@@ -232,24 +242,11 @@ if __name__ == "__main__":
     pd.set_option('display.precision', 4)
     pd.set_option('display.float_format', '{:.4f}'.format)
 
-    # Paths
-    path = "/Users/renero/phd/data/RC3/"
-    output_path = "/Users/renero/phd/output/RC3/"
-    # experiment_name = 'rex_generated_linear_1'
-    experiment_name = 'custom_rex'
-
-    # Read the data
-    ref_graph = graph_from_dot_file(f"{path}{experiment_name}.dot")
-    data = pd.read_csv(f"{path}{experiment_name}.csv")
-    scaler = StandardScaler()
-    data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)
-
-    # Split the dataframe into train and test
-    train = data.sample(frac=0.9, random_state=42)
-    test = data.drop(train.index)
-
-    custom = load_experiment(f"{experiment_name}", output_path)
-    custom.is_fitted_ = True
-    print(f"Loaded experiment {experiment_name}")
-
-    custom.G_shap = custom.shaps.predict(test)
+    values = np.array(
+        [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.959290610692456]
+    )
+    # values = np.array(
+    #     [0.083, 0.175, 0.353, 0.204, 0.081, 0.116, 0.088, 0.451, 0.152]
+    # )
+    names = [f"V{i}" for i in range(len(values))]
+    select_features(values, names, method='cluster', verbose=True)

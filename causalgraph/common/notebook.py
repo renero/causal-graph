@@ -187,9 +187,9 @@ class Experiment(BaseExperiment):
 
         return self
 
-    def save(self, exp_name=None):
+    def save(self, exp_name=None, overwrite: bool = False):
         save_as = exp_name if exp_name is not None else self.experiment_name
-        where_to = save_experiment(save_as, self.output_path, self.rex)
+        where_to = save_experiment(save_as, self.output_path, self.rex, overwrite)
         print(f"Saved '{self.experiment_name}' to '{where_to}'")
 
 

@@ -22,7 +22,7 @@ from causalgraph.independence.edge_orientation import get_edge_orientation
 AnyGraph = Union[nx.Graph, nx.DiGraph]
 
 
-def save_experiment(obj_name: str, folder: str, results: dict):
+def save_experiment(obj_name: str, folder: str, results: dict, overwrite: bool = False):
     """
     Creates a folder for the experiment and saves results. Results is a
     dictionary that will be saved as an opaque pickle. When the experiment will
@@ -43,7 +43,12 @@ def save_experiment(obj_name: str, folder: str, results: dict):
     """
     if not os.path.exists(folder):
         Path(folder).mkdir(parents=False, exist_ok=True)
-    output = valid_output_name(obj_name, folder, extension="pickle")
+        
+    if not overwrite:
+        output = valid_output_name(obj_name, folder, extension="pickle")
+    else:
+        output = join(folder, obj_name + ".pickle")
+
     with open(output, 'wb') as handle:
         pickle.dump(results, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
@@ -327,7 +332,7 @@ def digraph_from_connected_features(
     # have an edge pointing to that node.
     changes = []
     for parent_node in root_causes:
-        print(f"Checking parent node {parent_node}...") if verbose else None
+        print(f"Checking root cause {parent_node}...") if verbose else None
         for cause, effect in dag.edges():
             if effect == parent_node:
                 print(f"Reverting edge {cause} -> {effect}") if verbose else None
