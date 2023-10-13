@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Dict, List, Tuple, Union
 
 import networkx as nx
+import numpy as np
 import pydot as pydot
 import pydotplus
 import torch
@@ -225,12 +226,12 @@ def graph_intersection(g1: AnyGraph, g2: AnyGraph) -> AnyGraph:
         return nx.DiGraph()
     
     # Take the data from the nodes in g1 and g2, as the minimum value of both
-    first_node = list(g1.nodes)[0]
-    data_fields = g1.nodes[first_node].keys()
-    nodes_data = {}
-    for key in data_fields:
-        for n in nodes:
-            nodes_data[n] = {key: min(g1.nodes[n][key], g2.nodes[n][key])}
+    # first_node = list(g1.nodes)[0]
+    # data_fields = g1.nodes[first_node].keys()
+    # nodes_data = {}
+    # for key in data_fields:
+    #     for n in nodes:
+    #         nodes_data[n] = {key: min(g1.nodes[n][key], g2.nodes[n][key])}
         
     # Get the edges from g1 and g2, and take only those that match completely
     # edges = set(g1.edges).intersection(set(g2.edges))
@@ -239,7 +240,7 @@ def graph_intersection(g1: AnyGraph, g2: AnyGraph) -> AnyGraph:
     # Create a new graph with the nodes, nodes_data and edges
     g = nx.DiGraph()
     g.add_nodes_from(nodes)
-    nx.set_node_attributes(g, nodes_data)
+    # nx.set_node_attributes(g, nodes_data)
     g.add_edges_from(edges)
     
     return g
@@ -256,6 +257,15 @@ def graph_union(g1: AnyGraph, g2: AnyGraph) -> AnyGraph:
     g.add_nodes_from(nodes)
     g.add_edges_from(g1.edges)
     g.add_edges_from(g2.edges)
+    
+    # Take the data from the nodes in g1 and g2, as the minimum value of both
+    # first_node = list(g1.nodes)[0]
+    # data_fields = g1.nodes[first_node].keys()
+    # nodes_data = {}
+    # for key in data_fields:
+    #     for n in nodes:
+    #         nodes_data[n] = {key: min(g1.nodes[n][key], g2.nodes[n][key])}
+
 
     return g
 
