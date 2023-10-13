@@ -209,6 +209,7 @@ def format_graph(
         if missing_color is not None:
             for u, v in Gt.edges():
                 if not G.has_edge(u, v) and not G.has_edge(v, u):
+                    G.add_edge(u, v)
                     G[u][v]['color'] = missing_color
                     G[u][v]['width'] = 1.0
                     G[u][v]['style'] = '--'

@@ -469,7 +469,7 @@ class Rex(BaseEstimator, ClassifierMixin):
     def plot_dag(
             dag: nx.DiGraph,
             reference: nx.DiGraph = None,
-            figsize: Tuple[int, int] = (10, 5),
+            figsize: Tuple[int, int] = (5, 5),
             dpi: int = 75,
             save_to_pdf: str = None,
             **kwargs):
@@ -526,7 +526,7 @@ class Rex(BaseEstimator, ClassifierMixin):
             if reference:
                 ref_layout = nx.drawing.nx_agraph.graphviz_layout(Gt, prog="dot")
             plot.draw_graph_subplot(
-                G, layout=ref_layout, ax=ax, **plot.formatting_kwargs)
+                G, layout=ref_layout, ax=ax, title=None, **plot.formatting_kwargs)
             plt.show()
 
     @staticmethod
