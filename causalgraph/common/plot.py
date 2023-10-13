@@ -181,7 +181,7 @@ def format_graph(
         ok_color="green",
         inv_color="lightgreen",
         wrong_color="black",
-        missing_color="grey"
+        missing_color=None
     ) -> nx.DiGraph:
     if Gt is None:
         for u, v in G.edges():
