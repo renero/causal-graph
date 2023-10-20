@@ -130,7 +130,6 @@ class ShapEstimator(BaseEstimator):
         """
         """
         # X, y = check_X_y(X, y, accept_sparse=True)
-
         self.feature_names = list(self.models.regressor.keys())
         self.shap_explainer = dict()
         self.shap_values = dict()
@@ -311,14 +310,17 @@ class ShapEstimator(BaseEstimator):
         check_is_fitted(self, 'is_fitted_')
 
         pbar = tqdm(
-            total=3, **tqdm_params(
+            total=4, **tqdm_params(
                 "Building graph from SHAPs", self.prog_bar, silent=self.silent))
         pbar.refresh()
+        
+        # Compute error contribution at this stage, since it needs the individual
+        # SHAP values
+        self.compute_error_contribution()
+        pbar.update(1); pbar.refresh()
 
-        self._compute_discrepancies(self.X_test)  # (X)
-
-        pbar.update(1)
-        pbar.refresh()
+        self._compute_discrepancies(self.X_test)
+        pbar.update(1); pbar.refresh()
 
         self.connections = dict()
         for target in self.feature_names:
@@ -342,13 +344,12 @@ class ShapEstimator(BaseEstimator):
                 descending=self.descending,
                 min_impact=self.min_impact, verbose=self.verbose)
 
-        pbar.update(1)
-        pbar.refresh()
+        pbar.update(1); pbar.refresh()
 
         G_shap = utils.digraph_from_connected_features(
             X, self.feature_names, self.models, self.connections, root_causes,
             reciprocity=True, iters=10, verbose=self.verbose)
-
+        
         pbar.update(1)
         pbar.close()
 
@@ -631,6 +632,74 @@ class ShapEstimator(BaseEstimator):
 
         return input_vector
 
+    def compute_error_contribution(self):
+        """
+        Computes the error contribution of each feature for each target.
+        If this value is positive, then it means that, on average, the presence of 
+        the feature in the model leads to a higher error. Thus, without that feature, 
+        the prediction would have been generally better. In other words, the feature 
+        is making more harm than good!
+        On the contrary, the more negative this value, the more beneficial 
+        the feature is for the predictions since its presence leads to smaller errors.
+
+        Returns:
+        --------
+        err_contrib: pd.DataFrame
+            Error contribution of each feature for each target.
+        """
+        error_contribution = dict()
+        for target in self.feature_names:
+            shap_values = pd.DataFrame(
+                self.shap_values[target], 
+                columns=[c for c in self.feature_names if c != target] )
+            y_hat = pd.DataFrame(
+                self.models.predict(self.X_test).T, columns=self.feature_names)
+            y_true = self.X_test
+            
+            error_contribution[target] = self._individual_error_contribution(
+                shap_values, y_true[target], y_hat[target])
+            # Add a 0.0 value at index target in the error contribution series
+            error_contribution[target] = error_contribution[target].append(
+                pd.Series(0.0, index=[target]))
+            # Sort the series by index
+            error_contribution[target] = error_contribution[target].sort_index()
+
+        self.error_contribution = pd.DataFrame(error_contribution)
+        return self.error_contribution
+    
+    def _individual_error_contribution(self, shap_values, y_true, y_pred):
+        """
+        Compute the error contribution of each feature.
+        If this value is positive, then it means that, on average, the presence of 
+        the feature in the model leads to a higher error. Thus, without that feature, 
+        the prediction would have been generally better. In other words, the feature 
+        is making more harm than good!
+        On the contrary, the more negative this value, the more beneficial the feature is 
+        for the predictions since its presence leads to smaller errors.
+        
+        Parameters:
+        -----------
+        shap_values: pd.DataFrame
+            Shap values for a given target.
+        y_true: pd.Series
+            Ground truth values for a given target.
+        y_pred: pd.Series   
+            Predicted values for a given target.
+            
+        Returns:
+        --------
+        error_contribution: pd.Series
+            Error contribution of each feature.
+        """
+        abs_error = (y_true - y_pred).abs()
+        y_pred_wo_feature = shap_values.apply(lambda feature: y_pred - feature)
+        abs_error_wo_feature = y_pred_wo_feature.apply(
+            lambda feature: (y_true-feature).abs())
+        error_diff = abs_error_wo_feature.apply(lambda feature: abs_error - feature)
+        ind_error_contribution = error_diff.mean()
+        
+        return ind_error_contribution
+    
     def _debugmsg(
             self,
             msg,

@@ -539,7 +539,6 @@ class Rex(BaseEstimator, ClassifierMixin):
             if ax is None:
                 plt.show()
 
-
     def plot_shap_discrepancies(self, target_name: str, **kwargs):
         assert self.is_fitted_, "Model not fitted yet"
         # X = self.X.drop(target_name, axis=1)
