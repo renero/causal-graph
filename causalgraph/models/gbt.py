@@ -179,14 +179,14 @@ class GBTRegressor(GradientBoostingRegressor):
             if self.correlation_th is not None:
                 X = X_original.drop(
                     self.correlated_features[target_name], axis=1)
-
+                
             R2 = self.regressor[target_name].score(
                     X.drop(target_name, axis=1), X[target_name])
             
             # Append 1.0 if R2 is negative, or 1.0 - R2 otherwise since we're 
             # in the minimization mode of the error function.
             scores.append(1.0) if R2 < 0.0 else scores.append(1.0 - R2)
-
+        
         self.scoring = np.array(scores)
         return self.scoring
 
