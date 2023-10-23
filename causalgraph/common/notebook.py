@@ -19,12 +19,16 @@ from causalgraph.common.utils import (graph_from_dot_file, load_experiment,
 import shap
 import pandas as pd
 import numpy as np
-import networkx as nx
 import os
 from os import path
 import warnings
+from causalgraph.common import utils
+import matplotlib.pyplot as plt
 
 warnings.filterwarnings('ignore')
+
+metric_types = ['mlp', 'gbt', 'intersection', 'union', 'union_all', 'int_indep', 
+                'int_final', 'union_indep', 'union_final']
 
 
 class BaseExperiment:
@@ -275,6 +279,100 @@ class Experiments(BaseExperiment):
         self.names = list(self.experiment.keys())
         self.experiments = list(self.experiment.values())
         return self
+
+
+
+def get_combined_metrics(subtype: str):
+    """
+    Obtain the metrics for all the experiments matching the input pattern
+    
+    Parameters
+    ----------
+    subtype : str
+        The subtype of the experiment, e.g. "linear" or "nonlinear"
+    
+    Returns
+    -------
+    dict
+        A dictionary with the metrics for all the experiments
+    """
+    holder = Experiment(f"rex_generated_{subtype}_1")
+    files = [path.basename(f) for f in holder.list_files(
+        f"rex_generated_{subtype}_*")]
+    
+    metrics = {metric: [] for metric in metric_types}
+    
+    for exp_name in files:
+        mlp = Experiment(exp_name).load(f"{exp_name}_nn")
+        gbt = Experiment(exp_name).load(f"{exp_name}_gbt")
+
+        metrics['mlp'].append(mlp.rex.metrics_shap)
+        metrics['gbt'].append(gbt.rex.metrics_shap)
+        metrics['intersection'].append(evaluate_graph(
+            mlp.ref_graph, utils.graph_intersection(mlp.rex.G_shap, gbt.rex.G_shap)) )
+        metrics['union'].append(evaluate_graph(
+            mlp.ref_graph, utils.graph_union(mlp.rex.G_shap, gbt.rex.G_shap)))
+        metrics['union_all'].append(evaluate_graph(
+            mlp.ref_graph, utils.graph_union(
+                mlp.rex.G_pi, utils.graph_union(
+                    gbt.rex.G_pi, utils.graph_union(
+                        mlp.rex.G_shap, gbt.rex.G_shap)
+                ))))
+        metrics['int_indep'].append(evaluate_graph(
+            mlp.ref_graph, utils.graph_intersection(mlp.rex.G_indep, gbt.rex.G_indep)) )
+        metrics['int_final'].append(evaluate_graph(
+            mlp.ref_graph, utils.graph_intersection(mlp.rex.G_final, gbt.rex.G_final)) )
+        metrics['union_indep'].append(evaluate_graph(
+            mlp.ref_graph, utils.graph_union(mlp.rex.G_indep, gbt.rex.G_indep)) )
+        metrics['union_final'].append(evaluate_graph(
+            mlp.ref_graph, utils.graph_union(mlp.rex.G_final, gbt.rex.G_final)) )
+
+    for key in metrics:
+        metrics[key] = pd.DataFrame(metrics[key])
+
+    return metrics
+
+
+def plot_combined_metrics(metrics: dict, title: str):
+    """
+    Plot the metrics for all the experiments matching the input pattern
+    
+    Parameters
+    ----------
+    metrics : dict
+        A dictionary with the metrics for all the experiments
+    title : str
+        The title of the plot
+        
+    Returns
+    -------
+    None
+    """
+    what = ['f1', 'precision', 'recall', 'shd']
+    fig, axs = plt.subplots(2, 2, figsize=(6, 5))
+
+    for i, metric in enumerate(what):
+        row, col = i // 2, i % 2
+
+        combined_median = np.median(metrics['intersection'].loc[:, metric])
+        added_median = np.median(metrics['union'].loc[:, metric])
+        
+        metric_values = [metrics[key].loc[:, metric] for key in metric_types]
+        
+        axs[row, col].axhline(combined_median, color='g', linestyle='--', linewidth=0.5)
+        axs[row, col].axhline(added_median, color='b', linestyle='--', linewidth=0.5)
+
+        axs[row, col].boxplot(
+            metric_values,
+            labels=['nn', 'gbt', '∩', '[∪]', 'all', "∩i", "∩f", "∪i", "∪f"])
+        # check if any value is above 1
+        if np.all(np.array(metric_values) <= 1.0):
+            axs[row, col].set_ylim([0, 1])
+        axs[row, col].set_title(metric)
+
+    fig.suptitle(title)
+    plt.tight_layout()
+    plt.show()
 
 
 
