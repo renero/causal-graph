@@ -355,7 +355,6 @@ class ShapEstimator(BaseEstimator):
 
         return G_shap
 
-
     def adjust(
             self,
             graph: AnyGraph,

@@ -268,7 +268,7 @@ class Rex(BaseEstimator, ClassifierMixin):
             ('metrics_shap', 'score', {'ref_graph': ref_graph, 'predicted_graph': 'G_shap'}),
             ('metrics_indep', 'score', {'ref_graph': ref_graph, 'predicted_graph': 'G_indep'}),
             ('metrics_final', 'score', {'ref_graph': ref_graph, 'predicted_graph': 'G_final'}),
-            ('learnings', 'summarize_knowledge', {'ref_graph': ref_graph})
+            ('summarize_knowledge', {'ref_graph': ref_graph})
         ]
         prediction.run(steps, "Predicting graph")
         if '\\n' in self.G_final.nodes:
@@ -359,8 +359,9 @@ class Rex(BaseEstimator, ClassifierMixin):
         if ref_graph is None:
             return None
         
-        K = Knowledge(self, ref_graph)
-        return K.data()
+        self.learnings = Knowledge(self, ref_graph).info()
+        
+        return self.learnings
 
     def __repr__(self):
         forbidden_attrs = [

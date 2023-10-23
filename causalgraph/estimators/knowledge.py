@@ -21,7 +21,8 @@ class Knowledge:
     - mean_shap: the mean of the SHAP values between the origin and the target
     - slope_shap: the slope of the linear regression for target vs. SHAP values
     - slope_target: the slope of the linear regression for the target vs. origin values
-
+    - potential_root: whether the origin is a potential root cause
+    - err_contrib: the error contribution of the origin to the target
     """
 
     def __init__(self, rex: object, ref_graph: nx.DiGraph):
@@ -50,7 +51,7 @@ class Knowledge:
         if self.correlation_th is not None:
             self.correlated_features = self.hierarchies.correlated_features
 
-    def data(self):
+    def info(self):
         """Returns a dataframe with the knowledge about each edge in the graph"""
         rows = []
         for origin in self.feature_names:
@@ -82,7 +83,7 @@ class Knowledge:
                     'ref_edge': int((origin, target) in self.ref_graph.edges()),
                     'correlation': self.hierarchies.correlations[origin][target],
                     'shap_correlation': sd.shap_correlation,
-                    'KS_pval': sd.ks_pvalue,
+                    'ks_pval': sd.ks_pvalue,
                     'shap_edge': int(origin in set(self.G_shap.predecessors(target))),
                     'shap_skedastic_pval': sd.shap_p_value,
                     'parent_skedastic_pval': sd.parent_p_value,
@@ -90,7 +91,8 @@ class Knowledge:
                     'mean_pi': pi,
                     'slope_shap': shap_slope,
                     'slope_target': parent_slope,
-                    'potential_root': int(origin in self.root_causes)
+                    'potential_root': int(origin in self.root_causes),
+                    'err_contrib': self.shaps.error_contribution.loc[origin, target]
                 })
         self.results = pd.DataFrame.from_dict(rows)
         return self.results
