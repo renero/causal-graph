@@ -281,7 +281,6 @@ class Experiments(BaseExperiment):
         return self
 
 
-
 def get_combined_metrics(subtype: str):
     """
     Obtain the metrics for all the experiments matching the input pattern

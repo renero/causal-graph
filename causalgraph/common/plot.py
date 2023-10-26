@@ -19,7 +19,7 @@ from pydot import Dot
 
 # Defaults for the graphs plotted
 formatting_kwargs = {
-    "node_size": 1000,
+    "node_size": 800,
     "node_color": "white",
     "alpha": 0.8,
     "edgecolors": "black",
@@ -219,9 +219,10 @@ def format_graph(
 
 def draw_graph_subplot(
         G: nx.DiGraph,
-        layout: dict,
-        title: str,
-        ax: plt.Axes,
+        root_causes: list = None,
+        layout: dict = None,
+        title: str = None,
+        ax: plt.Axes = None,
         **formatting_kwargs):
     """
     Draw a graph in a subplot.
@@ -262,11 +263,17 @@ def draw_graph_subplot(
         # Set the node colors and the label colors according to the value of the
         # regr_score of each node.
         node_colors = []
-        label_colors = []
+        linewidths = []
+        # label_colors = []
         for node in G:
             node_colors.append(color_map(G.nodes[node]['regr_score']))
+            if root_causes is not None and node in root_causes:
+                linewidths.append(3.0)
+            else:
+                linewidths.append(1.0)
             # label_colors.append(color_map_r(G.nodes[node]['regr_score']))
         formatting_kwargs['node_color'] = node_colors
+        formatting_kwargs['linewidths'] = linewidths
 
     nx.draw(G, pos=layout, edge_color=edge_colors,
             width=widths, style=styles, **formatting_kwargs, ax=ax)
