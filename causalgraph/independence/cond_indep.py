@@ -9,6 +9,10 @@ import networkx as nx
 
 
 class Cond_Indep:
+    """
+    Class to store conditional independencies in a graph.
+    """
+
     def __init__(self):
         self._cache = {}
 
@@ -45,6 +49,10 @@ class Cond_Indep:
 
 
 class Suff_Sets:
+    """
+    Class to store sufficient sets for a pair of nodes in a graph.
+    """
+
     def __init__(self):
         self._cache = []
 
@@ -67,7 +75,23 @@ class Suff_Sets:
 
 def get_backdoor_paths(G, x, y):
     """
-    Returns all backdoor paths between two nodes in a graph.
+    Returns all backdoor paths between two nodes in a graph. A backdoor path
+    is a path that starts with an edge towards 'x' and ends with an edge
+    towards 'y'.
+
+    Parameters:
+    -----------
+    G: nx.DiGraph
+        A directed graph
+    x: str
+        A node in the graph
+    y: str
+        A node in the graph
+
+    Returns:
+    --------
+    paths: list
+        A list of paths between x and y
     """
     uG = G.to_undirected()
     # list all paths between 'x' and 'y'
@@ -112,6 +136,26 @@ def find_colliders_in_path(G, path):
 
 
 def get_sufficient_sets_for_pair(G, x, y, verbose=False):
+    """
+    Compute the sufficient sets for a pair of nodes in a graph. A sufficient set
+    is a set of nodes that blocks all backdoor paths between x and y.
+
+    Parameters:
+    -----------
+    G: nx.DiGraph
+        A directed graph
+    x: str
+        A node in the graph
+    y: str
+        A node in the graph
+    verbose: bool
+        If True, print additional information
+
+    Returns:
+    --------
+    sufficient_sets: list
+        A list of sufficient sets for the pair of nodes (x, y)
+    """
     backdoor_paths = get_backdoor_paths(G, x, y)
     if verbose:
         print("Backdoor paths:")
@@ -188,6 +232,21 @@ def get_sufficient_sets_for_pair(G, x, y, verbose=False):
 
 
 def get_sufficient_sets(G, verbose=False):
+    """
+    Get the sufficient sets (admissible sets) for all pairs of nodes in a graph.
+
+    Parameters:
+    -----------
+    G: nx.DiGraph
+        A directed graph
+    verbose: bool
+        If True, print additional information
+
+    Returns:
+    --------
+    suff_sets: Suff_Sets
+        A list of sufficient sets for all pairs of nodes in the graph
+    """
     suff_sets = Suff_Sets()
     for x, y in itertools.combinations(G.nodes(), 2):
         sufficient_set = get_sufficient_sets_for_pair(G, x, y, verbose)
@@ -242,5 +301,9 @@ if __name__ == "__main__":
     G = nx.DiGraph()
     G.add_edges_from([('z1', 'x'), ('z1', 'z3'), ('z3', 'x'),
                      ('z3', 'y'), ('x', 'y'), ('z2', 'z3'), ('z2', 'y')])
+
     ss = get_sufficient_sets(G, verbose=False)
     print(ss)
+
+    cond_indeps = get_conditional_independencies(G, verbose=False)
+    print(cond_indeps)
