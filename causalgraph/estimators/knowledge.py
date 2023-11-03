@@ -11,7 +11,9 @@ class Knowledge:
 
     - origin: the origin node
     - target: the target node
-    - ref_edge: whether the edge is in the reference graph
+    - is_edge: whether the edge is in the reference graph
+    - is_root_cause: whether the origin is a root cause
+    - is_leaf_node: whether the origin is a leaf node
     - correlation: the correlation between the individual SHAP values and the origin node
     - KS_pval: the p-value of the Kolmogorov-Smirnov test between the origin and the target
     - shap_edge: whether the edge is in the graph constructed after evaluating mean 
@@ -22,6 +24,7 @@ class Knowledge:
     - slope_shap: the slope of the linear regression for target vs. SHAP values
     - slope_target: the slope of the linear regression for the target vs. origin values
     - potential_root: whether the origin is a potential root cause
+    - regression_err: the regression error of the origin to the target
     - err_contrib: the error contribution of the origin to the target
     """
 
@@ -80,18 +83,21 @@ class Knowledge:
                 rows.append({
                     'origin': origin,
                     'target': target,
-                    'ref_edge': int((origin, target) in self.ref_graph.edges()),
+                    'is_edge': int((origin, target) in self.ref_graph.edges()),
+                    'o_is_root': int(nx.ancestors(self.ref_graph, origin) == set()),
+                    't_is_leaf': int(nx.descendants(self.ref_graph, target) == set()),
                     'correlation': self.hierarchies.correlations[origin][target],
-                    'shap_correlation': sd.shap_correlation,
+                    'shap_corr': sd.shap_correlation,
                     'ks_pval': sd.ks_pvalue,
                     'shap_edge': int(origin in set(self.G_shap.predecessors(target))),
-                    'shap_skedastic_pval': sd.shap_p_value,
-                    'parent_skedastic_pval': sd.parent_p_value,
+                    'shap_sk_pval': sd.shap_p_value,
+                    'parent_sk_pval': sd.parent_p_value,
                     'mean_shap': self.shaps.shap_mean_values[origin][feature_pos],
                     'mean_pi': pi,
                     'slope_shap': shap_slope,
                     'slope_target': parent_slope,
-                    'potential_root': int(origin in self.root_causes),
+                    'pot_root': int(origin in self.root_causes),
+                    'regr_err': self.scoring[self.feature_names.index(target)],
                     'err_contrib': self.shaps.error_contribution.loc[origin, target]
                 })
         self.results = pd.DataFrame.from_dict(rows)
