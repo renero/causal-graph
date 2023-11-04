@@ -1,6 +1,7 @@
 import networkx as nx
 
-from causalgraph.independence.cond_indep import get_backdoor_paths
+from causalgraph.independence.cond_indep import get_backdoor_paths, get_paths, \
+    find_colliders_in_path
 
 # Returns an empty list if x and y are not connected
 
@@ -128,3 +129,163 @@ def test_returns_empty_list_if_no_path():
     y = 6
     paths = get_backdoor_paths(dag, x, y)
     assert paths == []
+
+
+def test_get_paths_returns_empty_list_if_not_connected():
+    """
+    Test that the function get_paths returns an empty list when there 
+    is no path between x and y in the DAG.
+    """
+    # Create a simple DAG
+    dag = nx.DiGraph()
+    dag.add_edges_from([(2, 3), (2, 4), (3, 4), (4, 5), (5, 6)])
+
+    # Test case: x and y are not connected
+    x = 1
+    y = 6
+    paths = get_paths(dag, x, y)
+    assert paths == []
+
+
+def test_get_paths_returns_list_with_one_path_if_one_path():
+    """
+    Test that the function get_paths returns a list with one path if 
+    there is only one path between two nodes.
+    """
+    # Create a simple DAG
+    dag = nx.DiGraph()
+    dag.add_edges_from([(1, 2), (2, 3), (3, 4), (4, 5), (5, 6)])
+
+    # Test case: x and y are connected, and there is one path
+    x = 1
+    y = 6
+    paths = get_paths(dag, x, y)
+    assert paths == [[1, 2, 3, 4, 5, 6]]
+
+
+def test_get_paths_returns_list_with_multiple_paths():
+    """
+    Test that the function get_paths returns a list with multiple paths if 
+    there are multiple paths between two nodes.
+    """
+    # Create a simple DAG
+    dag = nx.DiGraph()
+    dag.add_edges_from([(1, 2), (2, 3), (2, 4), (3, 4), (4, 5), (5, 6)])
+
+    # Test case: x and y are connected, and there are multiple paths
+    x = 1
+    y = 6
+    paths = get_paths(dag, x, y)
+    assert set(map(tuple, paths)) == {
+        tuple([1, 2, 4, 5, 6]), tuple([1, 2, 3, 4, 5, 6])}
+
+
+def test_get_paths_returns_empty_list_if_same_node():
+    """
+    Test that the function get_paths returns an empty list when the 
+    input nodes are the same.
+
+    The function should return an empty list because there are no paths 
+    between a node and itself.
+    """
+    # Create a simple DAG
+    dag = nx.DiGraph()
+    dag.add_edges_from([(1, 2), (2, 3), (2, 4), (3, 4), (4, 5), (5, 6)])
+
+    # Test case: x and y are the same node
+    x = 1
+    y = 1
+    paths = get_paths(dag, x, y)
+    assert paths == []
+
+
+def test_get_paths_returns_empty_list_if_not_in_graph():
+    """
+    Test that the function get_paths returns an empty list when 
+    x and y are not in the graph.
+    """
+    # Create a simple DAG
+    dag = nx.DiGraph()
+    dag.add_edges_from([(1, 2), (2, 3), (2, 4), (3, 4), (4, 5), (5, 6)])
+
+    # Test case: x and y are not in the graph
+    x = 7
+    y = 8
+    paths = get_paths(dag, x, y)
+    assert paths == []
+
+
+def test_get_paths_returns_empty_list_if_no_path():
+    """
+    Test that the function get_paths returns an empty list when 
+    there is no path between x and y in the DAG.
+    """
+    # Create a simple DAG
+    dag = nx.DiGraph()
+    dag.add_edges_from([(1, 2), (2, 3), (2, 4), (3, 4), (4, 5), (7, 6)])
+
+    # Test case: there is no path between x and y
+    x = 1
+    y = 6
+    paths = get_paths(dag, x, y)
+    assert paths == []
+
+
+def test_find_colliders_in_path_returns_empty_set_when_no_colliders():
+    """
+    Test that the function find_colliders_in_path returns an empty set when 
+    there are no colliders in the path.
+    """
+    # Create a simple DAG
+    dag = nx.DiGraph()
+    dag.add_edges_from([(1, 2), (2, 3), (3, 4), (4, 5), (5, 6)])
+
+    # Test case: there are no colliders in the path
+    path = [1, 2, 3, 4, 5, 6]
+    colliders = find_colliders_in_path(dag, path)
+    assert colliders == set()
+
+
+def test_find_colliders_in_path_returns_set_of_colliders():
+    """
+    Test that the function find_colliders_in_path returns a set of colliders 
+    in the path.
+    """
+    # Create a simple DAG
+    dag = nx.DiGraph()
+    dag.add_edges_from([(1, 2), (2, 3), (3, 4), (5, 4), (5, 6)])
+
+    # Test case: there are colliders in the path
+    path = [1, 2, 3, 4, 5, 6]
+    colliders = find_colliders_in_path(dag, path)
+    assert colliders == {4}
+
+
+def test_find_colliders_in_path_returns_empty_set_when_path_is_too_short():
+    """
+    Test that the function find_colliders_in_path returns an empty set when 
+    the path is too short to contain a collider.
+    """
+    # Create a simple DAG
+    dag = nx.DiGraph()
+    dag.add_edges_from([(1, 2), (2, 3), (3, 4), (4, 5), (5, 6)])
+
+    # Test case: the path is too short to contain a collider
+    path = [1, 2]
+    colliders = find_colliders_in_path(dag, path)
+    assert colliders == set()
+
+
+def test_find_colliders_in_path_returns_empty_set_when_path_is_not_in_dag():
+    """
+    Test that the function find_colliders_in_path returns an empty set when 
+    the path is not in the DAG.
+    """
+    # Create a simple DAG
+    dag = nx.DiGraph()
+    dag.add_edges_from([(1, 2), (2, 3), (3, 4), (4, 5), (5, 6)])
+
+    # Test case: the path is not in the DAG
+    path = [1, 2, 3, 7]
+    colliders = find_colliders_in_path(dag, path)
+    assert colliders == set()

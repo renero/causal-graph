@@ -191,6 +191,9 @@ def get_paths(graph: nx.DiGraph, x: str, y: str):
     -------
         - list: A list of all simple paths between x and y.
     """
+    # Check if x or y are not in the graph
+    if x not in graph.nodes() or y not in graph.nodes():
+        return []
     undirected_graph = graph.to_undirected()
     # list all paths between 'x' and 'y'
     paths = list(nx.all_simple_paths(undirected_graph, source=x, target=y))
