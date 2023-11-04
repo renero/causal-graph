@@ -15,17 +15,14 @@ import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 import pandas as pd
-import shap
 from matplotlib.backends.backend_pdf import PdfPages
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.preprocessing import StandardScaler
 from sklearn.utils.validation import check_is_fitted, check_random_state
 
-from causalgraph.common import GRAY, GREEN, RESET
+from causalgraph.common import GRAY, GREEN, RESET, plot
 from causalgraph.common.pipeline import Pipeline
-from causalgraph.common import plot
-from causalgraph.common.utils import (graph_from_dot_file, load_experiment,
-                                      save_experiment)
+from causalgraph.common.utils import graph_from_dot_file, save_experiment
 from causalgraph.estimators.knowledge import Knowledge
 from causalgraph.explainability import (Hierarchies, PermutationImportance,
                                         ShapEstimator)
@@ -37,6 +34,10 @@ from causalgraph.models import GBTRegressor, NNRegressor
 np.set_printoptions(precision=4, linewidth=120)
 warnings.filterwarnings('ignore')
 
+
+# pylint: disable=E1101:no-member, W0201:attribute-defined-outside-init, W0511:fixme
+# pylint: disable=C0103:invalid_name, C0116:missing-function-docstring, R0913:too-many-arguments
+# pylint: disable=R0914:too-many-locals, R0915:too-many-statements, R1702:too-many-branches
 
 # TODO:
 # - Update the Knowledge class to reflect what is a bad regressor (potential_parent)
@@ -66,7 +67,7 @@ class Rex(BaseEstimator, ClassifierMixin):
             self,
             name: str,
             model_type: str = "nn",
-            explainer:str = "gradient",
+            explainer: str = "gradient",
             tune_model: bool = False,
             correlation_th: float = None,
             corr_method: str = 'spearman',
@@ -132,11 +133,12 @@ class Rex(BaseEstimator, ClassifierMixin):
                     be saved. Default is None, producing no pdf file.
         """
         self.name = name
-        self.hpo_study_name = kwargs.get('hpo_study_name', f"{self.name}_{model_type}")
+        self.hpo_study_name = kwargs.get(
+            'hpo_study_name', f"{self.name}_{model_type}")
         self.model_type = NNRegressor if model_type == "nn" else GBTRegressor
         self.explainer = explainer
         self._check_model_and_explainer(model_type, explainer)
-        
+
         self.tune_model = tune_model
         self.correlation_th = correlation_th
         self.corr_method = corr_method
@@ -160,8 +162,8 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.pdf_filename = pdf_filename
 
         for k, v in kwargs.items():
-                    setattr(self, k, v)
-                            
+            setattr(self, k, v)
+
         self._fit_desc = "Running Causal Discovery pipeline"
         os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
@@ -265,9 +267,12 @@ class Rex(BaseEstimator, ClassifierMixin):
             ('indep', GraphIndependence, {'base_graph': 'G_shap'}),
             ('G_indep', 'indep.fit_predict'),
             ('G_final', 'shaps.adjust', {'graph': 'G_indep'}),
-            ('metrics_shap', 'score', {'ref_graph': ref_graph, 'predicted_graph': 'G_shap'}),
-            ('metrics_indep', 'score', {'ref_graph': ref_graph, 'predicted_graph': 'G_indep'}),
-            ('metrics_final', 'score', {'ref_graph': ref_graph, 'predicted_graph': 'G_final'}),
+            ('metrics_shap', 'score', {
+             'ref_graph': ref_graph, 'predicted_graph': 'G_shap'}),
+            ('metrics_indep', 'score', {
+             'ref_graph': ref_graph, 'predicted_graph': 'G_indep'}),
+            ('metrics_final', 'score', {
+             'ref_graph': ref_graph, 'predicted_graph': 'G_final'}),
             ('summarize_knowledge', {'ref_graph': ref_graph})
         ]
         prediction.run(steps, "Predicting graph")
@@ -346,7 +351,7 @@ class Rex(BaseEstimator, ClassifierMixin):
         root_causes = RegQuality.predict(self.models.scoring)
         root_causes = set([self.feature_names[i] for i in root_causes])
         return root_causes
-        
+
     def summarize_knowledge(self, ref_graph: nx.DiGraph):
         """
         Returns a dataframe with the knowledge about each edge in the graph
@@ -358,9 +363,9 @@ class Rex(BaseEstimator, ClassifierMixin):
         """
         if ref_graph is None:
             return None
-        
+
         self.learnings = Knowledge(self, ref_graph).info()
-        
+
         return self.learnings
 
     def __repr__(self):
@@ -371,7 +376,7 @@ class Rex(BaseEstimator, ClassifierMixin):
         for attr in dir(self):
             if attr.startswith('_') or \
                 attr in forbidden_attrs or \
-                    type(getattr(self, attr)) == types.MethodType:
+                    isinstance(getattr(self, attr), types.MethodType):
                 continue
             elif attr == "X" or attr == "y":
                 if isinstance(getattr(self, attr), pd.DataFrame):
@@ -451,9 +456,9 @@ class Rex(BaseEstimator, ClassifierMixin):
                     ref_layout = nx.drawing.nx_agraph.graphviz_layout(
                         Gt, prog="dot")
                     plot.draw_graph_subplot(Gt, layout=ref_layout, title=None, ax=ax[0],
-                                        **plot.formatting_kwargs)
+                                            **plot.formatting_kwargs)
                 plot.draw_graph_subplot(G, layout=ref_layout, title=None, ax=ax_graph,
-                                    **plot.formatting_kwargs)
+                                        **plot.formatting_kwargs)
                 pdf.savefig(f, bbox_inches='tight', pad_inches=0)
                 plt.close()
         else:
@@ -461,9 +466,9 @@ class Rex(BaseEstimator, ClassifierMixin):
                 ref_layout = nx.drawing.nx_agraph.graphviz_layout(
                     Gt, prog="dot")
                 plot.draw_graph_subplot(Gt, layout=ref_layout, title=names[1], ax=ax[0],
-                                    **plot.formatting_kwargs)
+                                        **plot.formatting_kwargs)
             plot.draw_graph_subplot(G, layout=ref_layout, title=names[0], ax=ax_graph,
-                                **plot.formatting_kwargs)
+                                    **plot.formatting_kwargs)
             plt.show()
 
     @staticmethod
@@ -519,7 +524,7 @@ class Rex(BaseEstimator, ClassifierMixin):
         if ax is None:
             f, axis = plt.subplots(ncols=ncols, figsize=figsize)
         else:
-            axis=ax
+            axis = ax
         if save_to_pdf is not None:
             with PdfPages(save_to_pdf) as pdf:
                 if reference:
@@ -531,14 +536,16 @@ class Rex(BaseEstimator, ClassifierMixin):
                 plt.close()
         else:
             if reference:
-                ref_layout = nx.drawing.nx_agraph.graphviz_layout(Gt, prog="dot")
+                ref_layout = nx.drawing.nx_agraph.graphviz_layout(
+                    Gt, prog="dot")
             else:
-                ref_layout = nx.drawing.nx_agraph.graphviz_layout(G, prog="dot")
+                ref_layout = nx.drawing.nx_agraph.graphviz_layout(
+                    G, prog="dot")
 
             plot.draw_graph_subplot(
-                G, root_causes=root_causes, layout=ref_layout, ax=axis, title=title, 
+                G, root_causes=root_causes, layout=ref_layout, ax=axis, title=title,
                 **plot.formatting_kwargs)
-            
+
             if ax is None:
                 plt.show()
 
@@ -555,12 +562,12 @@ class Rex(BaseEstimator, ClassifierMixin):
         return plot.subplots(self.shaps._plot_shap_summary, *plot_args, **kwargs)
 
 
-def custom_main(dataset_name, 
-          input_path="/Users/renero/phd/data/RC3/",
-          output_path="/Users/renero/phd/output/RC3/", 
-          tune_model: bool = False,
-          model_type="mlp", explainer="gradient",
-          save=False):
+def custom_main(dataset_name,
+                input_path="/Users/renero/phd/data/RC3/",
+                output_path="/Users/renero/phd/output/RC3/",
+                tune_model: bool = False,
+                model_type="mlp", explainer="gradient",
+                save=False):
 
     ref_graph = graph_from_dot_file(f"{input_path}{dataset_name}.dot")
     data = pd.read_csv(f"{input_path}{dataset_name}.csv")
@@ -571,20 +578,20 @@ def custom_main(dataset_name,
 
     # rex = Rex(model_type="gbt")
     rex = Rex(
-        name=dataset_name, tune_model=tune_model, 
+        name=dataset_name, tune_model=tune_model,
         model_type=model_type, explainer=explainer)
     rex.fit_predict(train, test, ref_graph)
     if save:
         where_to = save_experiment(rex.name, output_path, rex)
         print(f"Saved '{rex.name}' to '{where_to}'")
-    
+
     # rex = load_experiment(dataset_name, output_path)
-    
+
     print(rex.score(ref_graph, 'shap'))
     rex.plot_dags(rex.G_shap, ref_graph)
     rex.plot_dags(rex.G_pi, ref_graph)
 
 
 if __name__ == "__main__":
-    custom_main('rex_generated_gp_mix_1', model_type="gbt", explainer="explainer", 
+    custom_main('rex_generated_gp_mix_1', model_type="gbt", explainer="explainer",
                 tune_model=True, save=True)

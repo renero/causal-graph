@@ -6,29 +6,60 @@ an existing graph in order to prune potentially spurious edges.
 """
 
 import itertools
+from collections import defaultdict
+
 import networkx as nx
 import numpy as np
 import pygam
-
-from collections import defaultdict
-from pandas import DataFrame
 from hyppo.independence import Hsic
+from pandas import DataFrame
 from tqdm.auto import tqdm
 
 from causalgraph.common import tqdm_params
 
 
+# pylint: disable=E1101:no-member, W0201:attribute-defined-outside-init, W0511:fixme
+# pylint: disable=C0103:invalid_name, C0116:missing-function-docstring, R0913:too-many-arguments
+# pylint: disable=R0914:too-many-locals, R0915:too-many-statements, R1702:too-many-branches
+# pylint: disable=W0106:expression-not-assigned
+
+
 class GraphIndependence(object):
+    """
+    Class for removing independent edges from a causal graph.
+
+    Parameters:
+    -----------
+    - base_graph (nx.DiGraph): The graph to be cleaned
+    - condlen (int): The number of conditioning sets to use in the 
+        independence test. Defaults to 1, meaning that the cond. indep.
+        test are of length=1.
+    - condsize (int): The size of the conditioning sets to use in the 
+        independence test. Default is 0, which means that conditioning 
+        sets will be based on direct connections
+    - prog_bar (bool): Whether to show a progress bar
+    - verbose (bool): Whether to print debug messages
+    - silent (bool): Whether to suppress all output
+
+    Methods:
+    --------
+    - fit(X: DataFrame, y=None) -> Tuple[nx.DiGraph, Dict[str, List[Tuple[str, Tuple[str]]]]]:
+        Remove edges from the graph that are conditionally independent.
+    - predict() -> nx.DiGraph:
+        Predicts the causal graph using the current independence tests and returns the resulting graph.
+    - fit_predict(X: DataFrame, y=None) -> nx.DiGraph:
+        Fits the model to the data and returns predictions.
+    """
 
     def __init__(
             self,
             base_graph,
             condlen: int = 1,
-            condsize: int = 0, 
-            prog_bar: bool = True, 
+            condsize: int = 0,
+            prog_bar: bool = True,
             verbose: bool = False,
             silent: bool = False):
-        
+
         self.base_graph = base_graph
         self.condlen = condlen
         self.condsize = condsize
@@ -60,7 +91,7 @@ class GraphIndependence(object):
             nx.DiGraph: The cleaned graph
             actions: A dictionary of actions that were taken
         """
-        #  TODO: This was ON in the original code, but it seems to be a bug
+        # TODO: This was ON in the original code, but it seems to be a bug
         # condlen = 1
         # condsize = 0
 
@@ -73,7 +104,7 @@ class GraphIndependence(object):
         self.sepset = {}
         for p in itertools.permutations(self.feature_names, 2):
             self.sepset[p] = ()
-        edge = list(self.base_graph.edges)
+        # edge = list(self.base_graph.edges)
 
         self.G_skl = nx.DiGraph()
         self.G_skl.add_nodes_from(self.base_graph.nodes(data=True))
@@ -97,9 +128,25 @@ class GraphIndependence(object):
         return self
 
     def predict(self):
+        """
+        Predicts the causal graph using the current independence tests and returns the resulting graph.
+
+        Returns:
+            The predicted causal graph.
+        """
         return self.G_skl
 
     def fit_predict(self, X: DataFrame, y=None):
+        """
+        Fits the model to the data and returns predictions.
+
+        Parameters:
+        X (DataFrame): The input data to fit the model on.
+        y (optional): The target variable to fit the model on.
+
+        Returns:
+        The predictions made by the model.
+        """
         self.fit(X, y)
         return self.predict()
 
@@ -122,7 +169,7 @@ class GraphIndependence(object):
         if size == 0:
             return [()]
         # Get all neighbors of x in g
-        adjy = self.graph.neighbors(x)
+        adjy = self.G_skl.neighbors(x)
         # Remove y from neighbour list
         adj = [node for node in adjy if node != y]
         # Generate all unique combinations of len size
