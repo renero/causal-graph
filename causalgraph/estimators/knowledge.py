@@ -1,7 +1,15 @@
 import math
+
+import networkx as nx
 import numpy as np
 import pandas as pd
-import networkx as nx
+from sklearn.preprocessing import StandardScaler
+
+from causalgraph.common.utils import graph_from_dot_file, load_experiment
+
+# pylint: disable=E1101:no-member, W0201:attribute-defined-outside-init, W0511:fixme
+# pylint: disable=C0103:invalid_name, C0116:missing-function-docstring, R0913:too-many-arguments
+# pylint: disable=R0914:too-many-locals, R0915:too-many-statements, R1702:too-many-branches
 
 
 class Knowledge:
@@ -26,6 +34,8 @@ class Knowledge:
     - potential_root: whether the origin is a potential root cause
     - regression_err: the regression error of the origin to the target
     - err_contrib: the error contribution of the origin to the target
+    - con_ind_pval: the p-value of the conditional independence test between the origin 
+        and the target
     """
 
     def __init__(self, rex: object, ref_graph: nx.DiGraph):
@@ -44,12 +54,13 @@ class Knowledge:
         self.shaps = rex.shaps
         self.pi = rex.pi
         self.hierarchies = rex.hierarchies
+        self.indep = rex.indep
         self.feature_names = rex.feature_names
         self.scoring = rex.models.scoring
         self.ref_graph = ref_graph
         self.G_shap = rex.G_shap
         self.root_causes = rex.root_causes
-        
+
         self.correlation_th = rex.correlation_th
         if self.correlation_th is not None:
             self.correlated_features = self.hierarchies.correlated_features
@@ -57,6 +68,7 @@ class Knowledge:
     def info(self):
         """Returns a dataframe with the knowledge about each edge in the graph"""
         rows = []
+        ci = self.indep.compute_cond_indep_pvals()
         for origin in self.feature_names:
             for target in self.feature_names:
                 if origin == target:
@@ -70,7 +82,8 @@ class Knowledge:
                     all_features = [f for f in self.feature_names if (
                         f != origin) and (f not in self.correlated_features[origin])]
                 else:
-                    all_features = [f for f in self.feature_names if f != origin]
+                    all_features = [
+                        f for f in self.feature_names if f != origin]
                 feature_pos = all_features.index(target)
 
                 sd = self.shaps.shap_discrepancies[origin][target]
@@ -98,17 +111,14 @@ class Knowledge:
                     'slope_target': parent_slope,
                     'pot_root': int(origin in self.root_causes),
                     'regr_err': self.scoring[self.feature_names.index(target)],
-                    'err_contrib': self.shaps.error_contribution.loc[origin, target]
+                    'err_contrib': self.shaps.error_contribution.loc[origin, target],
+                    'cond_ind_pval': ci[(origin, target)]
                 })
         self.results = pd.DataFrame.from_dict(rows)
         return self.results
 
 
 if __name__ == "__main__":
-    import numpy as np
-    import pandas as pd
-    from causalgraph.common.utils import graph_from_dot_file, load_experiment
-    from sklearn.preprocessing import StandardScaler
 
     # Display Options
     np.set_printoptions(precision=4, linewidth=100)

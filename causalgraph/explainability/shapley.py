@@ -149,7 +149,7 @@ class ShapEstimator(BaseEstimator):
         if self.correlation_th:
             self.corr_matrix = Hierarchies.compute_correlation_matrix(X)
             self.correlated_features = Hierarchies.compute_correlated_features(
-                self.corr_matrix, self.correlation_th, self.feature_names, 
+                self.corr_matrix, self.correlation_th, self.feature_names,
                 verbose=self.verbose)
             X_train_original = self.X_train.copy()
             X_test_original = self.X_test.copy()
@@ -163,10 +163,13 @@ class ShapEstimator(BaseEstimator):
                 self.X_train = X_train_original.copy()
                 self.X_test = X_test_original.copy()
                 if len(self.correlated_features[target_name]) > 0:
-                    self.X_train = self.X_train.drop(self.correlated_features[target_name], axis=1)
-                    self.X_test = self.X_test.drop(self.correlated_features[target_name], axis=1)
+                    self.X_train = self.X_train.drop(
+                        self.correlated_features[target_name], axis=1)
+                    self.X_test = self.X_test.drop(
+                        self.correlated_features[target_name], axis=1)
                     if self.verbose:
-                        print("REMOVED CORRELATED FEATURES: ", self.correlated_features[target_name])
+                        print("REMOVED CORRELATED FEATURES: ",
+                              self.correlated_features[target_name])
 
             # Get the model and the data (tensor form)
             if hasattr(self.models.regressor[target_name], "model"):
@@ -183,7 +186,8 @@ class ShapEstimator(BaseEstimator):
                     f"Reduced X_test to {X_test.shape[0]} samples") if self.verbose else None
 
             # Run the selected SHAP explainer
-            self._run_selected_shap_explainer(target_name, model, X_train, X_test)
+            self._run_selected_shap_explainer(
+                target_name, model, X_train, X_test)
 
             # Scale the SHAP values
             scaler = StandardScaler()
@@ -200,7 +204,8 @@ class ShapEstimator(BaseEstimator):
 
             # Add zeroes to positions of correlated features
             if self.correlation_th is not None:
-                self._add_zeroes(target_name, self.correlated_features[target_name])
+                self._add_zeroes(
+                    target_name, self.correlated_features[target_name])
 
             pbar.update(1)
 
@@ -222,7 +227,7 @@ class ShapEstimator(BaseEstimator):
     def _run_selected_shap_explainer(self, target_name, model, X_train, X_test):
         """
         Run the selected SHAP explainer, according to the given parameters.
-        
+
         Parameters
         ----------
         target_name : str
@@ -233,7 +238,7 @@ class ShapEstimator(BaseEstimator):
             The training data.
         X_test : PyTorch.Tensor object
             The testing data.
-            
+
         Returns
         -------
         shap.Explainer
@@ -241,19 +246,19 @@ class ShapEstimator(BaseEstimator):
         """
         if self.explainer == "kernel":
             self.shap_explainer[target_name] = shap.KernelExplainer(
-                    model.predict, X_train)
+                model.predict, X_train)
             self.shap_values[target_name] = self.shap_explainer[target_name].\
-                    shap_values(X_test)[0]
+                shap_values(X_test)[0]
         elif self.explainer == "gradient":
             X_train_tensor = torch.from_numpy(X_train).float()
             X_test_tensor = torch.from_numpy(X_test).float()
             self.shap_explainer[target_name] = shap.GradientExplainer(
-                    model.to(self.device), X_train_tensor.to(self.device))
+                model.to(self.device), X_train_tensor.to(self.device))
             self.shap_values[target_name] = self.shap_explainer[target_name](
-                    X_test_tensor.to(self.device)).values
+                X_test_tensor.to(self.device)).values
         elif self.explainer == "explainer":
             self.shap_explainer[target_name] = shap.Explainer(
-                    model.predict, X_train)
+                model.predict, X_train)
             explanation = self.shap_explainer[target_name](X_test)
             self.shap_values[target_name] = explanation.values
         else:
@@ -268,38 +273,38 @@ class ShapEstimator(BaseEstimator):
             self.all_mean_shap_values[-1] = np.insert(
                 self.all_mean_shap_values[-1], correlated_feature_position, 0.)
 
-    def _extract_data(self, X, target_name):
-        """
-        Extract the data and the model for the given target.
+    # def _extract_data(self, X, target_name):
+    #     """
+    #     Extract the data and the model for the given target.
 
-        Parameters
-        ----------
-        model: torch.nn.Module
-            The model for the given target.
-        X : pd.DataFrame
-            The input data.
-        target_name : str
-            The name of the target feature.
+    #     Parameters
+    #     ----------
+    #     model: torch.nn.Module
+    #         The model for the given target.
+    #     X : pd.DataFrame
+    #         The input data.
+    #     target_name : str
+    #         The name of the target feature.
 
-        Returns
-        -------
-        X_train : PyTorch.Tensor object
-            The training data.
-        X_test : PyTorch.Tensor object
-            The testing data.
-        """
-        tensor_data = X.drop(target_name, axis=1).values
-        tensor_data = torch.from_numpy(tensor_data).float()
+    #     Returns
+    #     -------
+    #     X_train : PyTorch.Tensor object
+    #         The training data.
+    #     X_test : PyTorch.Tensor object
+    #         The testing data.
+    #     """
+    #     tensor_data = X.drop(target_name, axis=1).values
+    #     tensor_data = torch.from_numpy(tensor_data).float()
 
-        X_train, X_test = self._train_test_split_tensors(
-            tensor_data, test_size=0.2, random_state=42)
+    #     X_train, X_test = self._train_test_split_tensors(
+    #         tensor_data, test_size=0.2, random_state=42)
 
-        # Move to GPU if available
-        if self.on_gpu:
-            X_train = X_train.cuda()
-            X_test = X_test.cuda()
+    #     # Move to GPU if available
+    #     if self.on_gpu:
+    #         X_train = X_train.cuda()
+    #         X_test = X_test.cuda()
 
-        return X_train, X_test
+    #     return X_train, X_test
 
     def predict(self, X, root_causes):
         """
@@ -313,14 +318,16 @@ class ShapEstimator(BaseEstimator):
             total=4, **tqdm_params(
                 "Building graph from SHAPs", self.prog_bar, silent=self.silent))
         pbar.refresh()
-        
+
         # Compute error contribution at this stage, since it needs the individual
         # SHAP values
         self.compute_error_contribution()
-        pbar.update(1); pbar.refresh()
+        pbar.update(1)
+        pbar.refresh()
 
         self._compute_discrepancies(self.X_test)
-        pbar.update(1); pbar.refresh()
+        pbar.update(1)
+        pbar.refresh()
 
         self.connections = dict()
         for target in self.feature_names:
@@ -329,12 +336,12 @@ class ShapEstimator(BaseEstimator):
 
             # Filter out features that are highly correlated with the target
             if self.correlation_th is not None:
-                candidate_causes = [f for f in candidate_causes \
-                    if f not in self.correlated_features[target]]
+                candidate_causes = [f for f in candidate_causes
+                                    if f not in self.correlated_features[target]]
 
             print(
                 f"Selecting features for target {target}...") if self.verbose else None
-            
+
             self.connections[target] = select_features(
                 values=self.shap_values[target],
                 feature_names=candidate_causes,
@@ -344,12 +351,13 @@ class ShapEstimator(BaseEstimator):
                 descending=self.descending,
                 min_impact=self.min_impact, verbose=self.verbose)
 
-        pbar.update(1); pbar.refresh()
+        pbar.update(1)
+        pbar.refresh()
 
         G_shap = utils.digraph_from_connected_features(
             X, self.feature_names, self.models, self.connections, root_causes,
             reciprocity=True, iters=10, verbose=self.verbose)
-        
+
         pbar.update(1)
         pbar.close()
 
@@ -401,8 +409,8 @@ class ShapEstimator(BaseEstimator):
 
             if self.correlation_th is not None:
                 feature_names = [
-                    f for f in self.feature_names if (f != target_name) & \
-                        (f not in self.correlated_features[target_name])]
+                    f for f in self.feature_names if (f != target_name) &
+                    (f not in self.correlated_features[target_name])]
             else:
                 feature_names = [
                     f for f in self.feature_names if f != target_name]
@@ -649,15 +657,15 @@ class ShapEstimator(BaseEstimator):
         error_contribution = dict()
         for target in self.feature_names:
             shap_values = pd.DataFrame(
-                self.shap_values[target], 
-                columns=[c for c in self.feature_names if c != target] )
+                self.shap_values[target],
+                columns=[c for c in self.feature_names if c != target])
             y_hat = pd.DataFrame(
                 self.models.predict(self.X_test).T, columns=self.feature_names)
             y_true = self.X_test
-            
+
             error_contribution[target] = self._individual_error_contribution(
                 shap_values, y_true[target], y_hat[target])
-            # Add a 0.0 value at index target in the error contribution series
+            #  Add a 0.0 value at index target in the error contribution series
             error_contribution[target] = error_contribution[target].append(
                 pd.Series(0.0, index=[target]))
             # Sort the series by index
@@ -665,7 +673,7 @@ class ShapEstimator(BaseEstimator):
 
         self.error_contribution = pd.DataFrame(error_contribution)
         return self.error_contribution
-    
+
     def _individual_error_contribution(self, shap_values, y_true, y_pred):
         """
         Compute the error contribution of each feature.
@@ -675,7 +683,7 @@ class ShapEstimator(BaseEstimator):
         is making more harm than good!
         On the contrary, the more negative this value, the more beneficial the feature is 
         for the predictions since its presence leads to smaller errors.
-        
+
         Parameters:
         -----------
         shap_values: pd.DataFrame
@@ -684,7 +692,7 @@ class ShapEstimator(BaseEstimator):
             Ground truth values for a given target.
         y_pred: pd.Series   
             Predicted values for a given target.
-            
+
         Returns:
         --------
         error_contribution: pd.Series
@@ -694,11 +702,12 @@ class ShapEstimator(BaseEstimator):
         y_pred_wo_feature = shap_values.apply(lambda feature: y_pred - feature)
         abs_error_wo_feature = y_pred_wo_feature.apply(
             lambda feature: (y_true-feature).abs())
-        error_diff = abs_error_wo_feature.apply(lambda feature: abs_error - feature)
+        error_diff = abs_error_wo_feature.apply(
+            lambda feature: abs_error - feature)
         ind_error_contribution = error_diff.mean()
-        
+
         return ind_error_contribution
-    
+
     def _debugmsg(
             self,
             msg,
@@ -763,7 +772,8 @@ class ShapEstimator(BaseEstimator):
         else:
             feature_names = [
                 f for f in self.feature_names if f != target_name]
-        selected_features = [parent for parent in self.connections[target_name]]
+        selected_features = [
+            parent for parent in self.connections[target_name]]
 
         y_pos = np.arange(len(feature_inds))
         ax.grid(True, axis='x')
@@ -871,7 +881,6 @@ class ShapEstimator(BaseEstimator):
 def custom_main(experiment_name):
     path = "/Users/renero/phd/data/RC3/"
     output_path = "/Users/renero/phd/output/RC3/"
-    
 
     ref_graph = utils.graph_from_dot_file(f"{path}{experiment_name}.dot")
     data = pd.read_csv(f"{path}{experiment_name}.csv")
@@ -885,7 +894,6 @@ def custom_main(experiment_name):
     print(f"Loaded experiment {experiment_name}")
 
     rex.shaps.predict(test, rex.root_causes)
-    
 
 
 if __name__ == "__main__":

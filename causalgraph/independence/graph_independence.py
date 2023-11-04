@@ -46,7 +46,8 @@ class GraphIndependence(object):
     - fit(X: DataFrame, y=None) -> Tuple[nx.DiGraph, Dict[str, List[Tuple[str, Tuple[str]]]]]:
         Remove edges from the graph that are conditionally independent.
     - predict() -> nx.DiGraph:
-        Predicts the causal graph using the current independence tests and returns the resulting graph.
+        Predicts the causal graph using the current independence tests and returns 
+        the resulting graph.
     - fit_predict(X: DataFrame, y=None) -> nx.DiGraph:
         Fits the model to the data and returns predictions.
     """
@@ -276,7 +277,7 @@ class GraphIndependence(object):
             self.actions = defaultdict(list)
 
         neighbors = list(self.G_skl.neighbors(x))
-        neighbors_str = ",".join([i for i in neighbors])
+        neighbors_str = ",".join(list(neighbors))
         print(
             f"> Iterating over neighbors: {neighbors_str}") if self.verbose else None
         for ny, y in enumerate(neighbors):
@@ -296,3 +297,21 @@ class GraphIndependence(object):
                 self._update_actions(tup)
 
         return condlen
+
+    def compute_cond_indep_pvals(self):
+        """
+        Perform the `_test_cond_independence` on all pairs of nodes in the graph, and
+        store the p_value (3rd element in the return tuple) on the class 
+        `cond_indep_pvals`
+        """
+        self.cond_indep_pvals = {}
+        for x in self.feature_names:
+            for y in self.feature_names:
+                if x == y:
+                    continue
+                X = self.data.loc[:, x].values.reshape(-1, 1)
+                Y = self.data.loc[:, y].values.reshape(-1, 1)
+                _, _, pval = self._cond_indep_test(X, Y, None)
+                self.cond_indep_pvals[(x, y)] = pval
+
+        return self.cond_indep_pvals
