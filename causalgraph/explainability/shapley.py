@@ -1,9 +1,21 @@
 """
-This is a module to be used as a reference for building other modules
+This module builds the causal graph based on the informacion that we derived 
+from the SHAP values. The main idea is to use the SHAP values to compute the
+discrepancy between the SHAP values and the target values. This discrepancy
+is then used to build the graph.
+
 """
-from collections import defaultdict
+
+# pylint: disable=E1101:no-member, W0201:attribute-defined-outside-init, W0511:fixme
+# pylint: disable=C0103:invalid-name
+# pylint: disable=C0116:missing-function-docstring
+# pylint: disable=R0913:too-many-arguments
+# pylint: disable=R0914:too-many-locals, R0915:too-many-statements
+# pylint: disable=W0106:expression-not-assigned, R1702:too-many-branches
+
 import math
 import types
+from collections import defaultdict
 from dataclasses import dataclass
 from typing import Union
 
@@ -20,16 +32,15 @@ from matplotlib.ticker import FormatStrFormatter
 from scipy.stats import kstest, spearmanr
 from sklearn.base import BaseEstimator
 from sklearn.discriminant_analysis import StandardScaler
-from sklearn.isotonic import spearmanr
+# from sklearn.isotonic import spearmanr
 from sklearn.model_selection import train_test_split
 from sklearn.utils.validation import check_is_fitted
 from tqdm.auto import tqdm
 
 from causalgraph.common import *
 from causalgraph.common import utils
-from causalgraph.independence.feature_selection import select_features
 from causalgraph.explainability.hierarchies import Hierarchies
-
+from causalgraph.independence.feature_selection import select_features
 
 AnyGraph = Union[nx.DiGraph, nx.Graph]
 K = 180.0 / math.pi
@@ -37,6 +48,29 @@ K = 180.0 / math.pi
 
 @dataclass
 class ShapDiscrepancy:
+    """
+    A class representing the discrepancy between the SHAP value and the parent value for a given feature.
+
+    Attributes:
+        - target (str): The name of the target feature.
+        - parent (str): The name of the parent feature.
+        - shap_heteroskedasticity (bool): Whether the SHAP value exhibits 
+            heteroskedasticity.
+        - parent_heteroskedasticity (bool): Whether the parent value exhibits 
+            heteroskedasticity.
+        - shap_p_value (float): The p-value for the SHAP value.
+        - parent_p_value (float): The p-value for the parent value.
+        - shap_model (sm.regression.linear_model.RegressionResultsWrapper): The 
+            regression model for the SHAP value.
+        - parent_model (sm.regression.linear_model.RegressionResultsWrapper): The 
+            regression model for the parent value.
+        - shap_discrepancy (float): The discrepancy between the SHAP value and the 
+            parent value.
+        - shap_correlation (float): The correlation between the SHAP value and the 
+            parent value.
+        - ks_pvalue (float): The p-value for the Kolmogorov-Smirnov test.
+        - ks_result (str): The result of the Kolmogorov-Smirnov test.
+    """
     target: str
     parent: str
     shap_heteroskedasticity: bool
@@ -273,39 +307,6 @@ class ShapEstimator(BaseEstimator):
             self.all_mean_shap_values[-1] = np.insert(
                 self.all_mean_shap_values[-1], correlated_feature_position, 0.)
 
-    # def _extract_data(self, X, target_name):
-    #     """
-    #     Extract the data and the model for the given target.
-
-    #     Parameters
-    #     ----------
-    #     model: torch.nn.Module
-    #         The model for the given target.
-    #     X : pd.DataFrame
-    #         The input data.
-    #     target_name : str
-    #         The name of the target feature.
-
-    #     Returns
-    #     -------
-    #     X_train : PyTorch.Tensor object
-    #         The training data.
-    #     X_test : PyTorch.Tensor object
-    #         The testing data.
-    #     """
-    #     tensor_data = X.drop(target_name, axis=1).values
-    #     tensor_data = torch.from_numpy(tensor_data).float()
-
-    #     X_train, X_test = self._train_test_split_tensors(
-    #         tensor_data, test_size=0.2, random_state=42)
-
-    #     # Move to GPU if available
-    #     if self.on_gpu:
-    #         X_train = X_train.cuda()
-    #         X_test = X_test.cuda()
-
-    #     return X_train, X_test
-
     def predict(self, X, root_causes):
         """
         Builds a causal graph from the shap values using a selection mechanism based
@@ -357,6 +358,9 @@ class ShapEstimator(BaseEstimator):
         G_shap = utils.digraph_from_connected_features(
             X, self.feature_names, self.models, self.connections, root_causes,
             reciprocity=True, iters=10, verbose=self.verbose)
+
+        G_shap = utils.remove_cycles(
+            G_shap, self.feature_names, verbose=self.verbose)
 
         pbar.update(1)
         pbar.close()
@@ -879,6 +883,15 @@ class ShapEstimator(BaseEstimator):
 
 
 def custom_main(experiment_name):
+    """
+    Runs a custom main function for the given experiment name.
+
+    Args:
+        experiment_name (str): The name of the experiment to run.
+
+    Returns:
+        None
+    """
     path = "/Users/renero/phd/data/RC3/"
     output_path = "/Users/renero/phd/output/RC3/"
 

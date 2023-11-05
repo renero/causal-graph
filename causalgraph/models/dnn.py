@@ -272,7 +272,7 @@ class NNRegressor(BaseEstimator):
         # Call the class method to predict the values for each target variable
         y_hat = self.predict(X)
 
-        # Handle the case where the prediction returned by the model is not a 
+        # Handle the case where the prediction returned by the model is not a
         # numpy array but a numpy object type
         if isinstance(y_hat, np.ndarray) and y_hat.dtype == np.object_:
             y_hat = np.vstack(y_hat[:, :].flatten()).astype('float')
@@ -517,7 +517,7 @@ class NNRegressor(BaseEstimator):
         # tune the model
         regressor_args = self.tune(
             train_data, test_data, n_trials=hpo_n_trials, study_name=hpo_study_name,
-            min_loss=hpo_min_loss, storage=hpo_storage, 
+            min_loss=hpo_min_loss, storage=hpo_storage,
             load_if_exists=hpo_load_if_exists)
 
         if self.verbose and not self.silent:
@@ -537,14 +537,14 @@ class NNRegressor(BaseEstimator):
 # Main function
 #
 
-def custom_main(score:bool=False, tune: bool = False):
+def custom_main(score: bool = False, tune: bool = False):
     from causalgraph.common import utils
     path = "/Users/renero/phd/data/RC3/"
     output_path = "/Users/renero/phd/output/RC3/"
     experiment_name = 'custom_rex'
 
     ref_graph = utils.graph_from_dot_file(f"{path}{experiment_name}.dot")
-    
+
     data = pd.read_csv(f"{path}{experiment_name}.csv")
     scaler = StandardScaler()
     data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)

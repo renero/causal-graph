@@ -364,7 +364,8 @@ class Rex(BaseEstimator, ClassifierMixin):
         if ref_graph is None:
             return None
 
-        self.learnings = Knowledge(self, ref_graph).info()
+        self.knowledge = Knowledge(self, ref_graph)
+        self.learnings = self.knowledge.info()
 
         return self.learnings
 

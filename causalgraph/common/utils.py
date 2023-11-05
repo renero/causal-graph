@@ -13,6 +13,7 @@ from typing import Dict, List, Tuple, Union
 
 import networkx as nx
 import numpy as np
+import pandas as pd
 import pydot as pydot
 import pydotplus
 import torch
@@ -44,7 +45,7 @@ def save_experiment(obj_name: str, folder: str, results: dict, overwrite: bool =
     """
     if not os.path.exists(folder):
         Path(folder).mkdir(parents=False, exist_ok=True)
-        
+
     if not overwrite:
         output = valid_output_name(obj_name, folder, extension="pickle")
     else:
@@ -220,11 +221,11 @@ def graph_intersection(g1: AnyGraph, g2: AnyGraph) -> AnyGraph:
     """
     # Get the nodes from g1 and g2, as the union of both
     nodes = set(g1.nodes).intersection(set(g2.nodes))
-    
+
     # Check if any of the graphs is empty
     if len(nodes) == 0:
         return nx.DiGraph()
-    
+
     # Take the data from the nodes in g1 and g2, as the minimum value of both
     # first_node = list(g1.nodes)[0]
     # data_fields = g1.nodes[first_node].keys()
@@ -232,17 +233,17 @@ def graph_intersection(g1: AnyGraph, g2: AnyGraph) -> AnyGraph:
     # for key in data_fields:
     #     for n in nodes:
     #         nodes_data[n] = {key: min(g1.nodes[n][key], g2.nodes[n][key])}
-        
+
     # Get the edges from g1 and g2, and take only those that match completely
     # edges = set(g1.edges).intersection(set(g2.edges))
     edges = g1.edges & g2.edges
-    
+
     # Create a new graph with the nodes, nodes_data and edges
     g = nx.DiGraph()
     g.add_nodes_from(nodes)
     # nx.set_node_attributes(g, nodes_data)
     g.add_edges_from(edges)
-    
+
     return g
 
 
@@ -257,7 +258,7 @@ def graph_union(g1: AnyGraph, g2: AnyGraph) -> AnyGraph:
     g.add_nodes_from(nodes)
     g.add_edges_from(g1.edges)
     g.add_edges_from(g2.edges)
-    
+
     # Take the data from the nodes in g1 and g2, as the minimum value of both
     # first_node = list(g1.nodes)[0]
     # data_fields = g1.nodes[first_node].keys()
@@ -266,7 +267,6 @@ def graph_union(g1: AnyGraph, g2: AnyGraph) -> AnyGraph:
     #     for n in nodes:
     #         nodes_data[n] = {key: min(g1.nodes[n][key], g2.nodes[n][key])}
 
-
     return g
 
 
@@ -274,10 +274,10 @@ def digraph_from_connected_features(
         X,
         feature_names,
         models,
-        connections, 
+        connections,
         root_causes,
         reciprocity=True,
-        iters=10, 
+        iters=10,
         verbose=False):
     """
     Builds a directed graph from a set of features and their connections. The
@@ -285,7 +285,7 @@ def digraph_from_connected_features(
     orientation of the edges is determined by the causal direction of the
     features. The orientation is determined by the method of edge orientation
     defined in the independence module.
-    
+
     Parameters:
     -----------
     X (numpy.ndarray): The input data.
@@ -302,13 +302,13 @@ def digraph_from_connected_features(
         module to determine the orientation of the edges.
     verbose (bool): If True, then the function prints information about the
         orientation of the edges.
-        
+
     Returns:
     --------
     networkx.DiGraph: The directed graph with the nodes and edges determined
         by the connections and the orientation determined by the independence
         module.
-    
+
     """
     unoriented_graph = nx.Graph()
     for target in feature_names:
@@ -325,7 +325,7 @@ def digraph_from_connected_features(
     for i, feature in enumerate(feature_names):
         dag.add_node(feature)
         dag.nodes[feature]['regr_score'] = models.scoring[i]
-    
+
     # Determine edge orientation for each edge
     for u, v in unoriented_graph.edges():
         orientation = get_edge_orientation(
@@ -336,7 +336,7 @@ def digraph_from_connected_features(
             dag.add_edge(v, u)
         else:
             pass
-        
+
     # Apply a simple fix: if quality of regression for a feature is poor, then
     # that feature can be considered a root or parent node. Therefore, we cannot
     # have an edge pointing to that node.
@@ -345,10 +345,64 @@ def digraph_from_connected_features(
         print(f"Checking root cause {parent_node}...") if verbose else None
         for cause, effect in dag.edges():
             if effect == parent_node:
-                print(f"Reverting edge {cause} -> {effect}") if verbose else None
+                print(
+                    f"Reverting edge {cause} -> {effect}") if verbose else None
                 changes.append((cause, effect))
     for cause, effect in changes:
         dag.remove_edge(cause, effect)
         dag.add_edge(effect, cause)
-    
+
+    return dag
+
+
+def break_cycle_if_present(
+        dag: nx.DiGraph,
+        knowledge: pd.DataFrame,
+        verbose: bool = False):
+    """
+    Breaks cycles in a directed acyclic graph (DAG) by removing the edge with 
+    the lowest permutation importance. If there are multiple cycles, they are 
+    all traversed and fixed.
+
+    Parameters:
+    - dag (nx.DiGraph): the DAG to break cycles in.
+    - knowledge (pd.DataFrame): a DataFrame containing the permutation importances 
+        for each edge in the DAG.
+
+    Returns:
+    - dag (nx.DiGraph): the DAG with cycles broken.
+    """
+    cycles = list(nx.simple_cycles(dag))
+    if len(cycles) == 0:
+        if verbose:
+            print("No cycles found")
+        return dag
+
+    # Traverse all cycles, fixing them
+    cycles_info = []
+    for cycle in cycles:
+        # For every pair of consecutive nodes in the cycle, store their
+        # permutation importance
+        cycle_edges = {}
+        for node in cycle:
+            if node == cycle[-1]:
+                neighbour = cycle[0]
+            else:
+                neighbour = cycle[cycle.index(node)+1]
+            cycle_edges[(node, neighbour)] = knowledge.get(
+                node, neighbour, 'mean_pi')
+        cycles_info.append((cycle, cycle_edges))
+
+        # Find the edge with the lowest permutation importance
+        min_pi = min(cycle_edges.values())
+        min_edge = [edge for edge, pi in cycle_edges.items() if pi ==
+                    min_pi][0]
+        if verbose:
+            print(f"Breaking cycle {cycle} by removing edge {min_edge}")
+
+        # Remove the edge with the lowest permutation importance, checking that
+        # the edge still exists
+        if min_edge in dag.edges:
+            dag.remove_edge(*min_edge)
+
     return dag

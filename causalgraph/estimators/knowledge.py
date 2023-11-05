@@ -117,6 +117,15 @@ class Knowledge:
         self.results = pd.DataFrame.from_dict(rows)
         return self.results
 
+    def get(self, origin: str, target: str, what: str = None):
+        """Returns the knowledge about a specific edge"""
+        if what is None:
+            return self.results[(self.results.origin == origin) &
+                                (self.results.target == target)]
+
+        return self.results[(self.results.origin == origin) &
+                            (self.results.target == target)][what].values[0]
+
 
 if __name__ == "__main__":
 
@@ -132,7 +141,7 @@ if __name__ == "__main__":
     experiment_name = 'custom_rex'
 
     # Read the data
-    ref_graph = graph_from_dot_file(f"{path}{experiment_name}.dot")
+    reference_graph = graph_from_dot_file(f"{path}{experiment_name}.dot")
     data = pd.read_csv(f"{path}{experiment_name}.csv")
     scaler = StandardScaler()
     data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)
@@ -147,4 +156,4 @@ if __name__ == "__main__":
 
     custom.feature_names = list(data.columns)
     custom.models.score(train)
-    custom.knowledge(ref_graph)
+    custom.knowledge(reference_graph)
