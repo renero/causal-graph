@@ -355,7 +355,7 @@ def digraph_from_connected_features(
     return dag
 
 
-def break_cycle_if_present(
+def break_cycles_if_present(
         dag: nx.DiGraph,
         knowledge: pd.DataFrame,
         verbose: bool = False):
@@ -372,11 +372,12 @@ def break_cycle_if_present(
     Returns:
     - dag (nx.DiGraph): the DAG with cycles broken.
     """
-    cycles = list(nx.simple_cycles(dag))
+    new_dag = dag.copy()
+    cycles = list(nx.simple_cycles(new_dag))
     if len(cycles) == 0:
         if verbose:
             print("No cycles found")
-        return dag
+        return new_dag
 
     # Traverse all cycles, fixing them
     cycles_info = []
@@ -402,7 +403,7 @@ def break_cycle_if_present(
 
         # Remove the edge with the lowest permutation importance, checking that
         # the edge still exists
-        if min_edge in dag.edges:
-            dag.remove_edge(*min_edge)
+        if min_edge in new_dag.edges:
+            new_dag.remove_edge(*min_edge)
 
-    return dag
+    return new_dag

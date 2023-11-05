@@ -87,7 +87,42 @@ class ShapDiscrepancy:
 
 class ShapEstimator(BaseEstimator):
     """
+    A class for computing SHAP values and building a causal graph from them.
+
+    Parameters
+    ----------
+    explainer : str, default="explainer"
+        The SHAP explainer to use. Possible values are "kernel", "gradient", and "explainer".
+    models : BaseEstimator, default=None
+        The models to use for computing SHAP values. If None, a linear regression model is used for each feature.
+    correlation_th : float, default=None
+        The correlation threshold to use for removing highly correlated features.
+    method : str, default="cluster"
+        The method to use for selecting features. Possible values are "cluster", "knee", and "abrupt".
+    sensitivity : float, default=1.0
+        The sensitivity parameter for the feature selection method.
+    mean_shap_percentile : float, default=0.8
+        The percentile threshold for selecting features based on their mean SHAP value.
+    tolerance : float, default=None
+        The tolerance parameter for the feature selection method.
+    descending : bool, default=False
+        Whether to sort the features in descending order of importance.
+    iters : int, default=20
+        The number of iterations to use for the feature selection method.
+    reciprocity : bool, default=False
+        Whether to enforce reciprocity in the causal graph.
+    min_impact : float, default=1e-06
+        The minimum impact threshold for selecting features.
+    on_gpu : bool, default=False
+        Whether to use the GPU for computing SHAP values.
+    verbose : bool, default=False
+        Whether to print verbose output.
+    prog_bar : bool, default=True
+        Whether to show a progress bar.
+    silent : bool, default=False
+        Whether to suppress all output.
     """
+
     device = utils.select_device("cpu")
 
     def __init__(
@@ -358,9 +393,6 @@ class ShapEstimator(BaseEstimator):
         G_shap = utils.digraph_from_connected_features(
             X, self.feature_names, self.models, self.connections, root_causes,
             reciprocity=True, iters=10, verbose=self.verbose)
-
-        G_shap = utils.remove_cycles(
-            G_shap, self.feature_names, verbose=self.verbose)
 
         pbar.update(1)
         pbar.close()

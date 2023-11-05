@@ -20,9 +20,9 @@ from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.preprocessing import StandardScaler
 from sklearn.utils.validation import check_is_fitted, check_random_state
 
+from causalgraph.common import utils
 from causalgraph.common import GRAY, GREEN, RESET, plot
 from causalgraph.common.pipeline import Pipeline
-from causalgraph.common.utils import graph_from_dot_file, save_experiment
 from causalgraph.estimators.knowledge import Knowledge
 from causalgraph.explainability import (Hierarchies, PermutationImportance,
                                         ShapEstimator)
@@ -263,6 +263,8 @@ class Rex(BaseEstimator, ClassifierMixin):
 
         steps = [
             ('G_shap', 'shaps.predict', {'root_causes': 'root_causes'}),
+            ('G_shag', utils.break_cycles_if_present, {
+                'dag': 'G_shap', 'knowledge': 'knowledge'}),
             ('G_pi', 'pi.predict', {'root_causes': 'root_causes'}),
             ('indep', GraphIndependence, {'base_graph': 'G_shap'}),
             ('G_indep', 'indep.fit_predict'),
@@ -570,7 +572,7 @@ def custom_main(dataset_name,
                 model_type="mlp", explainer="gradient",
                 save=False):
 
-    ref_graph = graph_from_dot_file(f"{input_path}{dataset_name}.dot")
+    ref_graph = utils.graph_from_dot_file(f"{input_path}{dataset_name}.dot")
     data = pd.read_csv(f"{input_path}{dataset_name}.csv")
     scaler = StandardScaler()
     data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)
@@ -583,7 +585,7 @@ def custom_main(dataset_name,
         model_type=model_type, explainer=explainer)
     rex.fit_predict(train, test, ref_graph)
     if save:
-        where_to = save_experiment(rex.name, output_path, rex)
+        where_to = utils.save_experiment(rex.name, output_path, rex)
         print(f"Saved '{rex.name}' to '{where_to}'")
 
     # rex = load_experiment(dataset_name, output_path)
