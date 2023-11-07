@@ -36,8 +36,11 @@ warnings.filterwarnings('ignore')
 
 
 # pylint: disable=E1101:no-member, W0201:attribute-defined-outside-init, W0511:fixme
-# pylint: disable=C0103:invalid_name, C0116:missing-function-docstring, R0913:too-many-arguments
-# pylint: disable=R0914:too-many-locals, R0915:too-many-statements, R1702:too-many-branches
+# pylint: disable=C0103:invalid-name
+# pylint: disable=C0116:missing-function-docstring
+# pylint: disable=R0913:too-many-arguments
+# pylint: disable=R0914:too-many-locals, R0915:too-many-statements
+# pylint: disable=W0106:expression-not-assigned, R1702:too-many-branches
 
 # TODO:
 # - Update the Knowledge class to reflect what is a bad regressor (potential_parent)
@@ -271,6 +274,8 @@ class Rex(BaseEstimator, ClassifierMixin):
             ('G_final', 'shaps.adjust', {'graph': 'G_indep'}),
             ('metrics_shap', 'score', {
              'ref_graph': ref_graph, 'predicted_graph': 'G_shap'}),
+            ('metrics_shag', 'score', {
+             'ref_graph': ref_graph, 'predicted_graph': 'G_shag'}),
             ('metrics_indep', 'score', {
              'ref_graph': ref_graph, 'predicted_graph': 'G_indep'}),
             ('metrics_final', 'score', {

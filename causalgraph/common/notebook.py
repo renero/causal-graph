@@ -10,6 +10,7 @@ Example:
 (C) 2023 J. Renero
 """
 
+from collections import defaultdict
 import glob
 from sklearn.preprocessing import StandardScaler
 from causalgraph.metrics.compare_graphs import evaluate_graph
@@ -27,8 +28,19 @@ import matplotlib.pyplot as plt
 
 warnings.filterwarnings('ignore')
 
-metric_types = ['mlp', 'gbt', 'intersection', 'union', 'union_all', 'int_indep', 
-                'int_final', 'union_indep', 'union_final']
+
+# pylint: disable=E1101:no-member, W0201:attribute-defined-outside-init, W0511:fixme
+# pylint: disable=C0103:invalid-name
+# pylint: disable=C0116:missing-function-docstring
+# pylint: disable=R0913:too-many-arguments
+# pylint: disable=R0914:too-many-locals, R0915:too-many-statements
+# pylint: disable=W0106:expression-not-assigned, R1702:too-many-branches
+
+
+metric_types = ['mlp', 'gbt', 'intersection', 'union', 'union_all',
+                'int_indep', 'int_final', 'union_indep', 'union_final']
+nc_metric_types = ['mlp_nc', 'gbt_nc', 'intersection_nc', 'union_nc', 'union_all_nc',
+                   'int_indep', 'int_final', 'union_indep', 'union_final']
 
 
 class BaseExperiment:
@@ -56,9 +68,9 @@ class BaseExperiment:
         pd.set_option('display.float_format', '{:.4f}'.format)
 
     def prepare_experiment_input(
-            self, 
-            experiment_filename, 
-            csv_filename=None, 
+            self,
+            experiment_filename,
+            csv_filename=None,
             dot_filename=None):
         """
         - Loads the data and 
@@ -67,12 +79,13 @@ class BaseExperiment:
         - loads the reference graph from the dot file, which has to be named
           as the experiment file, with the .dot extension
         """
-        self.experiment_name = path.splitext(path.basename(experiment_filename))[0]
+        self.experiment_name = path.splitext(
+            path.basename(experiment_filename))[0]
         if csv_filename is None:
             csv_filename = f"{path.join(self.input_path, self.experiment_name)}.csv"
         if dot_filename is None:
             dot_filename = f"{path.join(self.input_path, self.experiment_name)}.dot"
-        
+
         self.data = pd.read_csv(csv_filename)
         self.data = self.data.apply(pd.to_numeric, downcast='float')
         scaler = StandardScaler()
@@ -129,12 +142,12 @@ class BaseExperiment:
 
         self.save_experiment = True
         if self.save_experiment and not experiment_exists:
-            print(f"    +-> Experiment will be saved.") if self.verbose else None
+            print("    +-> Experiment will be saved.") if self.verbose else None
         elif self.save_experiment and experiment_exists:
-            print(f"    +-> Experiment exists and will be overwritten.") \
+            print("    +-> Experiment exists and will be overwritten.") \
                 if self.verbose else None
         else:
-            print(f"    +-> Experiment will NOT be saved.") if self.verbose else None
+            print("    +-> Experiment will NOT be saved.") if self.verbose else None
             self.save_experiment = False
 
     def list_files(self, input_pattern, where='input') -> list:
@@ -169,9 +182,10 @@ class Experiment(BaseExperiment):
         super().__init__(
             input_path, output_path, train_size=train_size,
             random_state=random_state, verbose=verbose)
-        
+
         # Prepare the input
-        self.prepare_experiment_input(experiment_name, csv_filename, dot_filename)
+        self.prepare_experiment_input(
+            experiment_name, csv_filename, dot_filename)
 
     def load(self, exp_name=None) -> Rex:
         if exp_name is not None:
@@ -181,7 +195,8 @@ class Experiment(BaseExperiment):
         else:
             self.rex = load_experiment(self.experiment_name, self.output_path)
             if self.verbose:
-                print(f"Loaded '{self.experiment_name}' from '{self.output_path}'")
+                print(
+                    f"Loaded '{self.experiment_name}' from '{self.output_path}'")
 
         return self
 
@@ -193,7 +208,8 @@ class Experiment(BaseExperiment):
 
     def save(self, exp_name=None, overwrite: bool = False):
         save_as = exp_name if exp_name is not None else self.experiment_name
-        where_to = save_experiment(save_as, self.output_path, self.rex, overwrite)
+        where_to = save_experiment(
+            save_as, self.output_path, self.rex, overwrite)
         print(f"Saved '{self.experiment_name}' to '{where_to}'")
 
 
@@ -264,13 +280,13 @@ class Experiments(BaseExperiment):
             if self.experiment_exists(save_as) and not self.train_anyway:
                 print(f"Experiment {save_as} already exists, skipping...")
                 continue
-            
+
             print(f"Training Rex on {filename}...")
             self.experiment[self.experiment_name] = Rex(
                 name=self.experiment_name, **kwargs)
             self.experiment[self.experiment_name].fit_predict(
                 self.train_data, self.test_data, self.ref_graph)
-                
+
             saved_to = save_experiment(
                 save_as, self.output_path, self.experiment[self.experiment_name])
             print(f"\rSaved to: {saved_to}")
@@ -284,12 +300,12 @@ class Experiments(BaseExperiment):
 def get_combined_metrics(subtype: str):
     """
     Obtain the metrics for all the experiments matching the input pattern
-    
+
     Parameters
     ----------
     subtype : str
         The subtype of the experiment, e.g. "linear" or "nonlinear"
-    
+
     Returns
     -------
     dict
@@ -298,33 +314,44 @@ def get_combined_metrics(subtype: str):
     holder = Experiment(f"rex_generated_{subtype}_1")
     files = [path.basename(f) for f in holder.list_files(
         f"rex_generated_{subtype}_*")]
-    
-    metrics = {metric: [] for metric in metric_types}
-    
+
+    metrics = defaultdict(list)
     for exp_name in files:
         mlp = Experiment(exp_name).load(f"{exp_name}_nn")
         gbt = Experiment(exp_name).load(f"{exp_name}_gbt")
 
         metrics['mlp'].append(mlp.rex.metrics_shap)
         metrics['gbt'].append(gbt.rex.metrics_shap)
+        metrics['mlp_nc'].append(mlp.rex.metrics_shag)
+        metrics['gbt_nc'].append(gbt.rex.metrics_shag)
         metrics['intersection'].append(evaluate_graph(
-            mlp.ref_graph, utils.graph_intersection(mlp.rex.G_shap, gbt.rex.G_shap)) )
+            mlp.ref_graph, utils.graph_intersection(mlp.rex.G_shap, gbt.rex.G_shap)))
+        metrics['intersection_nc'].append(evaluate_graph(
+            mlp.ref_graph, utils.graph_intersection(mlp.rex.G_shag, gbt.rex.G_shag)))
         metrics['union'].append(evaluate_graph(
             mlp.ref_graph, utils.graph_union(mlp.rex.G_shap, gbt.rex.G_shap)))
+        metrics['union_nc'].append(evaluate_graph(
+            mlp.ref_graph, utils.graph_union(mlp.rex.G_shag, gbt.rex.G_shag)))
         metrics['union_all'].append(evaluate_graph(
             mlp.ref_graph, utils.graph_union(
                 mlp.rex.G_pi, utils.graph_union(
                     gbt.rex.G_pi, utils.graph_union(
                         mlp.rex.G_shap, gbt.rex.G_shap)
                 ))))
+        metrics['union_all_nc'].append(evaluate_graph(
+            mlp.ref_graph, utils.graph_union(
+                mlp.rex.G_pi, utils.graph_union(
+                    gbt.rex.G_pi, utils.graph_union(
+                        mlp.rex.G_shag, gbt.rex.G_shag)
+                ))))
         metrics['int_indep'].append(evaluate_graph(
-            mlp.ref_graph, utils.graph_intersection(mlp.rex.G_indep, gbt.rex.G_indep)) )
+            mlp.ref_graph, utils.graph_intersection(mlp.rex.G_indep, gbt.rex.G_indep)))
         metrics['int_final'].append(evaluate_graph(
-            mlp.ref_graph, utils.graph_intersection(mlp.rex.G_final, gbt.rex.G_final)) )
+            mlp.ref_graph, utils.graph_intersection(mlp.rex.G_final, gbt.rex.G_final)))
         metrics['union_indep'].append(evaluate_graph(
-            mlp.ref_graph, utils.graph_union(mlp.rex.G_indep, gbt.rex.G_indep)) )
+            mlp.ref_graph, utils.graph_union(mlp.rex.G_indep, gbt.rex.G_indep)))
         metrics['union_final'].append(evaluate_graph(
-            mlp.ref_graph, utils.graph_union(mlp.rex.G_final, gbt.rex.G_final)) )
+            mlp.ref_graph, utils.graph_union(mlp.rex.G_final, gbt.rex.G_final)))
 
     for key in metrics:
         metrics[key] = pd.DataFrame(metrics[key])
@@ -332,17 +359,19 @@ def get_combined_metrics(subtype: str):
     return metrics
 
 
-def plot_combined_metrics(metrics: dict, title: str):
+def plot_combined_metrics(metrics: dict, title: str, acyclic=False):
     """
     Plot the metrics for all the experiments matching the input pattern
-    
+
     Parameters
     ----------
     metrics : dict
         A dictionary with the metrics for all the experiments
     title : str
         The title of the plot
-        
+    acyclic : bool
+        Whether to plot the metrics for the no_cycles graphs
+
     Returns
     -------
     None
@@ -355,11 +384,18 @@ def plot_combined_metrics(metrics: dict, title: str):
 
         combined_median = np.median(metrics['intersection'].loc[:, metric])
         added_median = np.median(metrics['union'].loc[:, metric])
-        
-        metric_values = [metrics[key].loc[:, metric] for key in metric_types]
-        
-        axs[row, col].axhline(combined_median, color='g', linestyle='--', linewidth=0.5)
-        axs[row, col].axhline(added_median, color='b', linestyle='--', linewidth=0.5)
+
+        if acyclic:
+            metric_values = [metrics[key].loc[:, metric]
+                             for key in nc_metric_types]
+        else:
+            metric_values = [metrics[key].loc[:, metric]
+                             for key in metric_types]
+
+        axs[row, col].axhline(combined_median, color='g',
+                              linestyle='--', linewidth=0.5)
+        axs[row, col].axhline(added_median, color='b',
+                              linestyle='--', linewidth=0.5)
 
         axs[row, col].boxplot(
             metric_values,
@@ -374,9 +410,8 @@ def plot_combined_metrics(metrics: dict, title: str):
     plt.show()
 
 
-
 if __name__ == "__main__":
     experiments = Experiments("rex_generated_linear_*.csv", verbose=False)
     experiments.load("rex_generated_linear_*_gbt.pickle")
-    metrics = experiments.metrics()
-    print(metrics)
+    main_metrics = experiments.metrics()
+    print(main_metrics)
