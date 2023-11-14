@@ -43,6 +43,28 @@ nc_metric_types = ['mlp_nc', 'gbt_nc', 'intersection_nc', 'union_nc', 'union_all
                    'int_indep', 'int_final', 'union_indep', 'union_final']
 
 
+def list_files(input_pattern: str, where: str) -> list:
+    """
+    List all the files in the input path matching the input pattern
+
+    Parameters:
+    -----------
+    input_pattern : str
+        The pattern to match the files
+    where : str
+        The path to use to look for the files matching the pattern
+    """
+    input_files = glob.glob(os.path.join(
+        where, input_pattern))
+    input_files = sorted([os.path.basename(os.path.splitext(f)[0])
+                         for f in input_files])
+
+    assert len(input_files) > 0, \
+        f"No files found in {where} matching <{input_pattern}>"
+
+    return sorted(list(set(input_files)))
+
+
 class BaseExperiment:
     def __init__(
             self,

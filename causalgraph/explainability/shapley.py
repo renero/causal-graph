@@ -717,8 +717,8 @@ class ShapEstimator(BaseEstimator):
         the feature in the model leads to a higher error. Thus, without that feature, 
         the prediction would have been generally better. In other words, the feature 
         is making more harm than good!
-        On the contrary, the more negative this value, the more beneficial the feature is 
-        for the predictions since its presence leads to smaller errors.
+        On the contrary, the more negative this value, the more beneficial the 
+        feature is for the predictions since its presence leads to smaller errors.
 
         Parameters:
         -----------

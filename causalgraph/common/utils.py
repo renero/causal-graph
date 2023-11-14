@@ -4,6 +4,13 @@
 # (C) J. Renero, 2022, 2023
 #
 
+# pylint: disable=E1101:no-member, W0201:attribute-defined-outside-init, W0511:fixme
+# pylint: disable=C0103:invalid-name
+# pylint: disable=C0116:missing-function-docstring
+# pylint: disable=R0913:too-many-arguments
+# pylint: disable=R0914:too-many-locals, R0915:too-many-statements
+# pylint: disable=W0106:expression-not-assigned, R1702:too-many-branches
+
 import glob
 import os
 import pickle
