@@ -10,21 +10,23 @@ Example:
 (C) 2023 J. Renero
 """
 
-from collections import defaultdict
 import glob
+import os
+import warnings
+from collections import defaultdict
+from os import path
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+
 from sklearn.preprocessing import StandardScaler
-from causalgraph.metrics.compare_graphs import evaluate_graph
-from causalgraph.estimators.rex import Rex
+
+from causalgraph.common import utils
 from causalgraph.common.utils import (graph_from_dot_file, load_experiment,
                                       save_experiment)
-import shap
-import pandas as pd
-import numpy as np
-import os
-from os import path
-import warnings
-from causalgraph.common import utils
-import matplotlib.pyplot as plt
+from causalgraph.estimators.rex import Rex
+from causalgraph.metrics.compare_graphs import evaluate_graph
 
 warnings.filterwarnings('ignore')
 
@@ -37,10 +39,28 @@ warnings.filterwarnings('ignore')
 # pylint: disable=W0106:expression-not-assigned, R1702:too-many-branches
 
 
-metric_types = ['mlp', 'gbt', 'intersection', 'union', 'union_all',
-                'int_indep', 'int_final', 'union_indep', 'union_final']
-nc_metric_types = ['mlp_nc', 'gbt_nc', 'intersection_nc', 'union_nc', 'union_all_nc',
-                   'int_indep', 'int_final', 'union_indep', 'union_final']
+global_metric_types = [
+    'mlp', 'gbt', 'intersection', 'union', 'union_all',
+    'int_indep', 'int_final', 'union_indep', 'union_final']
+global_nc_metric_types = [
+    'mlp_nc', 'gbt_nc', 'intersection_nc', 'union_nc', 'union_all_nc',
+    'int_indep', 'int_final', 'union_indep', 'union_final']
+metric_labels = {
+    'mlp': 'DFN',
+    'gbt': 'GBT',
+    'intersection': r'$\textrm{DAG}_\cap$',
+    'union': r'$\textrm{DAG}_\cup$',
+    'union_all': 'all',
+    'int_indep': '∩i',
+    'int_final': '∩f',
+    'union_indep': '∪i',
+    'union_final': '∪f',
+    'mlp_nc': 'DFN',
+    'gbt_nc': 'GBT',
+    'intersection_nc': '∩',
+    'union_nc': '∪',
+    'union_all_nc': 'all'
+}
 
 
 def list_files(input_pattern: str, where: str) -> list:
@@ -381,7 +401,13 @@ def get_combined_metrics(subtype: str):
     return metrics
 
 
-def plot_combined_metrics(metrics: dict, title: str, acyclic=False):
+def plot_combined_metrics(
+        metrics: dict,
+        metric_types: list = None,
+        title: str = None,
+        acyclic=False,
+        medians=False,
+        pdf_filename=None):
     """
     Plot the metrics for all the experiments matching the input pattern
 
@@ -393,43 +419,59 @@ def plot_combined_metrics(metrics: dict, title: str, acyclic=False):
         The title of the plot
     acyclic : bool
         Whether to plot the metrics for the no_cycles graphs
+    medians: bool
+        Whether to plot the median lines
 
     Returns
     -------
     None
     """
-    what = ['f1', 'precision', 'recall', 'shd']
-    fig, axs = plt.subplots(2, 2, figsize=(6, 5))
-
-    for i, metric in enumerate(what):
-        row, col = i // 2, i % 2
-
-        combined_median = np.median(metrics['intersection'].loc[:, metric])
-        added_median = np.median(metrics['union'].loc[:, metric])
-
+    what = ['f1', 'precision', 'recall', 'shd', 'sid']
+    axs = plt.figure(layout="constrained").subplot_mosaic(
+        """
+        AABBCC
+        .DDEE.
+        """
+    )
+    # fig, axs = plt.subplots(2, 2, figsize=(6, 5))
+    if metric_types is None:
         if acyclic:
-            metric_values = [metrics[key].loc[:, metric]
-                             for key in nc_metric_types]
+            metric_types = global_nc_metric_types
         else:
-            metric_values = [metrics[key].loc[:, metric]
-                             for key in metric_types]
+            metric_types = global_metric_types
 
-        axs[row, col].axhline(combined_median, color='g',
-                              linestyle='--', linewidth=0.5)
-        axs[row, col].axhline(added_median, color='b',
-                              linestyle='--', linewidth=0.5)
+    ax_labels = list(axs.keys())
+    for i, metric in enumerate(what):
+        # row, col = i // 2, i % 2
+        ax = axs[ax_labels[i]]
+        metric_values = [metrics[key].loc[:, metric] for key in metric_types]
 
-        axs[row, col].boxplot(
+        if medians:
+            combined_median = np.median(metrics['intersection'].loc[:, metric])
+            added_median = np.median(metrics['union'].loc[:, metric])
+            ax.axhline(
+                combined_median, color='g', linestyle='--', linewidth=0.5)
+            ax.axhline(
+                added_median, color='b', linestyle='--', linewidth=0.5)
+
+        ax.boxplot(
             metric_values,
-            labels=['nn', 'gbt', '∩', '[∪]', 'all', "∩i", "∩f", "∪i", "∪f"])
+            labels=[metric_labels[key] for key in metric_types])
         # check if any value is above 1
         if np.all(np.array(metric_values) <= 1.0):
-            axs[row, col].set_ylim([0, 1])
-        axs[row, col].set_title(metric)
+            ax.set_ylim([0, 1])
+        ax.set_title(metric.upper())
 
-    fig.suptitle(title)
-    plt.tight_layout()
-    plt.show()
+    if title is not None:
+        fig = plt.gcf()
+        fig.suptitle(title)
+
+    if pdf_filename is not None:
+        plt.savefig(pdf_filename, bbox_inches='tight')
+        plt.close()
+    else:
+        plt.tight_layout()
+        plt.show()
 
 
 if __name__ == "__main__":
