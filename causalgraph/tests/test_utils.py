@@ -181,7 +181,7 @@ def test_break_cycle_if_present_no_cycles():
     })
 
     # Call the break_cycle_if_present function
-    result = utils.break_cycle_if_present(dag, knowledge)
+    result = utils.break_cycles_if_present(dag, knowledge)
 
     # Check if the result is equal to the input DAG
     assert result.nodes == dag.nodes
@@ -219,7 +219,7 @@ def test_break_cycle_if_present_one_cycle():
     knowledge.results = learnings
 
     # Call the break_cycle_if_present function
-    result = utils.break_cycle_if_present(dag, knowledge)
+    result = utils.break_cycles_if_present(dag, knowledge)
 
     # Check if the result is a DAG with no cycles
     assert nx.is_directed_acyclic_graph(result)
@@ -264,7 +264,7 @@ def test_break_cycle_if_present_multiple_cycles():
     knowledge.results = learnings
 
     # Call the break_cycle_if_present function
-    result = utils.break_cycle_if_present(dag, knowledge)
+    result = utils.break_cycles_if_present(dag, knowledge)
 
     # Check if the result is a DAG with no cycles
     assert nx.is_directed_acyclic_graph(result)

@@ -208,6 +208,14 @@ class BaseExperiment:
 
 
 class Experiment(BaseExperiment):
+    """
+    Represents an experiment for causal graph analysis.
+
+    Methods:
+        load: Loads the experiment data.
+        fit: Fits the experiment data.
+        save: Saves the experiment data.
+    """
 
     def __init__(
         self,
@@ -220,6 +228,26 @@ class Experiment(BaseExperiment):
         random_state: int = 42,
         verbose=False
     ):
+        """
+        Initializes a new instance of the Experiment class.
+
+        Args:
+            experiment_name (str): The name of the experiment.
+            csv_filename (str, optional): The filename of the CSV file containing 
+                the data. Defaults to None.
+            dot_filename (str, optional): The filename of the DOT file containing 
+                the causal graph. Defaults to None.
+            input_path (str, optional): The path to the input data. 
+                Defaults to "/Users/renero/phd/data/RC3/".
+            output_path (str, optional): The path to save the output. 
+                Defaults to "/Users/renero/phd/output/RC3/".
+            train_size (float, optional): The proportion of data to use for training. 
+                Defaults to 0.9.
+            random_state (int, optional): The random seed for reproducibility. 
+                Defaults to 42.
+            verbose (bool, optional): Whether to print verbose output.  
+                Defaults to False.
+        """
 
         super().__init__(
             input_path, output_path, train_size=train_size,
@@ -230,6 +258,17 @@ class Experiment(BaseExperiment):
             experiment_name, csv_filename, dot_filename)
 
     def load(self, exp_name=None) -> Rex:
+        """
+        Loads the experiment data.
+
+        Args:
+            exp_name (str, optional): The name of the experiment to load. 
+            If None, loads the current experiment. Defaults to None.
+
+        Returns:
+            Rex: The loaded experiment data.
+        """
+
         if exp_name is not None:
             self.rex = load_experiment(exp_name, self.output_path)
             if self.verbose:
@@ -243,12 +282,33 @@ class Experiment(BaseExperiment):
         return self
 
     def fit(self, **kwargs) -> Rex:
+        """
+        Fits the experiment data.
+
+        Args:
+            **kwargs: Additional keyword arguments to pass to the Rex constructor.
+
+        Returns:
+            Rex: The fitted experiment data.
+        """
+
         self.rex = Rex(name=self.experiment_name, **kwargs)
         self.rex.fit_predict(self.train_data, self.test_data, self.ref_graph)
 
         return self
 
     def save(self, exp_name=None, overwrite: bool = False):
+        """
+        Saves the experiment data.
+
+        Args:
+        -----
+        - exp_name (str, optional): The name to save the experiment as. 
+            If None, uses the experiment name. Defaults to None.
+        - overwrite (bool, optional): Whether to overwrite an existing 
+            experiment with the same name. Defaults to False.
+        """
+
         save_as = exp_name if exp_name is not None else self.experiment_name
         where_to = save_experiment(
             save_as, self.output_path, self.rex, overwrite)

@@ -130,11 +130,7 @@ class ShapEstimator(BaseEstimator):
             explainer: str = "explainer",
             models: BaseEstimator = None,
             correlation_th: float = None,
-            method: str = 'cluster',
-            sensitivity: float = 1.0,
             mean_shap_percentile: float = 0.8,
-            tolerance: float = None,
-            descending: bool = False,
             iters: int = 20,
             reciprocity: False = False,
             min_impact: float = 1e-06,
@@ -147,11 +143,7 @@ class ShapEstimator(BaseEstimator):
         self.explainer = explainer
         self.models = models
         self.correlation_th = correlation_th
-        self.method = method
-        self.sensitivity = sensitivity
         self.mean_shap_percentile = mean_shap_percentile
-        self.tolerance = tolerance
-        self.descending = descending
         self.iters = iters
         self.reciprocity = reciprocity
         self.min_impact = min_impact
@@ -381,10 +373,6 @@ class ShapEstimator(BaseEstimator):
             self.connections[target] = select_features(
                 values=self.shap_values[target],
                 feature_names=candidate_causes,
-                method=self.method,
-                tolerance=self.tolerance,
-                sensitivity=self.sensitivity,
-                descending=self.descending,
                 min_impact=self.min_impact, verbose=self.verbose)
 
         pbar.update(1)
