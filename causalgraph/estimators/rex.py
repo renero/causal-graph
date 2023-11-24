@@ -266,12 +266,12 @@ class Rex(BaseEstimator, ClassifierMixin):
 
         steps = [
             ('G_shap', 'shaps.predict', {'root_causes': 'root_causes'}),
-            ('G_shag', utils.break_cycles_if_present, {
-                'dag': 'G_shap', 'knowledge': 'knowledge'}),
             ('G_pi', 'pi.predict', {'root_causes': 'root_causes'}),
             ('indep', GraphIndependence, {'base_graph': 'G_shap'}),
             ('G_indep', 'indep.fit_predict'),
             ('G_final', 'shaps.adjust', {'graph': 'G_indep'}),
+            ('summarize_knowledge', {'ref_graph': ref_graph}),
+            ('G_shag', 'break_cycles', {'dag': 'G_shap'}),
             ('metrics_shap', 'score', {
              'ref_graph': ref_graph, 'predicted_graph': 'G_shap'}),
             ('metrics_shag', 'score', {
@@ -279,8 +279,7 @@ class Rex(BaseEstimator, ClassifierMixin):
             ('metrics_indep', 'score', {
              'ref_graph': ref_graph, 'predicted_graph': 'G_indep'}),
             ('metrics_final', 'score', {
-             'ref_graph': ref_graph, 'predicted_graph': 'G_final'}),
-            ('summarize_knowledge', {'ref_graph': ref_graph})
+             'ref_graph': ref_graph, 'predicted_graph': 'G_final'})
         ]
         prediction.run(steps, "Predicting graph")
         if '\\n' in self.G_final.nodes:
@@ -375,6 +374,15 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.learnings = self.knowledge.info()
 
         return self.learnings
+
+    def break_cycles(self, dag: nx.DiGraph):
+        """ Break a cycle in the given DAG.
+
+        Parameters:
+        -----------
+            dag (nx.DiGraph): The DAG to break the cycle from.
+        """
+        return utils.break_cycles_if_present(dag, self.learnings)
 
     def __repr__(self):
         forbidden_attrs = [
@@ -574,7 +582,7 @@ def custom_main(dataset_name,
                 input_path="/Users/renero/phd/data/RC3/",
                 output_path="/Users/renero/phd/output/RC3/",
                 tune_model: bool = False,
-                model_type="mlp", explainer="gradient",
+                model_type="nn", explainer="gradient",
                 save=False):
 
     ref_graph = utils.graph_from_dot_file(f"{input_path}{dataset_name}.dot")
@@ -584,7 +592,6 @@ def custom_main(dataset_name,
     train = data.sample(frac=0.9, random_state=42)
     test = data.drop(train.index)
 
-    # rex = Rex(model_type="gbt")
     rex = Rex(
         name=dataset_name, tune_model=tune_model,
         model_type=model_type, explainer=explainer)
@@ -601,5 +608,5 @@ def custom_main(dataset_name,
 
 
 if __name__ == "__main__":
-    custom_main('rex_generated_gp_mix_1', model_type="gbt", explainer="explainer",
-                tune_model=True, save=True)
+    custom_main('sachs',  model_type="nn", explainer="gradient",
+                tune_model=False, save=True)
