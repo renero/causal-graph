@@ -187,23 +187,23 @@ class ShapEstimator(BaseEstimator):
 
         return ret
 
-    def fit(self, X, y=None):
+    def fit(self, X):
         """
         """
         # X, y = check_X_y(X, y, accept_sparse=True)
         self.feature_names = list(self.models.regressor.keys())
-        self.shap_explainer = dict()
-        self.shap_values = dict()
-        self.shap_scaled_values = dict()
-        self.shap_mean_values = dict()
-        self.feature_order = dict()
+        self.shap_explainer = {}
+        self.shap_values = {}
+        self.shap_scaled_values = {}
+        self.shap_mean_values = {}
+        self.feature_order = {}
         self.all_mean_shap_values = []
 
         pbar = tqdm(total=len(self.feature_names),
                     **tqdm_params(self._fit_desc, self.prog_bar, silent=self.silent))
 
         self.X_train, self.X_test = train_test_split(
-            X, test_size=0.2, random_state=42)
+            X, test_size=min(0.2, 250 / len(X)), random_state=42)
 
         # Make a copy of the data if correlation threshold is set, since I will have
         # to drop some features at each iteration.
@@ -241,10 +241,10 @@ class ShapEstimator(BaseEstimator):
 
             X_train = self.X_train.drop(target_name, axis=1).values
             X_test = self.X_test.drop(target_name, axis=1).values
-            if X_test.shape[0] > 200:
-                X_test = shap.sample(X_test, 200)
-                print(
-                    f"Reduced X_test to {X_test.shape[0]} samples") if self.verbose else None
+            # if X_test.shape[0] > 250:
+            #     X_test = shap.sample(X_test, 250)
+            #     print(
+            #         f"Reduced X_test to {X_test.shape[0]} samples") if self.verbose else None
 
             # Run the selected SHAP explainer
             self._run_selected_shap_explainer(
@@ -357,7 +357,7 @@ class ShapEstimator(BaseEstimator):
         pbar.update(1)
         pbar.refresh()
 
-        self.connections = dict()
+        self.connections = {}
         for target in self.feature_names:
             candidate_causes = [
                 f for f in self.feature_names if f != target]
@@ -466,11 +466,11 @@ class ShapEstimator(BaseEstimator):
         return self.discrepancies
 
     def _compute_discrepancy(self, x, y, s, target_name, parent_name) -> ShapDiscrepancy:
-        if isinstance(x, pd.Series) or isinstance(x, pd.DataFrame):
+        if isinstance(x, (pd.Series, pd.DataFrame)):
             x = x.values
         elif not isinstance(x, np.ndarray):
             x = np.array(x)
-        if isinstance(y, pd.Series) or isinstance(y, pd.DataFrame):
+        if isinstance(y, (pd.Series, pd.DataFrame)):
             y = y.values
         elif not isinstance(y, np.ndarray):
             y = np.array(y)
@@ -926,8 +926,21 @@ def custom_main(experiment_name):
     rex.is_fitted_ = True
     print(f"Loaded experiment {experiment_name}")
 
+    rex.shaps = ShapEstimator(
+        explainer="gradient",
+        models=rex.models,
+        correlation_th=0.5,
+        mean_shap_percentile=0.8,
+        iters=20,
+        reciprocity=True,
+        min_impact=1e-06,
+        on_gpu=False,
+        verbose=False,
+        prog_bar=True,
+        silent=False)
+    rex.shaps.fit(train)
     rex.shaps.predict(test, rex.root_causes)
 
 
 if __name__ == "__main__":
-    custom_main('rex_generated_linear_1')
+    custom_main('sachs_long')

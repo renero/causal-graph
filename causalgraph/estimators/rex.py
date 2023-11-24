@@ -79,7 +79,6 @@ class Rex(BaseEstimator, ClassifierMixin):
             shap_diff_upper_bound: float = 0.1,
             correction_method: str = 'heuristic',
             correction_model: Union[str, Path] = None,
-            increase_tolerance: float = 0.0,
             condlen: int = 1,
             condsize: int = 0,
             mean_pi_percentile: float = 0.8,
@@ -114,9 +113,6 @@ class Rex(BaseEstimator, ClassifierMixin):
                 'heuristic' or 'model'. Default is 'heuristic'.
             correction_model (str or Path): The path to the model to use for the
                 correction. Default is None.
-            increase_tolerance (float): The increase in the tolerance for the
-                correction. Default is 0.0. This increase only occurs when certain
-                SHAP discrepancies matrix properties have been met.
             condlen (int): The depth of the conditioning sequence. Default is 1.
             condsize (int): The size of the conditioning sequence. Default is 0.
             prog_bar (bool): Whether to display a progress bar.
@@ -150,7 +146,6 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.shap_diff_upper_bound = shap_diff_upper_bound
         self.correction_method = correction_method
         self.correction_model = correction_model
-        self.increase_tolerance = increase_tolerance
         self.condlen = condlen
         self.condsize = condsize
         self.mean_pi_percentile = mean_pi_percentile
@@ -589,12 +584,13 @@ def custom_main(dataset_name,
     data = pd.read_csv(f"{input_path}{dataset_name}.csv")
     scaler = StandardScaler()
     data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)
-    train = data.sample(frac=0.9, random_state=42)
+    train = data.sample(frac=0.8, random_state=42)
     test = data.drop(train.index)
 
     rex = Rex(
         name=dataset_name, tune_model=tune_model,
         model_type=model_type, explainer=explainer)
+    # rex.fit(train)
     rex.fit_predict(train, test, ref_graph)
     if save:
         where_to = utils.save_experiment(rex.name, output_path, rex)
@@ -602,11 +598,11 @@ def custom_main(dataset_name,
 
     # rex = load_experiment(dataset_name, output_path)
 
-    print(rex.score(ref_graph, 'shap'))
-    rex.plot_dags(rex.G_shap, ref_graph)
-    rex.plot_dags(rex.G_pi, ref_graph)
+    # print(rex.score(ref_graph, 'shap'))
+    # rex.plot_dags(rex.G_shap, ref_graph)
+    # rex.plot_dags(rex.G_pi, ref_graph)
 
 
 if __name__ == "__main__":
-    custom_main('sachs',  model_type="nn", explainer="gradient",
+    custom_main('sachs_long',  model_type="nn", explainer="gradient",
                 tune_model=False, save=True)
