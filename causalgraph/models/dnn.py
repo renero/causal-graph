@@ -1,24 +1,29 @@
-from collections import defaultdict
+# pylint: disable=E1101:no-member, W0201:attribute-defined-outside-init, W0511:fixme
+# pylint: disable=C0103:invalid-name
+# pylint: disable=C0116:missing-function-docstring
+# pylint: disable=R0913:too-many-arguments
+# pylint: disable=R0914:too-many-locals, R0915:too-many-statements
+# pylint: disable=W0106:expression-not-assigned, R1702:too-many-branches
+# pylint: disable=W0102:dangerous-default-value
+
 import types
 import warnings
-from typing import List, Union, Tuple
+from typing import List, Tuple, Union
 
 import numpy as np
 import optuna
 import pandas as pd
 import torch
-import torch.nn as nn
 from sklearn.base import BaseEstimator
 from sklearn.preprocessing import StandardScaler
-from sklearn.utils.validation import check_array, check_is_fitted
+from sklearn.utils.validation import check_is_fitted
 from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 
 from causalgraph.common import GRAY, GREEN, RESET, tqdm_params
+from causalgraph.explainability.hierarchies import Hierarchies
 from causalgraph.models._columnar import ColumnsDataset
 from causalgraph.models._models import MLPModel
-from causalgraph.explainability.hierarchies import Hierarchies
-
 
 warnings.filterwarnings("ignore")
 
@@ -132,7 +137,7 @@ class NNRegressor(BaseEstimator):
         self.regressor = None
         self._fit_desc = "Training NNs"
 
-    def fit(self, X, y=None):
+    def fit(self, X):
         """A reference implementation of a fitting function.
 
         Parameters
@@ -151,7 +156,7 @@ class NNRegressor(BaseEstimator):
         # X, y = check_X_y(X, y)
         self.n_features_in_ = X.shape[1]
         self.feature_names = list(X.columns)
-        self.regressor = dict()
+        self.regressor = {}
 
         if self.correlation_th:
             self.corr_matrix = Hierarchies.compute_correlation_matrix(X)
@@ -286,38 +291,38 @@ class NNRegressor(BaseEstimator):
         self.scoring = np.array(scores)
         return self.scoring
 
-    def get_input_tensors(self, target_name: str):
-        """
-        Returns the data used to train the model for the given target.
+    # def get_input_tensors(self, target_name: str):
+    #     """
+    #     Returns the data used to train the model for the given target.
 
-        Parameters
-        ----------
-        target_name : str
-            The name of the target.
+    #     Parameters
+    #     ----------
+    #     target_name : str
+    #         The name of the target.
 
-        Returns
-        -------
-        Tuple[pd.DataFrame, pd.Series]
-            The data used to train the model for the given target.
+    #     Returns
+    #     -------
+    #     Tuple[pd.DataFrame, pd.Series]
+    #         The data used to train the model for the given target.
 
-        Examples
-        --------
-        >>> nn = NNRegressor().fit(data)
-        >>> X, y = nn.get_input_tensors('target1')
+    #     Examples
+    #     --------
+    #     >>> nn = NNRegressor().fit(data)
+    #     >>> X, y = nn.get_input_tensors('target1')
 
-        """
-        model = self.regressor[target_name]
-        features_tensor = torch.autograd.Variable(
-            model.train_loader.dataset.features)
-        target_tensor = model.train_loader.dataset.target
+    #     """
+    #     model = self.regressor[target_name]
+    #     features_tensor = torch.autograd.Variable(
+    #         model.train_loader.dataset.features)
+    #     target_tensor = model.train_loader.dataset.target
 
-        cols = list(self.feature_names)
-        cols.remove(target_name)
+    #     cols = list(self.feature_names)
+    #     cols.remove(target_name)
 
-        X = pd.DataFrame(features_tensor.detach().numpy(), columns=cols)
-        y = pd.DataFrame(target_tensor.detach().numpy(), columns=[target_name])
+    #     X = pd.DataFrame(features_tensor.detach().numpy(), columns=cols)
+    #     y = pd.DataFrame(target_tensor.detach().numpy(), columns=[target_name])
 
-        return X, y
+    #     return X, y
 
     def __repr__(self):
         forbidden_attrs = [
@@ -375,6 +380,14 @@ class NNRegressor(BaseEstimator):
                 self.train_data = train_data
                 self.test_data = test_data
                 self.device = device
+
+                self.n_layers = None
+                self.activation = None
+                self.learning_rate = None
+                self.dropout = None
+                self.batch_size = None
+                self.num_epochs = None
+                self.models = None
 
             def __call__(self, trial):
                 self.n_layers = trial.suggest_int('n_layers', 1, 4)
