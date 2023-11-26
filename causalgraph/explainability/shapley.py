@@ -128,11 +128,49 @@ class ShapEstimator(BaseEstimator):
             iters: int = 20,
             reciprocity: False = False,
             min_impact: float = 1e-06,
+            exhaustive: bool = False,
+            threshold: float = None,
             on_gpu: bool = False,
             verbose: bool = False,
             prog_bar: bool = True,
             silent: bool = False):
         """
+        Initialize the ShapEstimator object.
+
+        Parameters
+        ----------
+        explainer : str, default="explainer"
+            The SHAP explainer to use. Possible values are "kernel", "gradient", and 
+            "explainer".
+        models : BaseEstimator, default=None
+            The models to use for computing SHAP values. If None, a linear regression 
+            model is used for each feature.
+        correlation_th : float, default=None
+            The correlation threshold to use for removing highly correlated features.
+        mean_shap_percentile : float, default=0.8
+            The percentile threshold for selecting features based on their 
+            mean SHAP value.
+        iters : int, default=20
+            The number of iterations to use for the feature selection method.
+        reciprocity : bool, default=False
+            Whether to enforce reciprocity in the causal graph.
+        min_impact : float, default=1e-06
+            The minimum impact threshold for selecting features.
+        exhaustive : bool, default=False
+            Whether to use the exhaustive (recursive) method for selecting features.
+            If this is True, the threshold parameter must be provided, and the 
+            clustering is performed until remaining values to be clustered are below
+            the given threshold.
+        threshold : float, default=None
+            The threshold to use when exhaustive is True. If None, exception is raised.
+        on_gpu : bool, default=False
+            Whether to use the GPU for computing SHAP values.
+        verbose : bool, default=False   
+            Whether to print verbose output.
+        prog_bar : bool, default=True
+            Whether to show a progress bar.
+        silent : bool, default=False
+            Whether to suppress all output.
         """
         self.explainer = explainer
         self.models = models
@@ -141,6 +179,8 @@ class ShapEstimator(BaseEstimator):
         self.iters = iters
         self.reciprocity = reciprocity
         self.min_impact = min_impact
+        self.exhaustive = exhaustive
+        self.threshold = threshold
         self.verbose = verbose
         self.prog_bar = prog_bar
         self.silent = silent
@@ -340,7 +380,7 @@ class ShapEstimator(BaseEstimator):
         check_is_fitted(self, 'is_fitted_')
 
         pbar = tqdm(
-            total=4, **tqdm_params(
+            total=3+len(self.feature_names), **tqdm_params(
                 "Building graph from SHAPs", self.prog_bar, silent=self.silent))
         pbar.refresh()
 
@@ -358,22 +398,21 @@ class ShapEstimator(BaseEstimator):
         for target in self.feature_names:
             candidate_causes = [
                 f for f in self.feature_names if f != target]
-
             # Filter out features that are highly correlated with the target
             if self.correlation_th is not None:
                 candidate_causes = [f for f in candidate_causes
                                     if f not in self.correlated_features[target]]
-
             print(
                 f"Selecting features for target {target}...") if self.verbose else None
-
             self.connections[target] = select_features(
                 values=self.shap_values[target],
                 feature_names=candidate_causes,
-                min_impact=self.min_impact, verbose=self.verbose)
-
-        pbar.update(1)
-        pbar.refresh()
+                min_impact=self.min_impact,
+                exhaustive=self.exhaustive,
+                threshold=self.mean_shap_threshold,
+                verbose=self.verbose)
+            pbar.update(1)
+            pbar.refresh()
 
         G_shap = utils.digraph_from_connected_features(
             X, self.feature_names, self.models, self.connections, root_causes,

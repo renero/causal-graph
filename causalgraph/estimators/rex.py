@@ -43,7 +43,7 @@ warnings.filterwarnings('ignore')
 # pylint: disable=W0106:expression-not-assigned, R1702:too-many-branches
 
 # TODO:
-# - Update the Knowledge class to reflect what is a bad regressor (potential_parent)
+#
 
 class Rex(BaseEstimator, ClassifierMixin):
     """ Regression with Explainability (Rex) is a causal inference discovery that
@@ -226,7 +226,7 @@ class Rex(BaseEstimator, ClassifierMixin):
             ('models.score', {'X': X}),
             ('root_causes', 'compute_regression_quality'),
             ('shaps', ShapEstimator, {'models': 'models'}),
-            ('shaps.fit'),
+            ('shaps.fit'),  # , {'exhaustive': False}),
             ('pi', PermutationImportance, {'models': 'models'}),
             ('pi.fit'),
         ]
@@ -604,5 +604,5 @@ def custom_main(dataset_name,
 
 
 if __name__ == "__main__":
-    custom_main('sachs_long',  model_type="nn", explainer="gradient",
-                tune_model=False, save=True)
+    custom_main('sachs',  model_type="nn", explainer="gradient",
+                tune_model=False, save=False)

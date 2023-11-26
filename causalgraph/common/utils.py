@@ -397,8 +397,12 @@ def break_cycles_if_present(
                 neighbour = cycle[0]
             else:
                 neighbour = cycle[cycle.index(node)+1]
-            cycle_edges[(node, neighbour)] = knowledge.get(
-                node, neighbour, 'mean_pi')
+            # cycle_edges[(node, neighbour)] = knowledge.get(
+            #     node, neighbour, 'mean_pi')
+            cycle_edges[(node, neighbour)] = knowledge.loc[
+                (knowledge['origin'] == node) & (
+                    knowledge['target'] == neighbour),
+                'mean_pi'].values[0]
         cycles_info.append((cycle, cycle_edges))
 
         # Find the edge with the lowest permutation importance

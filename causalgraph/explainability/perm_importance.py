@@ -32,6 +32,8 @@ class PermutationImportance(BaseEstimator):
             correlation_th: float = None,
             n_repeats: int = 10,
             mean_pi_percentile: float = 0.8,
+            exhaustive: bool = False,
+            threshold: float = None,
             random_state: int = 42,
             prog_bar=True,
             verbose=False,
@@ -62,18 +64,30 @@ class PermutationImportance(BaseEstimator):
         self.correlation_th = correlation_th
         self.n_repeats = n_repeats
         self.mean_pi_percentile = mean_pi_percentile
+        self.exhaustive = exhaustive
+        self.threshold = threshold
         self.random_state = random_state
         self.prog_bar = prog_bar
         self.verbose = verbose
         self.silent = silent
         self.feature_names = list(self.regressors.keys())
 
+        self.base_loss = {}
+        self.base_std = {}
+        self.all_pi = []
+        self.pi = {}
+        self.connections = {}
+        self.corr_matrix = None
+        self.correlated_features = None
+        self.G_pi = None
+        self.mean_pi_threshold = None
+
         self.is_fitted_ = False
 
         self._fit_desc = "Running Perm.Importance"
         self._pred_desc = "Predicting w perm. imp."
 
-    def fit(self, X, y=None):
+    def fit(self, X):
         """
         Implementation of the fit method for the PermutationImportance class.
         If the model is a PyTorch model, the fit method will compute the base loss
@@ -104,8 +118,6 @@ class PermutationImportance(BaseEstimator):
             **tqdm_params(self._fit_desc, self.prog_bar, silent=self.silent))
         print("Computing base loss (PyTorch)") if self.verbose else None
 
-        self.base_loss = dict()
-        self.base_std = dict()
         for feature in self.feature_names:
             pbar.refresh()
             print(f"Feature: {feature} ", end="") if self.verbose else None
@@ -205,10 +217,6 @@ class PermutationImportance(BaseEstimator):
             **tqdm_params(self._fit_desc, self.prog_bar, silent=self.silent))
         print("Computing permutation loss (PyTorch)") if self.verbose else None
 
-        self.all_pi = []
-        self.pi = dict()
-        self.connections = dict()
-
         num_vars = len(self.feature_names)
         for target in self.feature_names:
             pbar.refresh()
@@ -221,7 +229,7 @@ class PermutationImportance(BaseEstimator):
 
             # Create the dictionary to store the permutation importance, same way
             # as the sklearn implementation
-            self.pi[target] = dict()
+            self.pi[target] = {}
             if self.correlation_th is not None:
                 num_vars = len(self.feature_names) - \
                     len(self.correlated_features[target])
@@ -243,6 +251,8 @@ class PermutationImportance(BaseEstimator):
             self.connections[target] = select_features(
                 values=self.pi[target]['importances_mean'],
                 feature_names=candidate_causes,
+                exhaustive=self.exhaustive,
+                threshold=self.mean_pi_threshold,
                 verbose=self.verbose)
 
         pbar.close()
@@ -256,7 +266,7 @@ class PermutationImportance(BaseEstimator):
             self.all_pi, self.mean_pi_percentile)
 
         return self.G_pi
-    
+
     def _predict_sklearn(self, X, root_causes) -> nx.DiGraph:
         """
         Predict the permutation importance for each feature, for each target, 
@@ -508,7 +518,8 @@ class PermutationImportance(BaseEstimator):
         ax.axvline(
             x=self.mean_pi_threshold, color='red', linestyle='--', linewidth=0.5)
 
-        ax.set_title(f"Perm.Imp.{target}: {','.join(self.connections[target])}")
+        ax.set_title(
+            f"Perm.Imp.{target}: {','.join(self.connections[target])}")
         fig = ax.figure if fig is None else fig
 
         return fig

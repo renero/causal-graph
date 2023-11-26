@@ -5,6 +5,7 @@
 # pylint: disable=R0914:too-many-locals, R0915:too-many-statements
 # pylint: disable=W0106:expression-not-assigned, R1702:too-many-branches
 
+from copy import copy
 from typing import List
 
 import colorama
@@ -26,6 +27,8 @@ def select_features(
         feature_names,
         return_shaps=False,
         min_impact: float = 1e-06,
+        exhaustive=False,
+        threshold: float = None,
         verbose=False) -> List[str]:
     """
     Sort the values and select those before (strict) the point of max. curvature,
@@ -43,16 +46,25 @@ def select_features(
             order of the features.
         - min_impact (float): Default 1e-06. The minimum impact of a feature to be
             selected. If all features are below this value, none are selected.
+        - exhaustive (bool): Default False. Whether to use the exhaustive method or
+            not. If True, the threshold is used to find all possible clusters above
+            the given threshold, not only the first one.
+        - threshold (float): Default None. The threshold to use when exahustive is
+            True. If None, exception is raised.
         - verbose: guess what.
 
     """
+    if (exhaustive is True) and (threshold is not None):
+        raise ValueError("If exhaustive is True, threshold must be provided.")
+    threshold = 0.0 if threshold is None else threshold
+
     if len(values.shape) > 1:
         feature_order = np.argsort(np.sum(np.abs(values), axis=0))
         mean_values = np.abs(values).mean(0)
     else:
         feature_order = np.argsort(np.abs(values))
         mean_values = np.abs(values)
-    sorted_impact_values = [mean_values[idx] for idx in feature_order]
+    sorted_shap_values = [mean_values[idx] for idx in feature_order]
 
     # In some cases, the mean SHAP values are 0. We return an empty list in that case.
     if np.all(mean_values < min_impact):
@@ -70,11 +82,24 @@ def select_features(
             f"  Feature_order......: "
             f"{','.join([f'{feature_names[i]}' for i in feature_order])}\n"
             f"  sorted_mean_values.: "
-            f"{','.join([f'{x:.6f}' for x in sorted_impact_values])}")
+            f"{','.join([f'{x:.6f}' for x in sorted_shap_values])}")
 
-    limit_idx = cluster_change(sorted_impact_values, verbose=verbose)
-    selected_features = list(reversed(
-        [feature_names[i] for i in feature_order[limit_idx:]]))
+    # Get a copy of the sorted_shap_values into a new variable called kk
+    sorted_impact_values = copy(sorted_shap_values)
+    selected_features = []
+    while any(value > threshold for value in sorted_impact_values):
+        limit_idx = cluster_change(sorted_impact_values, verbose=verbose)
+        selected_features = list(reversed(
+            [feature_names[i] for i in feature_order[limit_idx:]]))
+
+        if not exhaustive:
+            break
+
+        sorted_impact_values = sorted_impact_values[:limit_idx]
+
+        # limit_idx = cluster_change(sorted_impact_values, verbose=verbose)
+        # selected_features = list(reversed(
+        #     [feature_names[i] for i in feature_order[limit_idx:]]))
 
     if verbose:
         print(f"  Limit_idx(cut-off).: {limit_idx}")
@@ -132,7 +157,7 @@ def cluster_change(X: List, verbose: bool = False) -> int:
         n_noise_ = list(labels).count(-1)
         if n_clusters_ <= 1:
             if verbose:
-                print("  +-> Only 1 cluster generated. Increasing max_distance.")
+                print("  +-> Only 1 cluster generated. Decreasing max_distance.")
             pairwise_distances = pairwise_distances[1:]
 
     if pairwise_distances.size == 0:
