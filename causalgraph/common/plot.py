@@ -166,8 +166,8 @@ def subplots(
         for j in range(num_cols):
             index = i * num_cols + j
             if index < len(plot_args):
-                ax = ax[i][j]
-                plot_func(plot_args[index], ax=ax)
+                # axe = ax[i][j]
+                plot_func(plot_args[index], ax=ax[i][j])
             else:
                 blank(ax[i][j])
 
@@ -252,8 +252,9 @@ def draw_graph_subplot(
 
     # Create a colormap list with the colors of the nodes, based on the regr_score
     if all(['regr_score' in G.nodes[node] for node in G.nodes]):
-        reg_scores = [G.nodes[node]['regr_score'] for node in G.nodes]
-        max_cmap_value = max(reg_scores, 1.0)
+        reg_scores: List[float] = [G.nodes[node]['regr_score']
+                                   for node in G.nodes]
+        max_cmap_value = max(*reg_scores, 1.0)
         color_map = set_colormap(0.0, max_cmap_value, 'RdYlGn_r')
         # color_map_r = set_colormap(0.0, max_cmap_value, 'gist_gray')
         kwargs['font_color'] = "black"
@@ -447,7 +448,7 @@ def correlations(
     title = kwargs.get('title', 'Correlation matrix')
     fontsize = kwargs.get('fontsize', 9)
     fontname = kwargs.get('fontname', "Arial")
-    xrot = kwargs.get('xrot', 0)
+    xrot = kwargs.get('xrot', 90)
     cm = set_colormap(color_threshold=threshold, max_color=0.9)
     precision = 2
 
