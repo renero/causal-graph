@@ -1,21 +1,29 @@
-#
-# This file includes all the plot methods for the causal graph
-#
-# (C) J. Renero, 2022, 2023
-#
+"""
+This file includes all the plot methods for the causal graph
+
+(C) J. Renero, 2022, 2023
+"""
+
+# pylint: disable=E1101:no-member, W0201:attribute-defined-outside-init, W0511:fixme
+# pylint: disable=C0103:invalid-name, E1121:too-many-function-args
+# pylint: disable=C0116:missing-function-docstring
+# pylint: disable=R0913:too-many-arguments
+# pylint: disable=R0914:too-many-locals, R0915:too-many-statements
+# pylint: disable=W0106:expression-not-assigned, R1702:too-many-branches
 
 from copy import copy
-from typing import Any, Callable
+from typing import Any, Callable, List
 
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
+import pandas as pd
 import pydotplus
 import seaborn as sns
+from matplotlib import axes
 from matplotlib.colors import ListedColormap
 from matplotlib.ticker import MultipleLocator
 from pydot import Dot
-
 
 # Defaults for the graphs plotted
 formatting_kwargs = {
@@ -43,7 +51,7 @@ def setup_plot(**kwargs):  # tex=True, font="serif", dpi=75, font_size=10):
     usetex = kwargs.pop("usetex", True)
     font_familiy = kwargs.pop("font_family", "serif")
     dpi = kwargs.pop("dpi", 75)
-    format = kwargs.pop("format", "pdf")
+    file_format = kwargs.pop("file_format", "pdf")
     title_size = kwargs.pop("title_size", 8)
     axis_labelsize = kwargs.pop("axis_labelsize", 8)
     xtick_labelsize = kwargs.pop("xtick_labelsize", 8)
@@ -65,7 +73,7 @@ def setup_plot(**kwargs):  # tex=True, font="serif", dpi=75, font_size=10):
             "figure.subplot.hspace": 0.4,
             "figure.dpi": dpi,
             "savefig.dpi": 180,
-            "savefig.format": format,
+            "savefig.format": file_format,
             "axes.titlesize": title_size,
             "axes.labelsize": axis_labelsize,
             "axes.axisbelow": True,
@@ -129,14 +137,8 @@ def subplots(
     ----------
         plot_func: function
             The function to be used to plot each subplot.
-        num_cols: int
-            The number of columns in the subplot grid.
         *plot_args: List
             The arguments to be passed to the plot function.
-        fig_size: Tuple[int, int]
-            The size of the figure.
-        title: str
-            The title of the figure.
         **kwargs: Dict
             Additional arguments to be passed to the plot function.
 
@@ -159,15 +161,15 @@ def subplots(
         ax.set_axis_off()
 
     plt.rcParams.update({'font.size': 8})
-    fig, axes = plt.subplots(num_rows, num_cols, figsize=fig_size)
+    fig, ax = plt.subplots(num_rows, num_cols, figsize=fig_size)
     for i in range(num_rows):
         for j in range(num_cols):
             index = i * num_cols + j
             if index < len(plot_args):
-                ax = axes[i][j]
+                ax = ax[i][j]
                 plot_func(plot_args[index], ax=ax)
             else:
-                blank(axes[i][j])
+                blank(ax[i][j])
 
     if title is not None:
         fig.suptitle(title)
@@ -223,7 +225,7 @@ def draw_graph_subplot(
         layout: dict = None,
         title: str = None,
         ax: plt.Axes = None,
-        **formatting_kwargs):
+        **kwargs):
     """
     Draw a graph in a subplot.
 
@@ -251,14 +253,14 @@ def draw_graph_subplot(
     # Create a colormap list with the colors of the nodes, based on the regr_score
     if all(['regr_score' in G.nodes[node] for node in G.nodes]):
         reg_scores = [G.nodes[node]['regr_score'] for node in G.nodes]
-        max_cmap_value = max(max(reg_scores), 1.0)
+        max_cmap_value = max(reg_scores, 1.0)
         color_map = set_colormap(0.0, max_cmap_value, 'RdYlGn_r')
         # color_map_r = set_colormap(0.0, max_cmap_value, 'gist_gray')
-        formatting_kwargs['font_color'] = "black"
+        kwargs['font_color'] = "black"
 
         # Set with_labels to False if there is color information of each node,
         # since I will draw the labels afterwards
-        formatting_kwargs['with_labels'] = False
+        kwargs['with_labels'] = False
 
         # Set the node colors and the label colors according to the value of the
         # regr_score of each node.
@@ -272,21 +274,21 @@ def draw_graph_subplot(
             else:
                 linewidths.append(1.0)
             # label_colors.append(color_map_r(G.nodes[node]['regr_score']))
-        formatting_kwargs['node_color'] = node_colors
-        formatting_kwargs['linewidths'] = linewidths
+        kwargs['node_color'] = node_colors
+        kwargs['linewidths'] = linewidths
 
     nx.draw(G, pos=layout, edge_color=edge_colors,
-            width=widths, style=styles, **formatting_kwargs, ax=ax)
+            width=widths, style=styles, **kwargs, ax=ax)
 
-    if formatting_kwargs['with_labels'] == False:
+    if kwargs['with_labels'] is False:
         for _, node in enumerate(G):
             # font_color = label_colors[i]
             nx.draw_networkx_labels(
                 G, pos=layout, labels={node: node},  # font_color=font_color,
-                font_weight=formatting_kwargs['font_weight'],
-                font_family=formatting_kwargs['font_family'],
-                horizontalalignment=formatting_kwargs['horizontalalignment'],
-                verticalalignment=formatting_kwargs['verticalalignment'],
+                font_weight=kwargs['font_weight'],
+                font_family=kwargs['font_family'],
+                horizontalalignment=kwargs['horizontalalignment'],
+                verticalalignment=kwargs['verticalalignment'],
                 ax=ax)
 
     if title is not None:
@@ -328,12 +330,10 @@ def set_colormap(
 
 
 def dag2dot(
-    G: nx.DiGraph,
-    undirected=False,
-    name: str = "my_dotgraph",
-    odots: bool = True,
-    **kwargs,
-) -> Dot:
+        G: nx.DiGraph,
+        undirected=False,
+        name: str = "my_dotgraph",
+        odots: bool = True) -> Dot:
     """
     Display a DOT of the graph in the notebook.
 
@@ -410,13 +410,18 @@ def values_distribution(values, **kwargs):
     plt.show()
 
 
-def correlations(correlations, sorted_colnames, threshold, ax, **kwargs):
+def correlations(
+        corr_matrix: pd.DataFrame,
+        sorted_colnames: List[str],
+        threshold: float,
+        ax: axes.Axes,
+        **kwargs) -> None:
     """
     Plot the correlation matrix of the data.
 
     Parameters
     ----------
-        - correlations (pd.DataFrame)
+        - corrs (pd.DataFrame)
             Correlation matrix.
         - sorted_colnames (List[str])
             List of sorted column names.
@@ -451,7 +456,7 @@ def correlations(correlations, sorted_colnames, threshold, ax, **kwargs):
             return "0"
         return format(v, '.' + str(ndigits) + 'f')
 
-    corr_data = np.abs(copy(correlations.values))
+    corr_data = np.abs(copy(corr_matrix.values))
     ncols, nrows = corr_data.shape
     for x in range(ncols):
         for y in range(nrows):
