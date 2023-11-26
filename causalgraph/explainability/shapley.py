@@ -32,7 +32,6 @@ from matplotlib.ticker import FormatStrFormatter
 from scipy.stats import kstest, spearmanr
 from sklearn.base import BaseEstimator
 from sklearn.discriminant_analysis import StandardScaler
-# from sklearn.isotonic import spearmanr
 from sklearn.model_selection import train_test_split
 from sklearn.utils.validation import check_is_fitted
 from tqdm.auto import tqdm
@@ -49,7 +48,8 @@ K = 180.0 / math.pi
 @dataclass
 class ShapDiscrepancy:
     """
-    A class representing the discrepancy between the SHAP value and the parent value for a given feature.
+    A class representing the discrepancy between the SHAP value and the parent 
+    value for a given feature.
 
     Attributes:
         - target (str): The name of the target feature.
@@ -92,21 +92,15 @@ class ShapEstimator(BaseEstimator):
     Parameters
     ----------
     explainer : str, default="explainer"
-        The SHAP explainer to use. Possible values are "kernel", "gradient", and "explainer".
+        The SHAP explainer to use. Possible values are "kernel", "gradient", and 
+        "explainer".
     models : BaseEstimator, default=None
-        The models to use for computing SHAP values. If None, a linear regression model is used for each feature.
+        The models to use for computing SHAP values. If None, a linear regression 
+        model is used for each feature.
     correlation_th : float, default=None
         The correlation threshold to use for removing highly correlated features.
-    method : str, default="cluster"
-        The method to use for selecting features. Possible values are "cluster", "knee", and "abrupt".
-    sensitivity : float, default=1.0
-        The sensitivity parameter for the feature selection method.
     mean_shap_percentile : float, default=0.8
         The percentile threshold for selecting features based on their mean SHAP value.
-    tolerance : float, default=None
-        The tolerance parameter for the feature selection method.
-    descending : bool, default=False
-        Whether to sort the features in descending order of importance.
     iters : int, default=20
         The number of iterations to use for the feature selection method.
     reciprocity : bool, default=False
@@ -163,7 +157,7 @@ class ShapEstimator(BaseEstimator):
         for attr in dir(self):
             if attr.startswith('_') or \
                 attr in forbidden_attrs or \
-                    type(getattr(self, attr)) == types.MethodType:
+                    isinstance(getattr(self, attr), types.MethodType):
                 continue
             elif attr == "X" or attr == "y":
                 if isinstance(getattr(self, attr), pd.DataFrame):
@@ -189,6 +183,13 @@ class ShapEstimator(BaseEstimator):
 
     def fit(self, X):
         """
+        Fit the ShapleyExplainer model to the given dataset.
+
+        Parameters:
+        - X: The input dataset.
+
+        Returns:
+        - self: The fitted ShapleyExplainer model.
         """
         # X, y = check_X_y(X, y, accept_sparse=True)
         self.feature_names = list(self.models.regressor.keys())
@@ -241,10 +242,6 @@ class ShapEstimator(BaseEstimator):
 
             X_train = self.X_train.drop(target_name, axis=1).values
             X_test = self.X_test.drop(target_name, axis=1).values
-            # if X_test.shape[0] > 250:
-            #     X_test = shap.sample(X_test, 250)
-            #     print(
-            #         f"Reduced X_test to {X_test.shape[0]} samples") if self.verbose else None
 
             # Run the selected SHAP explainer
             self._run_selected_shap_explainer(
@@ -380,7 +377,7 @@ class ShapEstimator(BaseEstimator):
 
         G_shap = utils.digraph_from_connected_features(
             X, self.feature_names, self.models, self.connections, root_causes,
-            reciprocity=True, iters=10, verbose=self.verbose)
+            reciprocity=self.reciprocity, iters=self.iters, verbose=self.verbose)
 
         pbar.update(1)
         pbar.close()
@@ -807,7 +804,7 @@ class ShapEstimator(BaseEstimator):
         ax.set_yticks(y_pos, [feature_names[i] for i in feature_inds])
         ax.set_xlabel("Avg. SHAP value")
         ax.set_title(
-            target_name + " $\leftarrow$ " +
+            target_name + r' $\leftarrow$ ' +
             (','.join(selected_features) if selected_features else 'ø'))
 
         xlims = ax.get_xlim()
@@ -864,7 +861,7 @@ class ShapEstimator(BaseEstimator):
                         fontsize=11)
         ax[0].set_xlabel(parent_name)
         ax[0].set_ylabel(
-            f"$$ \mathrm{{{target_name}}} / \phi_{{{target_name}}} $$")
+            fr'$$ \mathrm{{{target_name}}} / \phi_{{{target_name}}} $$')
 
         # Represent distributions
         pd.DataFrame(s).plot(kind='density', ax=ax[1], label="shap")
@@ -872,7 +869,7 @@ class ShapEstimator(BaseEstimator):
         ax[1].legend().set_visible(False)
         ax[1].set_ylabel('')
         ax[1].set_xlabel(
-            f"$$ \mathrm{{{target_name}}} /  \phi_{{{target_name}}} $$")
+            fr'$$ \mathrm{{{target_name}}} /  \phi_{{{target_name}}} $$')
         ax[1].set_title(f'KS({r.ks_pvalue:.2g}) - {r.ks_result}', fontsize=11)
 
         # Represent fitted vs. residuals
@@ -889,14 +886,14 @@ class ShapEstimator(BaseEstimator):
         ax[2].set_title(
             f"Parent {parent_label}; Shap {shap_label}", fontsize=10)
         ax[2].set_xlabel(
-            f"$$ \mathrm{{{target_name}}} /  \phi_{{{target_name}}} $$")
-        ax[2].set_ylabel(f"$$ \epsilon_{{{target_name}}} / \epsilon_\phi $$")
+            fr'$$ \mathrm{{{target_name}}} /  \phi_{{{target_name}}} $$')
+        ax[2].set_ylabel(fr'$$ \epsilon_{{{target_name}}} / \epsilon_\phi $$')
 
         # Represent target vs. SHAP values
         ax[3].scatter(s, y, alpha=0.3, marker='.', color='tab:green')
         ax[3].set_title(f"Corr: {r.shap_correlation:.2f}", fontsize=11)
-        ax[3].set_xlabel(f"$$ \phi_{{{target_name}}} $$")
-        ax[3].set_ylabel(f"$$ \mathrm{{{target_name}}} $$")
+        ax[3].set_xlabel(fr'$$ \phi_{{{target_name}}} $$')
+        ax[3].set_ylabel(fr'$$ \mathrm{{{target_name}}} $$')
 
         for ax_idx in range(4):
             _remove_ticks_and_box(ax[ax_idx])

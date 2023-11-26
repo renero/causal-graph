@@ -384,7 +384,7 @@ def dag2dot(
     return dot_object
 
 
-def values_distribution(values, **kwargs):
+def values_distribution(values, threshold=None, **kwargs):
     """
     Plot the probability density and cumulative density of a given set of values.
 
@@ -407,6 +407,8 @@ def values_distribution(values, **kwargs):
     ax[1].set_ylabel("Cumulative probability")
     sns.histplot(data=values, ax=ax[0], kde=True)
     sns.ecdfplot(data=values, ax=ax[1])
+    if threshold is not None:
+        ax[1].axvline(threshold, color='red', linestyle='--', linewidth=0.5)
     plt.tight_layout()
     plt.show()
 

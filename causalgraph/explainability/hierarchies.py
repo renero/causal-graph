@@ -58,8 +58,8 @@ class Hierarchies:
     def __init__(
             self,
             method: str = 'spearman',
-            alpha: float = 0.6,
-            c: int = 15,
+            mic_alpha: float = 0.6,
+            mic_c: int = 15,
             linkage_method: str = 'complete',
             correlation_th: float = None,
             prog_bar: bool = False,
@@ -73,9 +73,9 @@ class Hierarchies:
         method : str or Callable, optional
             Method to use to compute the correlation. Default is 'spearman', 
             but can also be 'pearson', 'kendall' or 'mic'.
-        alpha : float, optional
+        mic_alpha : float, optional
             Threshold for the correlation. Default is 0.6.
-        c : int, optional
+        mic_c : int, optional
             Number of clusters to be formed. Default is 15. Only valid with MIC.
         linkage_method : str, optional
             Method to use to compute the linkage. Default is 'complete'.
@@ -89,8 +89,8 @@ class Hierarchies:
             Whether to suppress all output. Default is False.
         """
         self.method = method
-        self.alpha = alpha
-        self.c = c
+        self.alpha = mic_alpha
+        self.c = mic_c
         self.linkage_method = linkage_method
         self.correlation_th = correlation_th
         self.prog_bar = prog_bar
@@ -121,7 +121,8 @@ class Hierarchies:
 
         # Set the list of correlated features for each target
         self.correlations = self.compute_correlation_matrix(
-            self.data, method=self.method, prog_bar=self.prog_bar)
+            self.data, method=self.method, mic_alpha=self.alpha, mic_c=self.c,
+            prog_bar=self.prog_bar)
         self.correlated_features = self.compute_correlated_features(
             self.correlations, self.correlation_th, self.feature_names)
 
@@ -134,10 +135,12 @@ class Hierarchies:
 
         return self
 
+    @staticmethod
     def compute_correlation_matrix(
-            self,
             data: pd.DataFrame,
             method='spearman',
+            mic_alpha: float = 0.6,
+            mic_c: int = 15,
             prog_bar=False):
         """
         Compute the correlation matrix.
@@ -161,7 +164,7 @@ class Hierarchies:
             correlations = data.corr(method=method)
         elif method == 'mic':
             correlations = pairwise_mic(
-                data, alpha=self.alpha, c=self.c, prog_bar=prog_bar)
+                data, alpha=mic_alpha, c=mic_c, prog_bar=prog_bar)
         else:
             raise ValueError(
                 f"Unknown correlation method: {method}. Use 'spearman', "
@@ -724,7 +727,7 @@ if __name__ == "__main__":
     m_c = 15
 
     test_data = pd.read_csv("/Users/renero/phd/data/generated_linear_10.csv")
-    h = Hierarchies(method='mic', alpha=m_alpha, c=m_c)
+    h = Hierarchies(method='mic', mic_alpha=m_alpha, mic_c=m_c)
     h.fit(test_data)
     h.plot()
     plt.show()
