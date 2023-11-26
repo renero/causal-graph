@@ -176,13 +176,13 @@ def subplots(
 
 
 def format_graph(
-        G: nx.DiGraph,
-        Gt: nx.DiGraph = None,
-        ok_color="green",
-        inv_color="lightgreen",
-        wrong_color="black",
-        missing_color=None
-    ) -> nx.DiGraph:
+    G: nx.DiGraph,
+    Gt: nx.DiGraph = None,
+    ok_color="green",
+    inv_color="lightgreen",
+    wrong_color="black",
+    missing_color=None
+) -> nx.DiGraph:
     if Gt is None:
         for u, v in G.edges():
             G[u][v]['color'] = "black"
@@ -255,8 +255,8 @@ def draw_graph_subplot(
         color_map = set_colormap(0.0, max_cmap_value, 'RdYlGn_r')
         # color_map_r = set_colormap(0.0, max_cmap_value, 'gist_gray')
         formatting_kwargs['font_color'] = "black"
-        
-        # Set with_labels to False if there is color information of each node, 
+
+        # Set with_labels to False if there is color information of each node,
         # since I will draw the labels afterwards
         formatting_kwargs['with_labels'] = False
 
@@ -277,18 +277,18 @@ def draw_graph_subplot(
 
     nx.draw(G, pos=layout, edge_color=edge_colors,
             width=widths, style=styles, **formatting_kwargs, ax=ax)
-    
+
     if formatting_kwargs['with_labels'] == False:
         for _, node in enumerate(G):
             # font_color = label_colors[i]
             nx.draw_networkx_labels(
-                G, pos=layout, labels={node:node}, #font_color=font_color, 
+                G, pos=layout, labels={node: node},  # font_color=font_color,
                 font_weight=formatting_kwargs['font_weight'],
                 font_family=formatting_kwargs['font_family'],
                 horizontalalignment=formatting_kwargs['horizontalalignment'],
                 verticalalignment=formatting_kwargs['verticalalignment'],
                 ax=ax)
-    
+
     if title is not None:
         ax.set_title(title, y=-0.1)
 
@@ -384,8 +384,18 @@ def dag2dot(
 
 
 def values_distribution(values, **kwargs):
-    # Plot two subplots: one with probability density of "all_mean_shap_values"
-    # and another with the cumulative density of "all_shap_values"
+    """
+    Plot the probability density and cumulative density of a given set of values.
+
+    Parameters:
+    ----------
+        values (array-like): The values to be plotted.
+        **kwargs: Additional keyword arguments for customizing the plot.
+
+    Returns:
+    -------
+        None
+    """
     figsize = kwargs.get('figsize', (7, 5))
     _, ax = plt.subplots(1, 2, figsize=figsize)
     ax[0].set_title("Probability density")
@@ -403,7 +413,7 @@ def values_distribution(values, **kwargs):
 def correlations(correlations, sorted_colnames, threshold, ax, **kwargs):
     """
     Plot the correlation matrix of the data.
-    
+
     Parameters
     ----------
         - correlations (pd.DataFrame)
@@ -424,7 +434,7 @@ def correlations(correlations, sorted_colnames, threshold, ax, **kwargs):
                 Font name for the labels.
             - xrot (int)
                 Rotation of the labels.
-                
+
     Returns
     -------
         None
@@ -449,26 +459,26 @@ def correlations(correlations, sorted_colnames, threshold, ax, **kwargs):
                 corr_data[x, y] = 0
 
     ax.set_xticks(range(len(sorted_colnames)), sorted_colnames, rotation=xrot,
-                    horizontalalignment='center',
-                    fontsize=fontsize, fontname=fontname, color='black')
+                  horizontalalignment='center',
+                  fontsize=fontsize, fontname=fontname, color='black')
     ax.set_yticks(range(len(sorted_colnames)), sorted_colnames,
-                    verticalalignment='center',
-                    fontsize=fontsize, fontname=fontname, color='black')
+                  verticalalignment='center',
+                  fontsize=fontsize, fontname=fontname, color='black')
     ax.imshow(corr_data, cmap=cm, vmin=threshold,
-                vmax=1.0, aspect='equal')
+              vmax=1.0, aspect='equal')
     ax.grid(True, which='major', alpha=.25)
     for x in range(ncols):
         for y in range(nrows):
             if (x) == y:
                 ax.annotate('x', xy=(y, x),
-                                horizontalalignment='center',
-                                verticalalignment='center',
-                                fontsize=fontsize, fontname=fontname, color='black')
+                            horizontalalignment='center',
+                            verticalalignment='center',
+                            fontsize=fontsize, fontname=fontname, color='black')
             if (x) != y and not np.isclose(round(corr_data[x, y], precision), 0.0):
                 ax.annotate(myround(corr_data[x, y], precision), xy=(y, x),
-                                horizontalalignment='center',
-                                verticalalignment='center',
-                                fontsize=fontsize, fontname=fontname, color='black')
+                            horizontalalignment='center',
+                            verticalalignment='center',
+                            fontsize=fontsize, fontname=fontname, color='black')
     plt.tick_params(pad=10, axis='x', which='both')
 
     ax.spines['top'].set_linewidth(.3)

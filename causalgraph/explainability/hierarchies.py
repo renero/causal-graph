@@ -5,6 +5,13 @@ Can I use the information above to decide wether to connect groups
 of variables linked together?
 
 """
+# pylint: disable=E1101:no-member, W0201:attribute-defined-outside-init, W0511:fixme
+# pylint: disable=C0103:invalid-name, E1121:too-many-function-args
+# pylint: disable=C0116:missing-function-docstring
+# pylint: disable=R0913:too-many-arguments
+# pylint: disable=R0914:too-many-locals, R0915:too-many-statements
+# pylint: disable=W0106:expression-not-assigned, R1702:too-many-branches
+
 from collections import defaultdict
 from typing import List, Tuple, Union
 
@@ -19,7 +26,31 @@ from scipy.spatial.distance import squareform
 from causalgraph.independence.mic import pairwise_mic
 from causalgraph.common import plot
 
+
 class Hierarchies:
+    """
+    Class representing the hierarchy of links between variables.
+
+    Parameters
+    ----------
+    method : str or Callable, optional
+        Method to use to compute the correlation. Default is 'spearman', but can 
+        also be 'pearson', 'kendall' or 'mic'.
+    alpha : float, optional
+        Threshold for the correlation. Default is 0.6.
+    c : int, optional
+        Number of clusters to be formed. Default is 15. Only valid with MIC.
+    linkage_method : str, optional
+        Method to use to compute the linkage. Default is 'complete'.
+    correlation_th : float, optional
+        Threshold for the correlation. Default is None.
+    prog_bar : bool, optional
+        Whether to show a progress bar during computation. Default is False.
+    verbose : bool, optional
+        Whether to print additional information. Default is False.
+    silent : bool, optional
+        Whether to suppress all output. Default is False.
+    """
 
     correlations = None
     linkage_mat = None
@@ -35,15 +66,27 @@ class Hierarchies:
             verbose: bool = False,
             silent: bool = False):
         """
+        Initialize the Hierarchies object.
+
         Parameters
         ----------
-            method (str or Callable) : Method to use to compute the correlation. 
-                Default is 'spearman', but can also be 'pearson', 'kendall' or 'mic'. 
-            alpha (float) : Threshold for the correlation. Default is 0.6.
-            c (int) : Number of clusters to be formed. Default is 15. Only valid with MIC.
-            linkage_method (str) : Method to use to compute the linkage. 
-                Default is 'complete'.
-            **kwargs : Keyword arguments to be passed to the plot_dendogram function.
+        method : str or Callable, optional
+            Method to use to compute the correlation. Default is 'spearman', 
+            but can also be 'pearson', 'kendall' or 'mic'.
+        alpha : float, optional
+            Threshold for the correlation. Default is 0.6.
+        c : int, optional
+            Number of clusters to be formed. Default is 15. Only valid with MIC.
+        linkage_method : str, optional
+            Method to use to compute the linkage. Default is 'complete'.
+        correlation_th : float, optional
+            Threshold for the correlation. Default is None.
+        prog_bar : bool, optional
+            Whether to show a progress bar during computation. Default is False.
+        verbose : bool, optional
+            Whether to print additional information. Default is False.
+        silent : bool, optional
+            Whether to suppress all output. Default is False.
         """
         self.method = method
         self.alpha = alpha
@@ -53,23 +96,29 @@ class Hierarchies:
         self.prog_bar = prog_bar
         self.verbose_ = verbose
         self.silent_ = silent
+        self.linkage_mat: np.ndarray = None
 
-    def fit(self, X: pd.DataFrame, y=None):
+    def fit(self, X: pd.DataFrame):
         """
-        Compute the hierarchy of links between variables using the correlation method
-        specified in `corr_method`.
+        Compute the hierarchy of links between variables using the correlation 
+        method specified in `corr_method`.
 
+        Parameters
+        ----------
+        X : pd.DataFrame
+            The input data.
+        y : None
+            Ignored.
 
         Returns
         -------
-            - np.array, np.array
-                Arrays with the correlation matrix and the linkage matrix.
-
+        self : Hierarchies
+            The fitted Hierarchies object.
         """
         # copy X into self.data
         self.data = X.copy()
         self.feature_names = list(self.data.columns)
-        
+
         # Set the list of correlated features for each target
         self.correlations = self.compute_correlation_matrix(
             self.data, method=self.method, prog_bar=self.prog_bar)
@@ -83,30 +132,70 @@ class Hierarchies:
         self.linkage_mat = linkage(squareform(
             self.dissimilarity), self.linkage_method)
 
-        return self 
+        return self
 
-    @staticmethod
-    def compute_correlation_matrix(data: pd.DataFrame, method='spearman', prog_bar=False):
+    def compute_correlation_matrix(
+            self,
+            data: pd.DataFrame,
+            method='spearman',
+            prog_bar=False):
+        """
+        Compute the correlation matrix.
+
+        Parameters
+        ----------
+        data : pd.DataFrame
+            The input data.
+        method : str or Callable, optional
+            Method to use to compute the correlation. Default is 'spearman', 
+            but can also be 'pearson', 'kendall' or 'mic'.
+        prog_bar : bool, optional
+            Whether to show a progress bar during computation. Default is False.
+
+        Returns
+        -------
+        correlations : pd.DataFrame
+            The correlation matrix.
+        """
         if method in ['spearman', 'pearson', 'kendall']:
             correlations = data.corr(method=method)
         elif method == 'mic':
             correlations = pairwise_mic(
-                data, alpha=alpha, c=c, prog_bar=prog_bar)
+                data, alpha=self.alpha, c=self.c, prog_bar=prog_bar)
         else:
             raise ValueError(
-                f"Unknown correlation method: {method}. \
-                    Use 'spearman', 'pearson', 'kendall' or 'mic'.")
-            
+                f"Unknown correlation method: {method}. Use 'spearman', "
+                f"'pearson', 'kendall' or 'mic'.")
+
         return correlations
 
     @staticmethod
     def compute_correlated_features(correlations, correlation_th, feature_names, verbose=False):
+        """
+        Compute the list of correlated features for each target.
+
+        Parameters
+        ----------
+        correlations : pd.DataFrame
+            The correlation matrix.
+        correlation_th : float
+            Threshold for the correlation.
+        feature_names : List[str]
+            The list of feature names.
+        verbose : bool, optional
+            Whether to print additional information. Default is False.
+
+        Returns
+        -------
+        correlated_features : defaultdict(list)
+            The list of correlated features for each target.
+        """
         correlated_features = defaultdict(list)
         if correlation_th:
             for target_name in feature_names:
                 corr_features = list(
                     correlations[(correlations[target_name] > correlation_th)
-                                      & (correlations[target_name] < 1.0)].index)
+                                 & (correlations[target_name] < 1.0)].index)
                 if len(corr_features) > 0:
                     correlated_features[target_name] = corr_features
                     if verbose:
@@ -117,21 +206,21 @@ class Hierarchies:
 
     def expand_clusters_perm_importance(self, pi, ground_truth=None):
         """
-        Expand the clusters of the linkage matrix to include the features that are
-        in the same cluster in the permutation importance matrix. It expands, for
-        each cluster, with the metrics related to correlation, deltas, backward PI, etc.
-        Used to determine if some criteria can be extracted 
+        Expand the clusters of the linkage matrix to include the features that are 
+        in the same cluster in the permutation importance matrix.
+        It expands, for each cluster, with the metrics related to correlation, 
+        deltas, backward PI, etc. Used to determine if some criteria can be extracted.
 
         Parameters
         ----------
-            pi : pd.DataFrame   
-                Permutation importance matrix.
-            ground_truth : pd.DataFrame
-                Ground truth matrix.
+        pi : pd.DataFrame
+            Permutation importance matrix.
+        ground_truth : pd.DataFrame, optional
+            Ground truth matrix.
 
         Returns
         -------
-            None
+        None
         """
         clusters = self._clusters_from_linkage(
             self.linkage_mat, self.data.columns)
@@ -156,8 +245,10 @@ class Hierarchies:
                 print(f" | R2({pi.regression_importances_[i]:.2f})", end="")
                 degree = self._are_connected(clusters, feature, name)
                 connected = True if degree is not None else False
-                print(f" | d{degree:.02f}", end="") if connected else print(
-                    f" | d0.00", end="")
+                if connected:
+                    print(f" | d{degree:.02f}", end="")
+                else:
+                    print(" | d0.00", end="")
                 if ground_truth is None:
                     print("")
                 if reverse:
@@ -174,23 +265,22 @@ class Hierarchies:
 
     def _cluster_features(self, method, threshold):
         """
-        This function clusters the features of the data based on the linkage matrix
-        obtained from the hierarchical clustering. It is used in the method 
-        plot_correlations.
-        
+        Cluster the features of the data based on the linkage matrix obtained 
+        from the hierarchical clustering.
+
         Parameters
         ----------
-            - method (str)
-                Method to compute the correlation.
-            - threshold (float)
-                Threshold for the correlation.
-        
+        method : str
+            Method to compute the correlation.
+        threshold : float
+            Threshold for the correlation.
+
         Returns
         -------
-            - pd.DataFrame
-                Correlation matrix.
-            - List[str]
-                List of sorted column names.        
+        clustered : pd.DataFrame
+            Correlation matrix.
+        sorted_colnames : List[str]
+            List of sorted column names.
         """
         # Keep the indices to sort labels
         labels = fcluster(self.linkage_mat, threshold, criterion='distance')
@@ -209,16 +299,11 @@ class Hierarchies:
     def hierarchical_dissimilarities(self):
         """
         Compute the dissimilarities between features in a hierarchical clustering.
-        Two features' dissimilarity is the distance between them in the same cluster 
-        of the dedrogram or to the inmediately superior cluster. If they are connected
-        by a path of clusters, the dissimilarity is the maximum dissimilarity between
-        the features in the path.
 
         Returns
         -------
-            pd.DataFrame
-                Dissimilarities between features.
-
+        hierarchical_dissimilarity : pd.DataFrame
+            Dissimilarities between features.
         """
         feature_names = list(self.data.columns)
         hierarchical_dissimilarity = pd.DataFrame(columns=feature_names)
@@ -233,14 +318,21 @@ class Hierarchies:
 
         return hierarchical_dissimilarity
 
-    def _clusters_from_linkage(linkage_mat, features):
+    def _clusters_from_linkage(self, linkage_mat: np.ndarray, features: List[str]):
         """
-        Get the clusters from the linkage matrix, in the form:
-            {'K10': [('V8', 'V9'), 0.32309495637982555],
-            'K11': [('V1', 'V2'), 0.3416643106572427],
-            'K12': [('V5', 'K11'), 0.4056455905823624],
-            'K13': [('V4', 'V7'), 0.4388866835467342],
-            'K14': [('K10', 'K12'), 0.46126091704366823]}
+        Get the clusters from the linkage matrix.
+
+        Parameters
+        ----------
+        linkage_mat : np.array
+            The linkage matrix.
+        features : List[str]
+            The list of feature names.
+
+        Returns
+        -------
+        clusters : dict
+            The clusters from the linkage matrix.
         """
         clusters = {}
         Z = linkage_mat
@@ -258,13 +350,27 @@ class Hierarchies:
                 feature_b = features[feature_b]
             else:
                 feature_b = f'K{feature_b}'
-            # print(f"K{new_cluster}: {feature_a:<3s} {feature_b:>3s}, sim: {Z[n][2]:.02f}")
             clusters[f"K{new_cluster}"] = [(feature_a, feature_b), Z[n][2]]
 
         return clusters
 
     @staticmethod
     def _get_cluster(clusters: List[str], node: str) -> str:
+        """
+        Get the cluster that contains the given node.
+
+        Parameters
+        ----------
+        clusters : List[str]
+            The list of clusters.
+        node : str
+            The node to search for.
+
+        Returns
+        -------
+        cluster : str
+            The cluster that contains the given node.
+        """
         for k in clusters.keys():
             if node in clusters[k][0]:
                 return k
@@ -272,32 +378,110 @@ class Hierarchies:
 
     @staticmethod
     def _is_cluster(node: str) -> bool:
+        """
+        Check if the given node is a cluster.
+
+        Parameters
+        ----------
+        node : str
+            The node to check.
+
+        Returns
+        -------
+        is_cluster : bool
+            True if the node is a cluster, False otherwise.
+        """
         return node.startswith('K')
 
     @staticmethod
     def _contains_a_cluster(clusters: List[str], node: str) -> bool:
-        return any([hierarchies._is_cluster(n) for n in clusters[node][0]])
+        """
+        Check if the given node contains a cluster.
+
+        Parameters
+        ----------
+        clusters : List[str]
+            The list of clusters.
+        node : str
+            The node to check.
+
+        Returns
+        -------
+        contains_cluster : bool
+            True if the node contains a cluster, False otherwise.
+        """
+        return any([Hierarchies._is_cluster(n) for n in clusters[node][0]])
 
     @staticmethod
     def _get_cluster_element(clusters: List[str], node: str) -> str:
+        """
+        Get the cluster element from the given node.
+
+        Parameters
+        ----------
+        clusters : List[str]
+            The list of clusters.
+        node : str
+            The node to get the cluster element from.
+
+        Returns
+        -------
+        cluster_element : str
+            The cluster element from the given node.
+        """
         for n in clusters[node][0]:
-            if hierarchies._is_cluster(n):
+            if Hierarchies._is_cluster(n):
                 return n
         return None
 
     @staticmethod
     def _in_cluster(cluster, node):
+        """
+        Check if the given node is in the given cluster.
+
+        Parameters
+        ----------
+        cluster : str
+            The cluster to check.
+        node : str
+            The node to check.
+
+        Returns
+        -------
+        in_cluster : bool
+            True if the node is in the cluster, False otherwise.
+        """
         return node in cluster[0]
 
     @staticmethod
     def _in_same_cluster(clusters: List[str], node1: str, node2: str) -> str:
+        """
+        Check if the given nodes are in the same cluster.
+
+        Parameters
+        ----------
+        clusters : List[str]
+            The list of clusters.
+        node1 : str
+            The first node to check.
+        node2 : str
+            The second node to check.
+
+        Returns
+        -------
+        cluster : str
+            The cluster that contains both nodes, or None if they are not in the same cluster.
+        """
         for k in clusters.keys():
             if node1 in clusters[k][0] and node2 in clusters[k][0]:
                 return k
         return None
 
-    @staticmethod
-    def _are_connected(clusters: List[str], node1: str, node2: str) -> Tuple[bool, float]:
+    def _are_connected(
+            self,
+            clusters: List[str],
+            node1: str,
+            node2: str) -> Tuple[bool, float]:
         """
         Determine if two nodes are connected in the hierarchical clustering represented
         in the clusters dictionary, obtained from the `linkage` function.
@@ -355,7 +539,6 @@ class Hierarchies:
             "spearman", threshold)
         plot.correlations(
             correlations, sorted_colnames, threshold, ax2, **kwargs)
-
 
 
 def _get_directed_pair(g, u, v):
@@ -464,7 +647,7 @@ def connect_hierarchies(G, linkage_mat, feature_names, verbose=True):
         u, v = node_names[int(linkage_mat[i][0])
                           ], node_names[int(linkage_mat[i][1])]
         weight, num = linkage_mat[i][2], int(linkage_mat[i][3])
-        arrow, direction = _get_direction(G_h, u, v)
+        arrow, _ = _get_direction(G_h, u, v)
         kname = f"K#{cluster_id}"
         node_names.append(kname)
         clusters[kname] = (u, v)
@@ -480,7 +663,7 @@ def connect_hierarchies(G, linkage_mat, feature_names, verbose=True):
             continue
 
         # Determine if source is a node or a cluster
-        if u in clusters.keys():
+        if u in clusters:
             pair = _get_directed_pair(G_h, *clusters[u])
             if pair is not None:
                 source = pair[1]
@@ -488,7 +671,7 @@ def connect_hierarchies(G, linkage_mat, feature_names, verbose=True):
             source = u
 
         # Determine if target is a node or cluster. If node, continue
-        if v in clusters.keys():
+        if v in clusters:
             pair = _get_directed_pair(G_h, *clusters[v])
             if pair is not None:
                 target = pair[0]
@@ -537,11 +720,11 @@ def plot_dendogram_correlations(correlations, feature_names: List[str], **kwargs
 
 
 if __name__ == "__main__":
-    alpha = 0.8
-    c = 15
+    m_alpha = 0.8
+    m_c = 15
 
     test_data = pd.read_csv("/Users/renero/phd/data/generated_linear_10.csv")
-    h = Hierarchies(method='mic', alpha=alpha, c=c)
+    h = Hierarchies(method='mic', alpha=m_alpha, c=m_c)
     h.fit(test_data)
     h.plot()
     plt.show()
