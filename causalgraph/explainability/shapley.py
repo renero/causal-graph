@@ -7,7 +7,7 @@ is then used to build the graph.
 """
 
 # pylint: disable=E1101:no-member, W0201:attribute-defined-outside-init, W0511:fixme
-# pylint: disable=C0103:invalid-name
+# pylint: disable=C0103:invalid-name, disable=R0902:too-many-instance-attributes
 # pylint: disable=C0116:missing-function-docstring
 # pylint: disable=R0913:too-many-arguments
 # pylint: disable=R0914:too-many-locals, R0915:too-many-statements
@@ -866,7 +866,7 @@ class ShapEstimator(BaseEstimator):
         fig = ax.figure if fig is None else fig
         return fig
 
-    def _plot_discrepancies(self, X: pd.DataFrame, target_name: str, **kwargs):
+    def _plot_discrepancies(self, target_name: str, **kwargs):
         mpl.rcParams['figure.dpi'] = kwargs.get('dpi', 75)
         figsize_ = kwargs.get('figsize', (10, 16))
         feature_names = [

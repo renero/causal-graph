@@ -8,6 +8,7 @@ import types
 import warnings
 from copy import copy
 from typing import List, Tuple, Union
+import deprecated
 
 import matplotlib.pyplot as plt
 import networkx as nx
@@ -394,6 +395,7 @@ class Rex(BaseEstimator, ClassifierMixin):
         return ret
 
     @staticmethod
+    @deprecated.deprecated(version='0.3.0', reason="Use plot.dags instead")
     def plot_dags(
             dag: nx.DiGraph,
             reference: nx.DiGraph = None,
@@ -402,72 +404,10 @@ class Rex(BaseEstimator, ClassifierMixin):
             dpi: int = 75,
             save_to_pdf: str = None,
             **kwargs):
-        """
-        Compare two graphs using dot.
-
-        Parameters:
-        -----------
-        reference: The reference DAG.
-        dag: The DAG to compare.
-        names: The names of the reference graph and the dag.
-        figsize: The size of the figure.
-        **kwargs: Additional arguments to format the graphs:
-            - "node_size": 500
-            - "node_color": 'white'
-            - "edgecolors": "black"
-            - "font_family": "monospace"
-            - "horizontalalignment": "center"
-            - "verticalalignment": "center_baseline"
-            - "with_labels": True
-        """
-        ncols = 1 if reference is None else 2
-
-        # Overwrite formatting_kwargs with kwargs if they are provided
-        plot.formatting_kwargs.update(kwargs)
-
-        G = nx.DiGraph()
-        G.add_nodes_from(dag.nodes(data=True))
-        G.add_edges_from(dag.edges())
-        if reference:
-            # Clean up reference graph for inconsistencies along the DOT conversion
-            # and add potential missing nodes to the predicted graph.
-            Gt = plot.cleanup_graph(reference.copy())
-            for missing in set(list(Gt.nodes)) - set(list(G.nodes)):
-                G.add_node(missing)
-            # Gt = _format_graph(Gt, Gt, inv_color="red", wrong_color="black")
-            # G  = _format_graph(G, Gt, inv_color="red", wrong_color="gray")
-            Gt = plot.format_graph(
-                Gt, G, inv_color="lightgreen", wrong_color="lightgreen")
-            G = plot.format_graph(G, Gt, inv_color="orange", wrong_color="red")
-        else:
-            G = plot.format_graph(G)
-
-        ref_layout = None
-        plot.setup_plot(dpi=dpi)
-        f, ax = plt.subplots(ncols=ncols, figsize=figsize)
-        ax_graph = ax[1] if reference else ax
-        if save_to_pdf is not None:
-            with PdfPages(save_to_pdf) as pdf:
-                if reference:
-                    ref_layout = nx.drawing.nx_agraph.graphviz_layout(
-                        Gt, prog="dot")
-                    plot.draw_graph_subplot(Gt, layout=ref_layout, title=None, ax=ax[0],
-                                            **plot.formatting_kwargs)
-                plot.draw_graph_subplot(G, layout=ref_layout, title=None, ax=ax_graph,
-                                        **plot.formatting_kwargs)
-                pdf.savefig(f, bbox_inches='tight', pad_inches=0)
-                plt.close()
-        else:
-            if reference:
-                ref_layout = nx.drawing.nx_agraph.graphviz_layout(
-                    Gt, prog="dot")
-                plot.draw_graph_subplot(Gt, layout=ref_layout, title=names[1], ax=ax[0],
-                                        **plot.formatting_kwargs)
-            plot.draw_graph_subplot(G, layout=ref_layout, title=names[0], ax=ax_graph,
-                                    **plot.formatting_kwargs)
-            plt.show()
+        plot.dags(dag, reference, names, figsize, dpi, save_to_pdf, **kwargs)
 
     @staticmethod
+    @deprecated.deprecated(version='0.3.0', reason="Use plot.dag instead")
     def plot_dag(
             dag: nx.DiGraph,
             reference: nx.DiGraph = None,
@@ -496,66 +436,16 @@ class Rex(BaseEstimator, ClassifierMixin):
             - "verticalalignment": "center_baseline"
             - "with_labels": True
         """
-        ncols = 1
+        plot.dag(
+            dag, reference, root_causes, title, ax, figsize, dpi, save_to_pdf, **kwargs)
 
-        # Overwrite formatting_kwargs with kwargs if they are provided
-        plot.formatting_kwargs.update(kwargs)
-
-        G = nx.DiGraph()
-        G.add_nodes_from(dag.nodes(data=True))
-        G.add_edges_from(dag.edges())
-        if reference:
-            # Clean up reference graph for inconsistencies along the DOT conversion
-            # and add potential missing nodes to the predicted graph.
-            Gt = plot.cleanup_graph(reference.copy())
-            for missing in set(list(Gt.nodes)) - set(list(G.nodes)):
-                G.add_node(missing)
-            G = plot.format_graph(
-                G, Gt, inv_color="orange", wrong_color="red", missing_color="lightgrey")
-        else:
-            G = plot.format_graph(G)
-
-        ref_layout = None
-        plot.setup_plot(dpi=dpi)
-        if ax is None:
-            f, axis = plt.subplots(ncols=ncols, figsize=figsize)
-        else:
-            axis = ax
-        if save_to_pdf is not None:
-            with PdfPages(save_to_pdf) as pdf:
-                if reference:
-                    ref_layout = nx.drawing.nx_agraph.graphviz_layout(
-                        Gt, prog="dot")
-                plot.draw_graph_subplot(
-                    G, layout=ref_layout, title=title, ax=axis, **plot.formatting_kwargs)
-                pdf.savefig(f, bbox_inches='tight', pad_inches=0)
-                plt.close()
-        else:
-            if reference:
-                ref_layout = nx.drawing.nx_agraph.graphviz_layout(
-                    Gt, prog="dot")
-            else:
-                ref_layout = nx.drawing.nx_agraph.graphviz_layout(
-                    G, prog="dot")
-
-            plot.draw_graph_subplot(
-                G, root_causes=root_causes, layout=ref_layout, ax=axis, title=title,
-                **plot.formatting_kwargs)
-
-            if ax is None:
-                plt.show()
-
+    @deprecated.deprecated(version='0.3.0', reason="Use plot.shap_discrepancies instead")
     def plot_shap_discrepancies(self, target_name: str, **kwargs):
-        assert self.is_fitted_, "Model not fitted yet"
-        # X = self.X.drop(target_name, axis=1)
-        # y = self.X[target_name].values
-        # return self.shaps._plot_discrepancies_for_target(X, y, target_name, **kwargs)
-        self.shaps._plot_discrepancies(self.X, target_name, **kwargs)
+        plot.shap_discrepancies(self.shaps, target_name, **kwargs)
 
+    @deprecated.deprecated(version='0.3.0', reason="Use plot.shap_values instead")
     def plot_shap_values(self, **kwargs):
-        assert self.is_fitted_, "Model not fitted yet"
-        plot_args = [(target_name) for target_name in self.feature_names]
-        return plot.subplots(self.shaps._plot_shap_summary, *plot_args, **kwargs)
+        plot.shap_values(self.shaps, **kwargs)
 
 
 def custom_main(dataset_name,
