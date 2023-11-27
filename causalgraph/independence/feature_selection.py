@@ -54,7 +54,7 @@ def select_features(
         - verbose: guess what.
 
     """
-    if (exhaustive is True) and (threshold is not None):
+    if (exhaustive is True) and (threshold is None):
         raise ValueError("If exhaustive is True, threshold must be provided.")
     threshold = 0.0 if threshold is None else threshold
 
@@ -64,7 +64,7 @@ def select_features(
     else:
         feature_order = np.argsort(np.abs(values))
         mean_values = np.abs(values)
-    sorted_shap_values = [mean_values[idx] for idx in feature_order]
+    sorted_shap_values = np.array([mean_values[idx] for idx in feature_order])
 
     # In some cases, the mean SHAP values are 0. We return an empty list in that case.
     if np.all(mean_values < min_impact):
@@ -87,7 +87,7 @@ def select_features(
     # Get a copy of the sorted_shap_values into a new variable called kk
     sorted_impact_values = copy(sorted_shap_values)
     selected_features = []
-    while any(value > threshold for value in sorted_impact_values):
+    while np.any(sorted_impact_values > threshold):
         limit_idx = cluster_change(sorted_impact_values, verbose=verbose)
         selected_features = list(reversed(
             [feature_names[i] for i in feature_order[limit_idx:]]))

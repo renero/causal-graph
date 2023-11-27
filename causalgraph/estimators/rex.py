@@ -1,14 +1,12 @@
-#
-# Main class for the REX estimator.
-#
-# (C) J. Renero, 2022, 2023
-#
+"""
+Main class for the REX estimator.
+(C) J. Renero, 2022, 2023
+"""
 
 import os
 import types
 import warnings
 from copy import copy
-from pathlib import Path
 from typing import List, Tuple, Union
 
 import matplotlib.pyplot as plt
@@ -42,6 +40,7 @@ warnings.filterwarnings('ignore')
 # pylint: disable=R0914:too-many-locals, R0915:too-many-statements
 # pylint: disable=W0106:expression-not-assigned, R1702:too-many-branches
 
+
 # TODO:
 #
 
@@ -61,9 +60,8 @@ class Rex(BaseEstimator, ClassifierMixin):
     >>> import numpy as np
     >>> X = np.arange(100).reshape(100, 1)
     >>> y = np.zeros((100, ))
-    >>> estimator = TemplateEstimator()
+    >>> estimator = Rex()
     >>> estimator.fit(X, y)
-    TemplateEstimator()
     """
 
     def __init__(
@@ -76,9 +74,6 @@ class Rex(BaseEstimator, ClassifierMixin):
             corr_method: str = 'spearman',
             corr_alpha: float = 0.6,
             corr_clusters: int = 15,
-            shap_diff_upper_bound: float = 0.1,
-            correction_method: str = 'heuristic',
-            correction_model: Union[str, Path] = None,
             condlen: int = 1,
             condsize: int = 0,
             mean_pi_percentile: float = 0.8,
@@ -106,13 +101,6 @@ class Rex(BaseEstimator, ClassifierMixin):
             corr_alpha (float): The alpha value for the correlation. Default is 0.6.
             corr_clusters (int): The number of clusters to use for the correlation.
                 Default is 15.
-            shap_diff_upper_bound (float): The upper bound for the shap values
-                difference. This value is the maximum difference between the forward
-                and backward direction in the discrepancies matrix. Default is 0.1.
-            correction_method (str): The method to use for the correction, can be
-                'heuristic' or 'model'. Default is 'heuristic'.
-            correction_model (str or Path): The path to the model to use for the
-                correction. Default is None.
             condlen (int): The depth of the conditioning sequence. Default is 1.
             condsize (int): The size of the conditioning sequence. Default is 0.
             prog_bar (bool): Whether to display a progress bar.
@@ -143,9 +131,6 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.corr_method = corr_method
         self.corr_alpha = corr_alpha
         self.corr_clusters = corr_clusters
-        self.shap_diff_upper_bound = shap_diff_upper_bound
-        self.correction_method = correction_method
-        self.correction_model = correction_model
         self.condlen = condlen
         self.condsize = condsize
         self.mean_pi_percentile = mean_pi_percentile
@@ -339,7 +324,7 @@ class Rex(BaseEstimator, ClassifierMixin):
                 pred_graph = self.G_indep
             else:
                 raise ValueError(
-                    f"Predicted graph must be one of 'final', 'shap' or 'indep'.")
+                    "Predicted graph must be one of 'final', 'shap' or 'indep'.")
         elif isinstance(predicted_graph, nx.DiGraph):
             pred_graph = predicted_graph
 
@@ -393,7 +378,7 @@ class Rex(BaseEstimator, ClassifierMixin):
                 if isinstance(getattr(self, attr), pd.DataFrame):
                     ret += f"{attr:25} {getattr(self, attr).shape}\n"
                     continue
-                elif isinstance(getattr(self, attr), nx.DiGraph):
+                if isinstance(getattr(self, attr), nx.DiGraph):
                     n_nodes = getattr(self, attr).number_of_nodes()
                     n_edges = getattr(self, attr).number_of_edges()
                     ret += f"{attr:25} {n_nodes} nodes, {n_edges} edges\n"

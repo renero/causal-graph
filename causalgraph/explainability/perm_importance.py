@@ -1,3 +1,38 @@
+"""
+Permutation Importance for feature selection.
+Wrapper over SKLearn's PermutationImportance and own implementation of
+the vanilla version of the algorithm to run over models trained with PyTorch.
+
+(C) J. Renero 2022, 2023
+
+Parameters:
+-----------
+models: dict
+    A dictionary of models, where the keys are the target variables and
+    the values are the models trained to predict the target variables.
+n_repeats: int
+    The number of times to repeat the permutation importance algorithm.
+mean_pi_percentile: float
+    The percentile of the mean permutation importance to use as a threshold
+    for feature selection.
+random_state: int
+    The random state to use for the permutation importance algorithm.
+prog_bar: bool
+    Whether to display a progress bar or not.
+verbose: bool
+    Whether to display explanations on the process or not.
+silent: bool
+    Whether to display anything or not.
+    
+"""
+
+# pylint: disable=E1101:no-member, W0201:attribute-defined-outside-init, W0511:fixme
+# pylint: disable=C0103:invalid-name
+# pylint: disable=C0116:missing-function-docstring
+# pylint: disable=R0913:too-many-arguments
+# pylint: disable=R0914:too-many-locals, R0915:too-many-statements
+# pylint: disable=W0106:expression-not-assigned, R1702:too-many-branches
+
 from typing import Tuple
 
 import numpy as np
@@ -257,14 +292,7 @@ class PermutationImportance(BaseEstimator):
 
         pbar.close()
 
-        self.G_pi = utils.digraph_from_connected_features(
-            X, self.feature_names, self.models, self.connections, root_causes,
-            reciprocity=True, iters=10, verbose=self.verbose)
-
-        self.all_pi = np.array(self.all_pi).flatten()
-        self.mean_pi_threshold = np.quantile(
-            self.all_pi, self.mean_pi_percentile)
-
+        self.G_pi = self._build_pi_dag(X, root_causes)
         return self.G_pi
 
     def _predict_sklearn(self, X, root_causes) -> nx.DiGraph:
@@ -274,18 +302,28 @@ class PermutationImportance(BaseEstimator):
         """
         print("Computing permutation loss (SKLearn)") if self.verbose else None
 
-        self.connections = dict()
+        self.connections = {}
         for target in self.feature_names:
-            print(f"Target: {target} ") if self.verbose else None
+            if self.verbose:
+                print(f"Target: {target} ")
             candidate_causes = [f for f in self.feature_names if f != target]
             self.connections[target] = select_features(
                 values=self.pi[target]['importances_mean'],
                 feature_names=candidate_causes,
                 verbose=self.verbose)
 
+        self.G_pi = self._build_pi_dag(X, root_causes)
+        return self.G_pi
+
+    def _build_pi_dag(self, X, root_causes):
+        """
+        Build a DAG from the permutation importance results. This is the last stage
+        of the algorithm, where we build a DAG from the permutation importance results.
+        Placed in a separate method as it is shared in SKLearn and PyTorch.
+        """
         self.G_pi = utils.digraph_from_connected_features(
             X, self.feature_names, self.models, self.connections, root_causes,
-            reciprocity=True, iters=10, verbose=self.verbose)
+            reciprocity=True, anm_iterations=10, verbose=self.verbose)
 
         self.all_pi = np.array(self.all_pi).flatten()
         self.mean_pi_threshold = np.quantile(

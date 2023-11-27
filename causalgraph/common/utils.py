@@ -284,7 +284,8 @@ def digraph_from_connected_features(
         connections,
         root_causes,
         reciprocity=True,
-        iters=10,
+        anm_iterations=10,
+        max_anm_samples=400,
         verbose=False):
     """
     Builds a directed graph from a set of features and their connections. The
@@ -305,8 +306,12 @@ def digraph_from_connected_features(
     reciprocity (bool): If True, then the edges are oriented only if the
         direction is reciprocal. If False, then the edges are oriented
         regardless of the reciprocity.
-    iters (int): The number of iterations to be used by the independence
+    anm_iterations=10 (int): The number of iterations to be used by the independence
         module to determine the orientation of the edges.
+    max_anm_samples=400 (int): The maximum number of samples to be used by the
+        independence module to determine the orientation of the edges. If the
+        number of samples is larger than the number of samples in the data, then
+        the number of samples is set to the number of samples in the data.
     verbose (bool): If True, then the function prints information about the
         orientation of the edges.
 
@@ -334,9 +339,13 @@ def digraph_from_connected_features(
         dag.nodes[feature]['regr_score'] = models.scoring[i]
 
     # Determine edge orientation for each edge
+    if X.shape[0] > max_anm_samples:
+        X = X.sample(max_anm_samples)
+        if verbose:
+            print(f"Reducing number of samples to {max_anm_samples}")
     for u, v in unoriented_graph.edges():
         orientation = get_edge_orientation(
-            X, u, v, iters=iters, method="gpr", verbose=verbose)
+            X, u, v, iters=anm_iterations, method="gpr", verbose=verbose)
         if orientation == +1:
             dag.add_edge(u, v)
         elif orientation == -1:
