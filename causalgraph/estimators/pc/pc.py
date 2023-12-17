@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 # pylint: disable=E1101:no-member, W0201:attribute-defined-outside-init, W0511:fixme
 # pylint: disable=C0103:invalid-name
 # pylint: disable=C0116:missing-function-docstring
