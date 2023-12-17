@@ -268,7 +268,8 @@ def semi_directed_paths(fro, to, A):
             stack = stack[1:]
         else:
             next_node = to_visit.pop()
-            next_to_visit = list(accessible[next_node] - set(visited) - {current_node})
+            next_to_visit = list(
+                accessible[next_node] - set(visited) - {current_node})
             stack = [(next_node, visited + [current_node], next_to_visit)] + stack
     return paths
 
@@ -298,7 +299,8 @@ def separates(S, A, B, G):
     """
     # Check that sets are pairwise disjoint
     if len(A & B) or len(A & S) or len(B & S):
-        raise ValueError("The sets S=%s,A=%s and B=%s are not pairwise disjoint" % (S, A, B))
+        raise ValueError(
+            "The sets S=%s,A=%s and B=%s are not pairwise disjoint" % (S, A, B))
     for a in A:
         for b in B:
             for path in semi_directed_paths(a, b, G):
@@ -502,49 +504,51 @@ def is_consistent_extension(G, P, debug=False):
     # guaranteed to have
     # no undirected edges
     if debug:
-        print("v-structures (%s) (P,G): " % same_vstructures, vstructures(P), vstructures(G))
-        print("skeleton (%s) (P,G): " % same_skeleton, skeleton(P), skeleton(G))
+        print("v-structures (%s) (P,G): " %
+              same_vstructures, vstructures(P), vstructures(G))
+        print("skeleton (%s) (P,G): " %
+              same_skeleton, skeleton(P), skeleton(G))
         print("orientation (%s) (P,G): " % same_orientation, P, G)
     return same_vstructures and same_orientation and same_skeleton
 
 # --------------------------------------------------------------------
 # Functions for PDAG to CPDAG conversion
 
-    # The following functions implement the conversion from PDAG to
-    # CPDAG that is carried after each transition to a different
-    # equivalence class, after the selection and application of the
-    # highest scoring insert/delete/turn operator. It consists of the
-    # succesive application of three algorithms, all described in
-    # Appendix C (pages 552,553) of Chickering's 2002 GES paper
-    # (www.jmlr.org/papers/volume3/chickering02b/chickering02b.pdf).
-    #
-    # The algorithms are:
+# The following functions implement the conversion from PDAG to
+# CPDAG that is carried after each transition to a different
+# equivalence class, after the selection and application of the
+# highest scoring insert/delete/turn operator. It consists of the
+# succesive application of three algorithms, all described in
+# Appendix C (pages 552,553) of Chickering's 2002 GES paper
+# (www.jmlr.org/papers/volume3/chickering02b/chickering02b.pdf).
+#
+# The algorithms are:
 
-    #   1. Obtaining a consistent extension of a PDAG, implemented in
-    #   the function pdag_to_dag.
-    #
-    #   2. Obtaining a total ordering of the edges of the extension
-    #   resulting from (1). It is summarized in Fig. 13 of
-    #   Chickering's paper and implemented in the function
-    #   order_edges.
-    #
-    #   3. Labelling the edges as compelled or reversible, by which we
-    #   can easily obtain the CPDAG. It is summarized in Fig. 14 of
-    #   Chickering's paper and implemented in the function label_edges.
+#   1. Obtaining a consistent extension of a PDAG, implemented in
+#   the function pdag_to_dag.
+#
+#   2. Obtaining a total ordering of the edges of the extension
+#   resulting from (1). It is summarized in Fig. 13 of
+#   Chickering's paper and implemented in the function
+#   order_edges.
+#
+#   3. Labelling the edges as compelled or reversible, by which we
+#   can easily obtain the CPDAG. It is summarized in Fig. 14 of
+#   Chickering's paper and implemented in the function label_edges.
 
-    # The above are put together in the function pdag_to_cpdag
+# The above are put together in the function pdag_to_cpdag
 
-    # NOTE!!!: Algorithm (1) is from the 1992 paper "A simple
-    # algorithm to construct a consistent extension of a partially
-    # oriented graph" by Dorit Dor and Michael Tarsi. There is an
-    # ERROR in the summarized version in Chickering's paper. In
-    # particular, the condition that N_x U Pa_x is a clique is not
-    # equivalent to the condition from Dor & Torsi that every neighbor
-    # of X should be adjacent to all of X's adjacent nodes. The
-    # condition summarized in Chickering is more restrictive (i.e. it
-    # also asks that the parents of X are adjacent to each other), but
-    # this only results in an error for some graphs, and was only
-    # uncovered during exhaustive testing.
+# NOTE!!!: Algorithm (1) is from the 1992 paper "A simple
+# algorithm to construct a consistent extension of a partially
+# oriented graph" by Dorit Dor and Michael Tarsi. There is an
+# ERROR in the summarized version in Chickering's paper. In
+# particular, the condition that N_x U Pa_x is a clique is not
+# equivalent to the condition from Dor & Torsi that every neighbor
+# of X should be adjacent to all of X's adjacent nodes. The
+# condition summarized in Chickering is more restrictive (i.e. it
+# also asks that the parents of X are adjacent to each other), but
+# this only results in an error for some graphs, and was only
+# uncovered during exhaustive testing.
 
 # The complete pipeline: pdag -> dag -> ordered -> labelled -> cpdag
 
@@ -644,12 +648,14 @@ def pdag_to_dag(P, debug=False):
             n_i = neighbors(i, P)
             adj_i = adj(i, P)
             adj_neighbors = np.all([adj_i - {y} <= adj(y, P) for y in n_i])
-            print("   i:", i, ": n=", n_i, "adj=", adj_i, "ch=", ch(i, P)) if debug else None
+            print("   i:", i, ": n=", n_i, "adj=", adj_i,
+                  "ch=", ch(i, P)) if debug else None
             found = sink and adj_neighbors
             # If found, orient all incident undirected edges and
             # remove i from the subgraph
             if found:
-                print("  Found candidate %d (%d)" % (i, indexes[i])) if debug else None
+                print("  Found candidate %d (%d)" %
+                      (i, indexes[i])) if debug else None
                 # Orient all incident undirected edges
                 real_i = indexes[i]
                 real_neighbors = [indexes[j] for j in n_i]
@@ -733,7 +739,8 @@ def label_edges(ordered):
         raise ValueError("The given graph is not a DAG")
     no_edges = (ordered != 0).sum()
     if sorted(ordered[ordered != 0]) != list(range(1, no_edges + 1)):
-        raise ValueError("The ordering of edges is not valid:", ordered[ordered != 0])
+        raise ValueError("The ordering of edges is not valid:",
+                         ordered[ordered != 0])
     # define labels: 1: compelled, -1: reversible, -2: unknown
     COM, REV, UNK = 1, -1, -2
     labelled = (ordered != 0).astype(int) * UNK

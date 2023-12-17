@@ -16,7 +16,7 @@ import pickle
 import numpy as np
 from os.path import join
 from pathlib import Path
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 import networkx as nx
 import pandas as pd
@@ -478,3 +478,88 @@ def graph_from_adjacency(
         G = nx.relabel_nodes(G, mapping)
 
     return G
+
+
+def graph_from_adjacency_file(file: Union[Path, str], th=0.0) -> Tuple[
+        nx.DiGraph, pd.DataFrame]:
+    """
+    Read Adjacency matrix from a file and return a Graph
+
+    Args:
+        file: (str) the full path of the file to read
+        th: (float) weight threshold to be considered a valid edge.
+    Returns:
+        DiGraph, DataFrame
+    """
+    df = pd.read_csv(file, dtype="str")
+    df = df.astype("float64")
+    labels = list(df)
+    G = graph_from_adjacency(df.values, node_labels=labels, th=th)
+
+    return G, df
+
+
+def graph_to_adjacency(graph: AnyGraph,
+                       node_names: Optional[List[str]] = None,
+                       weight_label: str = "weight") -> np.ndarray:
+    """
+    A method to generate the adjacency matrix of the graph. Labels are
+    sorted for better readability.
+
+    Args:
+        graph: (Union[Graph, DiGraph]) the graph to be converted.
+        weight_label: the label used to identify the weights.
+
+    Return:
+        graph: (numpy.ndarray) A 2d array containing the adjacency matrix of
+            the graph.
+    """
+    symbol_map = {"o": 1, ">": 2, "-": 3}
+    labels = sorted(list(graph.nodes))  # [node for node in self]
+    # Double check if all nodes are in the graph
+    if node_names is not None:
+        for n in list(node_names):
+            if n not in set(labels):
+                labels.append(n)
+        labels = sorted(labels)
+    # Fix for the case where an empty node is parsed from the .dot file
+    if '\\n' in labels:
+        labels.remove('\\n')
+    mat = np.zeros((len(labels), (len(labels))))
+    for x in labels:
+        for y in labels:
+            if graph.has_edge(x, y):
+                if bool(graph.get_edge_data(x, y)):
+                    if y in graph.get_edge_data(x, y).keys():
+                        mat[labels.index(x)][labels.index(y)] = symbol_map[
+                            graph.get_edge_data(x, y)[y]
+                        ]
+                    else:
+                        mat[labels.index(x)][labels.index(y)] = graph.get_edge_data(
+                            x, y
+                        )[weight_label]
+                else:
+                    mat[labels.index(x)][labels.index(y)] = 1
+    mat[np.isnan(mat)] = 0
+    return mat
+
+
+def graph_to_adjacency_file(graph: AnyGraph, output_file: Union[Path, str]):
+    """
+    A method to write the adjacency matrix of the graph to a file. If graph has
+    weights, these are the values stored in the adjacency matrix.
+
+    Args:
+        graph: (Union[Graph, DiGraph] the graph to be saved
+        output_file: (str) The full path where graph is to be saved
+    """
+    mat = graph_to_adjacency(graph)
+    labels = sorted(list(graph.nodes))
+    with open(output_file, "w", encoding="utf-8") as f:
+        f.write(",".join([f"{label}" for label in labels]))
+        f.write("\n")
+        for i, label in enumerate(labels):
+            f.write(f"{label}")
+            f.write(",")
+            f.write(",".join([str(point) for point in mat[i]]))
+            f.write("\n")
