@@ -902,7 +902,7 @@ class ShapEstimator(BaseEstimator):
         parent_label = "HET" if r.parent_heteroskedasticity else "HOM"
 
         # Represent scatter plots
-        ax[0].scatter(x, s, alpha=0.5, marker='.')
+        ax[0].scatter(x, s, alpha=0.5, marker='+')
         ax[0].scatter(x, y, alpha=0.5, marker='.')
         ax[0].plot(x, b1_s * x + b0_s, color='blue', linewidth=.5)
         ax[0].plot(x, b1_y * x + b0_y, color='red', linewidth=.5)
@@ -919,7 +919,8 @@ class ShapEstimator(BaseEstimator):
         ax[1].set_ylabel('')
         ax[1].set_xlabel(
             fr'$$ \mathrm{{{target_name}}} /  \phi_{{{target_name}}} $$')
-        ax[1].set_title(f'KS({r.ks_pvalue:.2g}) - {r.ks_result}', fontsize=11)
+        # ax[1].set_title(f'KS({r.ks_pvalue:.2g}) - {r.ks_result}', fontsize=11)
+        ax[1].set_title(f'KS({r.ks_pvalue:.2g})', fontsize=11)
 
         # Represent fitted vs. residuals
         s_resid = r.shap_model.get_influence().resid_studentized_internal
@@ -929,18 +930,20 @@ class ShapEstimator(BaseEstimator):
             r.shap_model.fittedvalues.reshape(-1, 1))
         y_fitted_scaled = scaler.fit_transform(
             r.parent_model.fittedvalues.reshape(-1, 1))
-        ax[2].scatter(s_fitted_scaled, s_resid, alpha=0.5, marker='.')
+        ax[2].scatter(s_fitted_scaled, s_resid, alpha=0.5, marker='+')
         ax[2].scatter(y_fitted_scaled, y_resid, alpha=0.5,
                       marker='.', color='tab:orange')
-        ax[2].set_title(
-            f"Parent {parent_label}; Shap {shap_label}", fontsize=10)
+        # ax[2].set_title(
+        #     f"Parent {parent_label}; Shap {shap_label}", fontsize=10)
+        ax[2].set_title("Residuals", fontsize=10)
         ax[2].set_xlabel(
             fr'$$ \mathrm{{{target_name}}} /  \phi_{{{target_name}}} $$')
         ax[2].set_ylabel(fr'$$ \epsilon_{{{target_name}}} / \epsilon_\phi $$')
 
         # Represent target vs. SHAP values
         ax[3].scatter(s, y, alpha=0.3, marker='.', color='tab:green')
-        ax[3].set_title(f"Corr: {r.shap_correlation:.2f}", fontsize=11)
+        # ax[3].set_title(f"Discrepancy: {r.shap_correlation:.2f}", fontsize=11)
+        ax[3].set_title(f"Discrepancy: {r.shap_discrepancy:.2f}", fontsize=11)
         ax[3].set_xlabel(fr'$$ \phi_{{{target_name}}} $$')
         ax[3].set_ylabel(fr'$$ \mathrm{{{target_name}}} $$')
 

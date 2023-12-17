@@ -3,7 +3,8 @@
 Generates a dataset out of an acyclic FCM.
 Author : Olivier Goudet and Diviyan Kalainathan
 
-Minor update: J. Renero (due to pandas changes to as_matrix())
+Minor update: J. Renero (due to pandas changes to as_matrix()), and bug fix in
+polynomial mechanism.
 """
 
 import numpy as np
@@ -37,7 +38,7 @@ class AcyclicGraphGenerator(object):
                           'gp_add': GaussianProcessAdd_Mechanism,
                           'gp_mix': GaussianProcessMix_Mechanism}[causal_mechanism]
         self.data = pd.DataFrame(
-            None, columns=["V{}".format(i) for i in range(nodes)])
+            None, columns=[f"V{i}" for i in range(nodes)])
         self.nodes = nodes
         if timesteps == 0:
             self.timesteps = np.inf
@@ -51,7 +52,7 @@ class AcyclicGraphGenerator(object):
         self.g = None
         self.verbose = verbose
 
-    def init_variables(self, verbose=False):
+    def init_variables(self):
         """Redefine the causes of the graph."""
         # Resetting adjacency matrix
         for i in range(self.nodes-1):
@@ -77,13 +78,12 @@ class AcyclicGraphGenerator(object):
         if self.verbose:
             print("Generating mechanisms...")
         self.cfunctions = [
-            self.mechanism(int(sum(self.adjacency_matrix[:, i])), self.points, 
+            self.mechanism(int(sum(self.adjacency_matrix[:, i])), self.points,
                            verbose=self.verbose)
             if sum(self.adjacency_matrix[:, i]) else self.initial_generator
             for i in range(self.nodes)
         ]
 
-    # def generate(self, nb_steps=100, averaging=50, rescale=True):
     def generate(self, rescale=True) -> (nx.DiGraph, pd.DataFrame):
         """Generate data from an FCM containing cycles."""
         if self.cfunctions is None:
@@ -98,11 +98,13 @@ class AcyclicGraphGenerator(object):
             if not sum(self.adjacency_matrix[:, i]):
                 if self.verbose:
                     print(f"  V{i} is a root cause")
-                self.data[f'V{i}'] = self.cfunctions[i](self.points, verbose=self.verbose)
+                self.data[f'V{i}'] = self.cfunctions[i](
+                    self.points, verbose=self.verbose)
             # Generating causes
             else:
                 if self.verbose:
-                    print(f"  V{i} parents: {self.adjacency_matrix[:, i].nonzero()[0]}")
+                    print(
+                        f"  V{i} parents: {self.adjacency_matrix[:, i].nonzero()[0]}")
                 column = self.adjacency_matrix[:, i].nonzero()[0]
                 self.data[f'V{i}'] = self.cfunctions[i](
                     np.stack(self.data.iloc[:, column].values),
@@ -156,7 +158,7 @@ if __name__ == '__main__':
         data.to_csv(
             "/Users/renero/phd/data/RC3/rex_generated_polynew_1.csv", index=False)
         # write to file
-        graph_dot_format = dag2dot(graph, plot=False).to_string()
+        graph_dot_format = dag2dot(graph).to_string()
         graph_dot_format = f"strict {graph_dot_format[:-9]}\n}}"
         with open("/Users/renero/phd/data/RC3/rex_generated_polynew_1.dot", "w") as f:
             f.write(graph_dot_format)

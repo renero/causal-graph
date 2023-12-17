@@ -14,13 +14,12 @@ import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 import pandas as pd
-from matplotlib.backends.backend_pdf import PdfPages
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.preprocessing import StandardScaler
 from sklearn.utils.validation import check_is_fitted, check_random_state
 
 from causalgraph.common import utils
-from causalgraph.common import GRAY, GREEN, RESET, plot
+from causalgraph.common import GRAY, GREEN, RESET
 from causalgraph.common.pipeline import Pipeline
 from causalgraph.estimators.knowledge import Knowledge
 from causalgraph.explainability import (Hierarchies, PermutationImportance,
@@ -43,7 +42,8 @@ warnings.filterwarnings('ignore')
 
 
 # TODO:
-#
+# - Instead of building a DAG in a single step, build it in several steps, using
+#   different samples.
 
 class Rex(BaseEstimator, ClassifierMixin):
     """ Regression with Explainability (Rex) is a causal inference discovery that
@@ -404,7 +404,8 @@ class Rex(BaseEstimator, ClassifierMixin):
             dpi: int = 75,
             save_to_pdf: str = None,
             **kwargs):
-        plot.dags(dag, reference, names, figsize, dpi, save_to_pdf, **kwargs)
+        pass
+        # plot.dags(dag, reference, names, figsize, dpi, save_to_pdf, **kwargs)
 
     @staticmethod
     @deprecated.deprecated(version='0.3.0', reason="Use plot.dag instead")
@@ -419,6 +420,7 @@ class Rex(BaseEstimator, ClassifierMixin):
             save_to_pdf: str = None,
             **kwargs):
         """
+        pass
         Compare two graphs using dot.
 
         Parameters:
@@ -436,16 +438,18 @@ class Rex(BaseEstimator, ClassifierMixin):
             - "verticalalignment": "center_baseline"
             - "with_labels": True
         """
-        plot.dag(
-            dag, reference, root_causes, title, ax, figsize, dpi, save_to_pdf, **kwargs)
+        # plot.dag(
+        # dag, reference, root_causes, title, ax, figsize, dpi, save_to_pdf, **kwargs)
 
     @deprecated.deprecated(version='0.3.0', reason="Use plot.shap_discrepancies instead")
     def plot_shap_discrepancies(self, target_name: str, **kwargs):
-        plot.shap_discrepancies(self.shaps, target_name, **kwargs)
+        pass
+        # plot.shap_discrepancies(self.shaps, target_name, **kwargs)
 
     @deprecated.deprecated(version='0.3.0', reason="Use plot.shap_values instead")
     def plot_shap_values(self, **kwargs):
-        plot.shap_values(self.shaps, **kwargs)
+        pass
+        # plot.shap_values(self.shaps, **kwargs)
 
 
 def custom_main(dataset_name,
