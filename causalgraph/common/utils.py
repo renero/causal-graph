@@ -1,8 +1,7 @@
-#
-# Utility functions for causalgraph
-#
-# (C) J. Renero, 2022, 2023
-#
+"""
+Utility functions for causalgraph
+(C) J. Renero, 2022, 2023
+"""
 
 # pylint: disable=E1101:no-member, W0201:attribute-defined-outside-init, W0511:fixme
 # pylint: disable=C0103:invalid-name
@@ -14,19 +13,18 @@
 import glob
 import os
 import pickle
+import numpy as np
 from os.path import join
 from pathlib import Path
 from typing import Dict, List, Tuple, Union
 
 import networkx as nx
-import numpy as np
 import pandas as pd
-import pydot as pydot
+import pydot
 import pydotplus
 import torch
 
 from causalgraph.independence.edge_orientation import get_edge_orientation
-
 
 AnyGraph = Union[nx.Graph, nx.DiGraph]
 
@@ -427,3 +425,56 @@ def break_cycles_if_present(
             new_dag.remove_edge(*min_edge)
 
     return new_dag
+
+
+def graph_from_adjacency(
+        adjacency: np.ndarray,
+        node_labels=None,
+        th=0.0,
+        inverse: bool = False,
+        absolute_values: bool = False
+) -> nx.DiGraph:
+    """
+    Manually parse the adj matrix to shape a dot graph
+
+    Args:
+        adjacency: a numpy adjacency matrix
+        node_labels: an array of same length as nr of columns in the adjacency
+            matrix containing the labels to use with every node.
+        th: (float) weight threshold to be considered a valid edge.
+        inverse (bool): Set to true if rows in adjacency reflects where edges are
+            comming from, instead of where are they going to.
+        absolute_values: Take absolute value of weight label to check if its greater
+            than the threshold.
+
+    Returns:
+         The Graph (DiGraph)
+    """
+    G = nx.DiGraph()
+    G.add_nodes_from(range(adjacency.shape[1]))
+
+    # What to do with absolute values?
+    def not_abs(x):
+        return x
+
+    w_val = np.abs if absolute_values else not_abs
+
+    def weight_gt(w, thresh):
+        return w != 0.0 if thresh is None else w_val(w) > thresh
+
+    # Do I have a threshold to consider?
+    for i, row in enumerate(adjacency):
+        for j, value in enumerate(row):
+            if inverse:
+                if weight_gt(adjacency[j][i], th):
+                    G.add_edge(i, j, weight=w_val(adjacency[j][i]))
+            else:
+                if weight_gt(value, th):
+                    # , arrowhead="normal")
+                    G.add_edge(i, j, weight=w_val(value))
+    # Map the current column numbers to the letters used in toy dataset
+    if node_labels is not None and len(node_labels) == adjacency.shape[1]:
+        mapping = dict(zip(sorted(G), node_labels))
+        G = nx.relabel_nodes(G, mapping)
+
+    return G
