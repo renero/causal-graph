@@ -99,7 +99,7 @@ class PDAG(nx.DiGraph):
         pdag = self.copy()
         while pdag.number_of_nodes() > 0:
             # find node with (1) no directed outgoing edges and
-            #                (2) the set of undirecte neighbors is either empty or
+            #                (2) the set of undirected neighbors is either empty or
             #                    undirected neighbors + parents of X are a clique
             found = False
             for X in pdag.nodes():

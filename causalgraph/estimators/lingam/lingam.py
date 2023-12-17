@@ -325,11 +325,6 @@ def main(dataset_name,
 
     lingam = DirectLiNGAM()
     lingam.fit(train)
-    # dag = utils.graph_from_adjacency(
-    #     lingam.adjacency_matrix_, node_labels=list(data),
-    #     th=threshold,
-    #     inverse=inverse,
-    #     absolute_values=absolute_values)
 
     for edge in lingam.dag.edges():
         print(edge)

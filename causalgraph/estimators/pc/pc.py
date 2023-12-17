@@ -23,6 +23,8 @@ from causalgraph.estimators.pc.pdag import PDAG
 
 SHOW_PROGRESS = True
 
+# TODO: Make PC work as SKLearn methods, with constructor and `fit` method.
+
 
 class PC(StructureEstimator):
     """
@@ -40,6 +42,9 @@ class PC(StructureEstimator):
         (page 550), 
         http://www.cs.technion.ac.il/~dang/books/Learning%20Bayesian%20Networks(Neapolitan,%20Richard).pdf # noqa
     """
+
+    dag = None
+    pdag = None
 
     def __init__(self, data=None, independencies=None, **kwargs):
         """
@@ -203,13 +208,15 @@ class PC(StructureEstimator):
             return skel, separating_sets
 
         # Step 2: Orient the edges based on build the PDAG/CPDAG.
-        pdag = self.skeleton_to_pdag(skel, separating_sets)
+        self.pdag = self.skeleton_to_pdag(skel, separating_sets)
+
+        self.dag = self.pdag.to_dag()
 
         # Step 3: Either return the CPDAG or fully orient the edges to build a DAG.
         if return_type.lower() in ("pdag", "cpdag"):
-            return pdag
-        elif return_type.lower() == "dag":
-            return nx.DiGraph(pdag.to_dag())
+            return self.pdag
+        if return_type.lower() == "dag":
+            return nx.DiGraph(self.pdag.to_dag())
         else:
             raise ValueError(
                 f"return_type must be one of: dag, pdag, cpdag, or skeleton. "
@@ -542,7 +549,9 @@ def main(dataset_name,
 
     pc = PC(data=data)
     model = pc.estimate(ci_test="pearsonr", variant="stable", max_cond_vars=5)
-    print(model.edges())
+
+    for edge in pc.dag.edges():
+        print(edge)
 
     # if save:
     #     where_to = utils.save_experiment(rex.name, output_path, rex)
