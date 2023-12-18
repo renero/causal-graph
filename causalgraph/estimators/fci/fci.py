@@ -20,23 +20,20 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Dict, Optional, Tuple, Union
 
-# from causallearn.search.ConstraintBased.FCI import fci as cl_fci
-# from causallearn.utils.PDAG2DAG import pdag2dag
-# from causallearn.utils.cit import kci
-
 import pandas as pd
 from networkx import Graph
 from sklearn.discriminant_analysis import StandardScaler
 from tqdm.auto import tqdm
 
-from causalgraph.estimators.fci.initialization import (dsep_set_from_csv,
-                                                       save_graph, save_sepset)
-from causalgraph.common.utils import graph_from_adjacency_file, graph_from_dot_file
+from causalgraph.common.utils import (graph_from_adjacency_file,
+                                      graph_from_dot_file)
 from causalgraph.estimators.fci.colliders import (get_dsep_combs,
                                                   get_neighbors, init_pag,
                                                   orientEdges)
 from causalgraph.estimators.fci.debug import DebugFCI
 from causalgraph.estimators.fci.graph_learner import GraphLearner
+from causalgraph.estimators.fci.initialization import (dsep_set_from_csv,
+                                                       save_graph, save_sepset)
 from causalgraph.estimators.fci.pag import PAG
 from causalgraph.independence.hsic import HSIC
 
@@ -334,19 +331,6 @@ def main(dataset_name,
     fci.fit(data)
     for edge in fci.dag.edges():
         print(edge)
-
-    # pag, edges = cl_fci(
-    #     data.values,
-    #     independence_test_method=kci,
-    #     alpha=0.05,
-    #     depth=-1,
-    #     max_path_length=3,
-    #     verbose=False,
-    #     background_knowledge=None,
-    #     cache_variables_map=None)
-    # dag = pdag2dag(pag)
-    # for edge in dag.edges():
-    #     print(edge)
 
     # if save:
     #     where_to = utils.save_experiment(rex.name, output_path, rex)
