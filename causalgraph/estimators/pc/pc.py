@@ -198,7 +198,8 @@ class PC(StructureEstimator):
                 "For using Chi Square or Pearsonr, data arguement must be specified"
             )
 
-        # Step 1: Run the PC algorithm to build the skeleton and get the separating sets.
+        # Step 1: Run the PC algorithm to build the skeleton and get the separating
+        # sets.
         skel, separating_sets = self.build_skeleton(
             ci_test=ci_test,
             max_cond_vars=max_cond_vars,
