@@ -14,28 +14,37 @@ def convert_args_tuple(func):
 
 
 class BaseEstimator(object):
-    def __init__(self, data=None, state_names=None, complete_samples_only=True):
-        """
-        Base class for estimators in pgmpy; `ParameterEstimator`,
-        `StructureEstimator` and `StructureScore` derive from this class.
+    """
+    Base class for estimators in pgmpy; `ParameterEstimator`,
+    `StructureEstimator` and `StructureScore` derive from this class.
 
-        Parameters
-        ----------
-        data: pandas DataFrame object datafame object where each column represents one variable.
-            (If some values in the data are missing the data cells should be set to `numpy.NaN`.
-            Note that pandas converts each column containing `numpy.NaN`s to dtype `float`.)
+    Parameters
+    ----------
+    data: pandas DataFrame object datafame object where each column represents one variable.
+        (If some values in the data are missing the data cells should be set to `numpy.NaN`.
+        Note that pandas converts each column containing `numpy.NaN`s to dtype `float`.)
 
-        state_names: dict (optional)
-            A dict indicating, for each variable, the discrete set of states (or values)
-            that the variable can take. If unspecified, the observed values in the data set
-            are taken to be the only possible states.
+    state_names: dict (optional)
+        A dict indicating, for each variable, the discrete set of states (or values)
+        that the variable can take. If unspecified, the observed values in the data set
+        are taken to be the only possible states.
 
-        complete_samples_only: bool (optional, default `True`)
-            Specifies how to deal with missing data, if present. If set to `True` all rows
-            that contain `np.Nan` somewhere are ignored. If `False` then, for each variable,
-            every row where neither the variable nor its parents are `np.NaN` is used.
-            This sets the behavior of the `state_count`-method.
-        """
+    complete_samples_only: bool (optional, default `True`)
+        Specifies how to deal with missing data, if present. If set to `True` all rows
+        that contain `np.Nan` somewhere are ignored. If `False` then, for each variable,
+        every row where neither the variable nor its parents are `np.NaN` is used.
+        This sets the behavior of the `state_count`-method.
+    """
+
+    data = None
+    complete_samples_only = True
+    variables = None
+    state_names = None
+
+    def __init__(self):
+        return
+
+    def _init_data(self, data=None, state_names=None, complete_samples_only=True):
 
         self.data = data
         # data can be None in the case when learning structre from
@@ -71,7 +80,7 @@ class BaseEstimator(object):
     @convert_args_tuple
     @lru_cache(maxsize=2048)
     def state_counts(
-        self, variable, parents=[], complete_samples_only=None, weighted=False
+        self, variable, parents=None, complete_samples_only=None, weighted=False
     ):
         """
         Return counts how often each state of 'variable' occurred in the data.
@@ -126,6 +135,8 @@ class BaseEstimator(object):
         c1  2.0  0.0
         c2  0.0  1.0
         """
+        if parents is None:
+            parents = []
         parents = list(parents)
 
         # default for how to deal with missing data can be set in class constructor
@@ -191,34 +202,37 @@ class BaseEstimator(object):
 
 
 class StructureEstimator(BaseEstimator):
-    def __init__(self, data=None, independencies=None, **kwargs):
-        """
-        Base class for structure estimators in pgmpy.
+    """
+    Base class for structure estimators in pgmpy.
 
-        Parameters
-        ----------
-        data: pandas DataFrame object
-            datafame object where each column represents one variable.
-            (If some values in the data are missing the data cells should be set to `numpy.NaN`.
-            Note that pandas converts each column containing `numpy.NaN`s to dtype `float`.)
+    Parameters
+    ----------
+    data: pandas DataFrame object
+        datafame object where each column represents one variable.
+        (If some values in the data are missing the data cells should be set to `numpy.NaN`.
+        Note that pandas converts each column containing `numpy.NaN`s to dtype `float`.)
 
-        state_names: dict (optional)
-            A dict indicating, for each variable, the discrete set of states (or values)
-            that the variable can take. If unspecified, the observed values in the data set
-            are taken to be the only possible states.
+    state_names: dict (optional)
+        A dict indicating, for each variable, the discrete set of states (or values)
+        that the variable can take. If unspecified, the observed values in the data set
+        are taken to be the only possible states.
 
-        complete_samples_only: bool (optional, default `True`)
-            Specifies how to deal with missing data, if present. If set to `True` all rows
-            that contain `np.Nan` somewhere are ignored. If `False` then, for each variable,
-            every row where neither the variable nor its parents are `np.NaN` is used.
-            This sets the behavior of the `state_count`-method.
-        """
+    complete_samples_only: bool (optional, default `True`)
+        Specifies how to deal with missing data, if present. If set to `True` all rows
+        that contain `np.Nan` somewhere are ignored. If `False` then, for each variable,
+        every row where neither the variable nor its parents are `np.NaN` is used.
+        This sets the behavior of the `state_count`-method.
+    """
+
+    def __init__(
+            self,
+            independencies=None):
 
         self.independencies = independencies
         if self.independencies is not None:
             self.variables = self.independencies.get_all_variables()
+        super().__init__()
 
-        super(StructureEstimator, self).__init__(data=data, **kwargs)
-
-    def estimate(self):
-        pass
+    def _init_data(self, data=None, state_names=None, complete_samples_only=True):
+        super()._init_data(data=data, state_names=state_names,
+                           complete_samples_only=complete_samples_only)

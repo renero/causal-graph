@@ -44,7 +44,7 @@ class PC(StructureEstimator):
     dag = None
     pdag = None
 
-    def __init__(self, data=None, independencies=None, **kwargs):
+    def __init__(self, independencies=None, **kwargs):
         """
         Class intialization.
 
@@ -63,11 +63,12 @@ class PC(StructureEstimator):
         kwargs: key-value arguments
             Additional arguments passed to the `StructureEstimator` base class.
         """
-        super(PC, self).__init__(
-            data=data, independencies=independencies, **kwargs)
+        # super().__init__(data=data, independencies=independencies, **kwargs)
+        super().__init__(independencies=independencies, **kwargs)
 
-    def estimate(
+    def fit(
         self,
+        data,
         variant="stable",
         ci_test="chi_square",
         max_cond_vars=5,
@@ -172,15 +173,21 @@ class PC(StructureEstimator):
         >>> print(model.edges())
         [('Z', 'sum'), ('X', 'sum'), ('Y', 'sum')]
         """
+
+        self.data = data
+        state_names = kwargs.get("state_names", None)
+        complete_samples_only = kwargs.get("complete_samples_only", True)
+        self._init_data(data=data, state_names=state_names,
+                        complete_samples_only=complete_samples_only)
+
         # Step 0: Do checks that the specified parameters are correct, else
         # throw meaningful error.
         if variant not in ("orig", "stable", "parallel"):
             raise ValueError(
                 f"variant must be one of: orig, stable, or parallel. Got: {variant}"
             )
-        elif (not callable(ci_test)) and (
-            ci_test not in ("chi_square", "independence_match", "pearsonr")
-        ):
+        if (not callable(ci_test)) and (
+                ci_test not in ("chi_square", "independence_match", "pearsonr")):
             raise ValueError(
                 "ci_test must be a callable or one of: chi_square, pearsonr, "
                 "independence_match"
@@ -545,8 +552,9 @@ def main(dataset_name,
     train = data.sample(frac=0.8, random_state=42)
     test = data.drop(train.index)
 
-    pc = PC(data=data)
-    model = pc.estimate(ci_test="pearsonr", variant="stable", max_cond_vars=5)
+    pc = PC()
+    model = pc.fit(data=data, ci_test="pearsonr",
+                   variant="stable", max_cond_vars=5)
 
     for edge in pc.dag.edges():
         print(edge)
