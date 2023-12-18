@@ -1,3 +1,6 @@
+"""
+This module contains the rules for edge orientation in the fci algorithm
+"""
 import networkx as nx
 
 
@@ -14,7 +17,7 @@ def rule1(pag, i, j, k):
     """
     if pag.has_directed_edge(i, j) and pag.has_o(j, k, j) and not pag.has_edge(i, k):
         pag.fully_direct_edge(j, k)
-        print("Orienting edge {},{} with rule 1".format(j, k))
+        print(f"Orienting edge {j},{k} with rule 1")
         return True
     return False
 
@@ -34,7 +37,7 @@ def rule2(pag, i, j, k):
     chain2 = pag.has_fully_directed_edge(j, k) and pag.has_directed_edge(i, j)
     if (chain1 or chain2) and pag.has_o(i, k, k):
         pag.direct_edge(i, k)
-        print("Orienting edge {},{} with rule 2".format(i, k))
+        # print("Orienting edge {},{} with rule 2".format(i, k))
         return True
     return False
 
@@ -54,7 +57,7 @@ def rule3(pag, i, j, k, l):
     chain2 = (pag.has_o(i, l, l)) and (pag.has_o(k, l, l))
     if chain1 and chain2 and not pag.has_edge(i, k) and pag.has_o(l, j, j):
         pag.direct_edge(l, j)
-        print("Orienting edge {},{} with rule 3".format(l, j))
+        # print("Orienting edge {},{} with rule 3".format(l, j))
         return True
     return False
 
@@ -77,14 +80,14 @@ def rule4(pag, i, j, k, node, sepSet):
         if path.index(i) == len(path) - 3 and pag.has_o(j, k, j):
             if j in sepSet[(node, k)]:
                 pag.fully_direct_edge(j, k)
-                print("Orienting edge {},{} with rule 4".format(j, k))
+                # print("Orienting edge {},{} with rule 4".format(j, k))
                 changes = True
             else:
                 pag.direct_edge(i, j)
                 pag.direct_edge(j, k)
                 pag.direct_edge(j, i)
                 pag.direct_edge(k, j)
-                print("Orienting edges {},{}, {},{} with rule 4".format(i, j, j, k))
+                # print("Orienting edges {},{}, {},{} with rule 4".format(i, j, j, k))
                 changes = True
     return changes
 
@@ -105,17 +108,18 @@ def rule5(pag, i, j, k, node):
         edge = pag.has_o(i, j, j) and pag.has_o(i, j, j)
         on_path = False
         if node in path and k in path:
-            on_path = path.index(k) == 1 and path.index(node) == (len(path) - 2)
+            on_path = path.index(k) == 1 and path.index(
+                node) == (len(path) - 2)
         nonadj = not pag.has_edge(i, node) and not pag.has_edge(k, j)
         if edge and on_path and nonadj:
             pag.undirect_edge(i, j)
-            print("Orienting edge {},{} with rule 5".format(i, j))
+            # print("Orienting edge {},{} with rule 5".format(i, j))
             for x in range(len(path) - 1):
                 pag.undirect_edge(path[x], path[x + 1])
-                print(
-                    "Orienting edge {},{} with rule 5".format(path[x],
-                                                              path[x + 1])
-                )
+                # print(
+                #     "Orienting edge {},{} with rule 5".format(path[x],
+                #                                               path[x + 1])
+                # )
                 changes = True
     return changes
 
@@ -137,7 +141,7 @@ def rule67(pag, i, j, k):
         edge2 = pag.get_edge_data(j, k)
         if edge1[i] == "-" and edge1[j] == "-" and edge2[j] == "o":
             pag.setTag([j, k], j, "-")
-            print("Orienting edge {},{} with rule 6".format(k, j))
+            # print("Orienting edge {},{} with rule 6".format(k, j))
             changes = True
         if (
                 edge1[i] == "-"
@@ -146,7 +150,7 @@ def rule67(pag, i, j, k):
                 and not pag.has_edge(i, k)
         ):
             pag.setTag([j, k], j, "-")
-            print("Orienting edge {},{} with rule 7".format(k, j))
+            # print("Orienting edge {},{} with rule 7".format(k, j))
             changes = True
     return changes
 
@@ -162,20 +166,21 @@ def rule8(pag, i, j, k):
         i,j,k: str
             nodes to test for orientation rule
     """
-    chain1 = pag.has_fully_directed_edge(i, j) and pag.has_fully_directed_edge(j, k)
+    chain1 = pag.has_fully_directed_edge(
+        i, j) and pag.has_fully_directed_edge(j, k)
     chain2 = False
     edge = False
     if pag.has_edge(i, j) and pag.has_edge(i, k):
         chain2 = (
-                pag.has_directed_edge(j, k)
-                and pag.get_edge_data(i, j)[j] == "o"
-                and pag.get_edge_data(i, j)[i] == "-"
+            pag.has_directed_edge(j, k)
+            and pag.get_edge_data(i, j)[j] == "o"
+            and pag.get_edge_data(i, j)[i] == "-"
         )
         edge = pag.get_edge_data(i, k)[i] == "o" and pag.has_directed_edge(
             i, k)
     if (chain1 or chain2) and edge:
         pag.fully_direct_edge(i, k)
-        print("Orienting edge {},{} with rule 8".format(k, i))
+        # print("Orienting edge {},{} with rule 8".format(k, i))
         return True
     return False
 
@@ -196,7 +201,7 @@ def rule9(pag, i, j, k, node):
             if pag.isUncovered(path) and pag.isPD(path):
                 if path[1] == j and path[2] == node and not pag.has_edge(j, k):
                     pag.fully_direct_edge(i, k)
-                    print("Orienting edge {},{} with rule 9".format(k, i))
+                    # print("Orienting edge {},{} with rule 9".format(k, i))
                     return True
     return False
 
@@ -227,8 +232,8 @@ def rule10(pag, i, j, k, node):
                                 path1[1], path2[1]
                         ):
                             pag.fully_direct_edge(i, k)
-                            print(
-                                "Orienting edge {},{} with rule 10".format(
-                                    k, i))
+                            # print(
+                            #     "Orienting edge {},{} with rule 10".format(
+                            #         k, i))
                             changes = True
     return changes

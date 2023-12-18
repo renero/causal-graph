@@ -1,9 +1,10 @@
-# pylint: disable=E1101:no-member, W0201:attribute-defined-outside-init, W0511:fixme
-# pylint: disable=C0103:invalid-name
-# pylint: disable=C0116:missing-function-docstring
-# pylint: disable=R0913:too-many-arguments
+# pylint: disable=E1101:no-member
+# pylint: disable=W0201:attribute-defined-outside-init, W0511:fixme
+# pylint: disable=W0106:expression-not-assigned
+# pylint: disable=C0103:invalid-name, C0116:missing-function-docstring
+# pylint: disable=R0913:too-many-arguments, R0902:too-many-instance-attributes
 # pylint: disable=R0914:too-many-locals, R0915:too-many-statements
-# pylint: disable=W0106:expression-not-assigned, R1702:too-many-branches
+# pylint: disable=R1702:too-many-branches
 
 import multiprocessing as mp
 import os
@@ -12,7 +13,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Callable, Dict, Optional, Tuple, Union
 
-from causallearn.search.ConstraintBased.FCI import fci
+from causallearn.search.ConstraintBased.FCI import fci as cl_fci
 from causallearn.utils.cit import kci
 
 import pandas as pd
@@ -20,9 +21,8 @@ from networkx import Graph
 from sklearn.discriminant_analysis import StandardScaler
 from tqdm.auto import tqdm
 
-from causalgraph.estimators.fci.initialization import (
-    dsep_set_from_csv, save_graph, save_sepset
-)
+from causalgraph.estimators.fci.initialization import (dsep_set_from_csv,
+                                                       save_graph, save_sepset)
 from causalgraph.common.utils import graph_from_adjacency_file, graph_from_dot_file
 from causalgraph.estimators.fci.colliders import (get_dsep_combs,
                                                   get_neighbors, init_pag,
@@ -112,7 +112,7 @@ class FCI(GraphLearner):
         if verbose:
             self.debug = DebugFCI(self.verbose)
 
-    def fit(self, *args, **kwargs):
+    def fit(self):
         """
         function to learn a causal network from data
 
@@ -130,7 +130,7 @@ class FCI(GraphLearner):
         self.pag = orientEdges(skeleton, sepset, data_file=self.data_file,
                                output_path=self.output_path, log=self.log,
                                verbose=self.verbose, debug=self.debug)
-        # self.dag = self.pag.to_dag()
+        self.dag = self.pag
 
         if self.verbose:
             print("Learning complete")
@@ -227,7 +227,7 @@ class FCI(GraphLearner):
         now = time.time()
         pag_actions = defaultdict(list)
         pag, dseps = init_pag(skeleton, sepSet, self.verbose, self.debug)
-        results = list()
+        results = []
         pbar = None
 
         def update_PAG(tup):
@@ -272,7 +272,7 @@ class FCI(GraphLearner):
         # self.oo(f"–––––– {mp.current_process().name} ––––––")
         neighbors = get_neighbors(x, pag)
         self.debug.neighbors(x, id_x, neighbors, pag)
-        if not len(neighbors):
+        if len(neighbors) == 0:
             return None
         for ny, y in enumerate(neighbors):
             tup = self.find_colliders(x, y, pag, ny, dseps, sepSet, neighbors)
@@ -349,9 +349,9 @@ def main(dataset_name,
         final_skeleton=final_skeleton,
         final_sepset=final_sepset,
     )
-    dag = fci.fit()
+    fci.fit()
 
-    # dag, edges = fci(
+    # dag, edges = cl_fci(
     #     data.values,
     #     independence_test_method=kci,
     #     alpha=0.05,
@@ -361,7 +361,7 @@ def main(dataset_name,
     #     background_knowledge=None,
     #     cache_variables_map=None)
 
-    for edge in dag.edges():
+    for edge in fci.dag.edges():
         print(edge)
 
     # if save:
@@ -371,4 +371,4 @@ def main(dataset_name,
 
 # Create a call to FCI with a sample dataset.
 if __name__ == "__main__":
-    main("rex_generated_linear_0", njobs=5)
+    main("rex_generated_linear_0", njobs=1)
