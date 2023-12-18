@@ -1,3 +1,10 @@
+"""
+FCI algorithm.
+
+This is a modified version of the FCI algorithm to work in parallel and improving
+the performance of the algorithm, as well as the conditional independence tests.
+"""
+
 # pylint: disable=E1101:no-member
 # pylint: disable=W0201:attribute-defined-outside-init, W0511:fixme
 # pylint: disable=W0106:expression-not-assigned
@@ -11,10 +18,11 @@ import os
 import time
 from collections import defaultdict
 from pathlib import Path
-from typing import Callable, Dict, Optional, Tuple, Union
+from typing import Dict, Optional, Tuple, Union
 
-from causallearn.search.ConstraintBased.FCI import fci as cl_fci
-from causallearn.utils.cit import kci
+# from causallearn.search.ConstraintBased.FCI import fci as cl_fci
+# from causallearn.utils.PDAG2DAG import pdag2dag
+# from causallearn.utils.cit import kci
 
 import pandas as pd
 from networkx import Graph
@@ -42,6 +50,7 @@ class FCI(GraphLearner):
     A graph learner which implements the FCI algorithm
     """
 
+    data = None
     pag = None
     dag = None
 
@@ -49,18 +58,6 @@ class FCI(GraphLearner):
             self,
             data_file: str,
             output_path: Union[Path, str],
-            logger: Optional[Callable] = None,
-            indep_test: Callable = HSIC,
-            load_base_skeleton: bool = False,
-            load_final_skeleton: bool = False,
-            save_intermediate: bool = False,
-            base_skeleton: str = None,
-            base_sepset: str = None,
-            final_skeleton: str = None,
-            final_sepset: str = None,
-            njobs: int = 1,
-            verbose: bool = False,
-            *args,
             **kwargs):
         """
         Initialize the FCI algorithm creating an FCI learner.
@@ -70,47 +67,51 @@ class FCI(GraphLearner):
         data (pd.DataFrame): data to be used for learning the causal graph
         data_file (str): name of the file containing the data
         output_path (Path): path to the directory where the output files will be saved
-        logger (logging.Logger): logger object
-        indep_test (Callable): independence test to be used for checking independence
-        load_base_skeleton (bool): if True, load the base skeleton from the files specified
-            in the YAML file for "base_skeleton" and "base_sepset"
-        load_final_skeleton (bool): if True, load the final skeleton from the files specified
-            in the YAML file for "final_skeleton" and "final_sepset"
-        save_intermediate (bool): if True, save the intermediate results
-        base_skeleton (str): name of the file containing the base skeleton
-        base_sepset (str): name of the file containing the base sepset
-        final_skeleton (str): name of the file containing the final skeleton
-        final_sepset (str): name of the file containing the final sepset
-        njobs (int): number of jobs to be used for parallel processing. If 1, run in
-            sequential mode.
-        verbose (bool): if True, print the progress of the algorithm
+        Keyword Arguments:
+            logger (logging.Logger): logger object
+            indep_test (Callable): independence test to be used for checking 
+                independence
+            load_base_skeleton (bool): if True, load the base skeleton from the files 
+                specified
+                in the YAML file for "base_skeleton" and "base_sepset"
+            load_final_skeleton (bool): if True, load the final skeleton from the 
+                files specified in the YAML file for "final_skeleton" and "final_sepset"
+            save_intermediate (bool): if True, save the intermediate results
+            base_skeleton (str): name of the file containing the base skeleton
+            base_sepset (str): name of the file containing the base sepset
+            final_skeleton (str): name of the file containing the final skeleton
+            final_sepset (str): name of the file containing the final sepset
+            njobs (int): number of jobs to be used for parallel processing. If 1, run in
+                sequential mode.
+            verbose (bool): if True, print the progress of the algorithm
 
         Returns
         -------
         FCI object.
         """
 
-        super().__init__(logger=logger,  # data=data,
-                         data_file=data_file,
-                         indep_test=indep_test,
-                         parallel=njobs > 1,
-                         verbose=verbose,
-                         *args, **kwargs)
         self.data_file = data_file
-        self.indep_test = indep_test
-        self.load_final_skeleton = load_final_skeleton
-        self.save_intermediate = save_intermediate
         self.output_path = output_path
-        self.final_skeleton = final_skeleton
-        self.final_sepset = final_sepset
-        self.njobs = njobs
-        self.verbose = verbose
-        self.load_base_skeleton = load_base_skeleton
-        self.base_skeleton = base_skeleton
-        self.base_sepset = base_sepset
-        self.log = logger
+        self.indep_test = kwargs.get("indep_test", HSIC)
+        self.load_final_skeleton = kwargs.get("load_final_skeleton", False)
+        self.save_intermediate = kwargs.get("save_intermediate", False)
+        self.final_skeleton = kwargs.get("final_skeleton", None)
+        self.final_sepset = kwargs.get("final_sepset", None)
+        self.njobs = kwargs.get("njobs", 1)
+        self.verbose = kwargs.get("verbose", False)
+        self.load_base_skeleton = kwargs.get("load_base_skeleton", False)
+        self.base_skeleton = kwargs.get("base_skeleton", None)
+        self.base_sepset = kwargs.get("base_sepset", None)
+        self.log = kwargs.get("logger", None)
 
-        if verbose:
+        super().__init__(logger=self.log,
+                         data_file=data_file,
+                         indep_test=self.indep_test,
+                         parallel=self.njobs > 1,
+                         verbose=self.verbose,
+                         **kwargs)
+
+        if self.verbose:
             self.debug = DebugFCI(self.verbose)
 
     def fit(self, data: pd.DataFrame):
@@ -329,32 +330,12 @@ def main(dataset_name,
     train = data.sample(frac=0.8, random_state=42)
     test = data.drop(train.index)
 
-    njobs = kwargs.get("njobs", 1)
-    indep_test = kwargs.get("indep_test", HSIC)
-    load_base_skeleton = kwargs.get("load_base_skeleton", False)
-    load_final_skeleton = kwargs.get("load_final_skeleton", False)
-    save_intermediate = kwargs.get("save_intermediate", False)
-    base_skeleton = kwargs.get("base_skeleton", None)
-    base_sepset = kwargs.get("base_sepset", None)
-    final_skeleton = kwargs.get("final_skeleton", None)
-    final_sepset = kwargs.get("final_sepset", None)
-    fci = FCI(
-        # data=data,
-        data_file=dataset_name,
-        output_path=output_path,
-        njobs=njobs,
-        indep_test=indep_test,
-        load_base_skeleton=load_base_skeleton,
-        load_final_skeleton=load_final_skeleton,
-        save_intermediate=save_intermediate,
-        base_skeleton=base_skeleton,
-        base_sepset=base_sepset,
-        final_skeleton=final_skeleton,
-        final_sepset=final_sepset,
-    )
+    fci = FCI(data_file=dataset_name, output_path=output_path, **kwargs)
     fci.fit(data)
+    for edge in fci.dag.edges():
+        print(edge)
 
-    # dag, edges = cl_fci(
+    # pag, edges = cl_fci(
     #     data.values,
     #     independence_test_method=kci,
     #     alpha=0.05,
@@ -363,9 +344,9 @@ def main(dataset_name,
     #     verbose=False,
     #     background_knowledge=None,
     #     cache_variables_map=None)
-
-    for edge in fci.dag.edges():
-        print(edge)
+    # dag = pdag2dag(pag)
+    # for edge in dag.edges():
+    #     print(edge)
 
     # if save:
     #     where_to = utils.save_experiment(rex.name, output_path, rex)

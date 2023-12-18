@@ -1,13 +1,22 @@
+# pylint: disable=E1101:no-member
+# pylint: disable=W0201:attribute-defined-outside-init, W0511:fixme
+# pylint: disable=W0106:expression-not-assigned
+# pylint: disable=C0103:invalid-name, C0116:missing-function-docstring
+# pylint: disable=R0913:too-many-arguments, R0902:too-many-instance-attributes
+# pylint: disable=R0914:too-many-locals, R0915:too-many-statements
+# pylint: disable=R1702:too-many-branches
+
 import itertools
 import multiprocessing as mp
 import os
 import time
 from collections import defaultdict
 from pathlib import Path
-from typing import Dict, Tuple, Union
+from typing import Dict, Tuple, Union, List
 
 import networkx as nx
 import numpy as np
+import pandas as pd
 from hyppo.independence import Hsic
 from networkx import DiGraph, Graph
 from pandas import DataFrame
@@ -21,16 +30,19 @@ from causalgraph.common.utils import graph_from_adjacency_file
 from causalgraph.estimators.fci.debug import *
 
 
-class GraphLearner(object):
+class GraphLearner():
     """
     Base Class for all graph learning algorithms
     implementing functionality used across algorithms
     """
 
+    data: pd.DataFrame = None
+    labels: List[str] = None
+    samples: np.ndarray = None
+
     def __init__(
             self,
             logger,
-            # data,
             data_file,
             indep_test,
             alpha=0.05,
@@ -45,6 +57,7 @@ class GraphLearner(object):
     ):
         """
         Initialise graph learner object
+
         Parameters
         ----------
             # :param data: pandas.DataFrame,
@@ -57,10 +70,7 @@ class GraphLearner(object):
                 parallel mode. Default is False
         """
         self.alpha = alpha
-        # self.data = data
         self.indep_test = indep_test
-        # self.labels = list(self.data.columns)
-        # self.samples = self.data.to_numpy(dtype='float')
         self.parallel = parallel
         self.log = logger
         self.verbose = verbose
@@ -78,6 +88,10 @@ class GraphLearner(object):
         self.verbose = self.verbose
 
     def _init_data(self, data):
+        """
+        Initialise data, labels and samples attributes. This method is
+        called from the `fit()` method of the subclasses.
+        """
         self.data = data
         self.labels = list(self.data.columns)
         self.samples = self.data.to_numpy(dtype='float')
@@ -221,13 +235,45 @@ class GraphLearner(object):
 
         return graph, sepset
 
-    def check_independence(self, x, graph, condlen, condsize, sepset,
-                           actions=None):
+    def check_independence(
+            self,
+            x,
+            graph,
+            condlen,
+            condsize,
+            sepset,
+            actions=None):
+        """
+        This method checks for independence between X and all its neighbors
+        in the graph. If X and Y are independent, then the edge between X and Y
+        is removed from the graph.
+
+        Parameters
+        ----------
+            x: str
+                The node being tested for independence
+            graph: nx.Graph
+                The graph being built
+            condlen: int
+                The number of conditioning sets being tested
+            condsize: int
+                The size of the conditioning sets being tested
+            sepset: dict
+                A dictionary containing the separation sets of all pairs of
+                nodes
+            actions: dict, optional
+                A dictionary containing the actions taken by the algorithm
+                Default is None
+        Returns
+        -------
+            int
+                The number of conditioning sets being tested
+        """
         if actions is None:
             actions = defaultdict(list)
 
         neighbors = list(graph.neighbors(x))
-        neighbors_str = ",".join([i for i in neighbors])
+        neighbors_str = ",".join(list(neighbors))
         self.oo(f"{A0}> Iterating over neighbors: {neighbors_str}")
         for ny, y in enumerate(neighbors):
             self.oo(f"{A0}+ y = {y}; {ny + 1}/{len(neighbors)}")
