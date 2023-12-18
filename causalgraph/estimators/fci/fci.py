@@ -47,7 +47,6 @@ class FCI(GraphLearner):
 
     def __init__(
             self,
-            data: pd.DataFrame,
             data_file: str,
             output_path: Union[Path, str],
             logger: Optional[Callable] = None,
@@ -91,10 +90,12 @@ class FCI(GraphLearner):
         FCI object.
         """
 
-        super().__init__(logger=logger, data=data, indep_test=indep_test,
-                         parallel=njobs > 1, verbose=verbose, data_file=data_file,
+        super().__init__(logger=logger,  # data=data,
+                         data_file=data_file,
+                         indep_test=indep_test,
+                         parallel=njobs > 1,
+                         verbose=verbose,
                          *args, **kwargs)
-        self.data = data
         self.data_file = data_file
         self.indep_test = indep_test
         self.load_final_skeleton = load_final_skeleton
@@ -112,7 +113,7 @@ class FCI(GraphLearner):
         if verbose:
             self.debug = DebugFCI(self.verbose)
 
-    def fit(self):
+    def fit(self, data: pd.DataFrame):
         """
         function to learn a causal network from data
 
@@ -121,6 +122,8 @@ class FCI(GraphLearner):
         PAG
             causal network learned from data
         """
+        self.data = data
+        super()._init_data(self.data)
         if self.verbose:
             print("Getting Skeleton of graph...")
         start_time = time.time()
@@ -336,7 +339,7 @@ def main(dataset_name,
     final_skeleton = kwargs.get("final_skeleton", None)
     final_sepset = kwargs.get("final_sepset", None)
     fci = FCI(
-        data=data,
+        # data=data,
         data_file=dataset_name,
         output_path=output_path,
         njobs=njobs,
@@ -349,7 +352,7 @@ def main(dataset_name,
         final_skeleton=final_skeleton,
         final_sepset=final_sepset,
     )
-    fci.fit()
+    fci.fit(data)
 
     # dag, edges = cl_fci(
     #     data.values,

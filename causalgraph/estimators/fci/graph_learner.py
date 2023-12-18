@@ -17,7 +17,6 @@ from tqdm.auto import tqdm
 
 from causalgraph.estimators.fci.initialization import (dsep_set_from_csv,
                                                        save_graph, save_sepset)
-from causalgraph.independence.hsic import HSIC
 from causalgraph.common.utils import graph_from_adjacency_file
 from causalgraph.estimators.fci.debug import *
 
@@ -31,7 +30,7 @@ class GraphLearner(object):
     def __init__(
             self,
             logger,
-            data,
+            # data,
             data_file,
             indep_test,
             alpha=0.05,
@@ -48,8 +47,8 @@ class GraphLearner(object):
         Initialise graph learner object
         Parameters
         ----------
-            :param data: pandas.DataFrame,
-                DataFrame with rows as datapoints and columns as variables
+            # :param data: pandas.DataFrame,
+            #     DataFrame with rows as datapoints and columns as variables
             :param log: A logger
             :param alpha: float, optional
                 The minimum p-value returned by the indepence test
@@ -58,10 +57,10 @@ class GraphLearner(object):
                 parallel mode. Default is False
         """
         self.alpha = alpha
-        self.data = data
+        # self.data = data
         self.indep_test = indep_test
-        self.labels = list(self.data.columns)
-        self.samples = self.data.to_numpy(dtype='float')
+        # self.labels = list(self.data.columns)
+        # self.samples = self.data.to_numpy(dtype='float')
         self.parallel = parallel
         self.log = logger
         self.verbose = verbose
@@ -77,6 +76,11 @@ class GraphLearner(object):
         self.debug = DebugFCI(self.verbose)
         self.oo = self.debug.dbg
         self.verbose = self.verbose
+
+    def _init_data(self, data):
+        self.data = data
+        self.labels = list(self.data.columns)
+        self.samples = self.data.to_numpy(dtype='float')
 
     def learn_or_load_base_skeleton(self):
         """
