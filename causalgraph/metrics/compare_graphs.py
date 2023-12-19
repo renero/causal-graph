@@ -32,6 +32,13 @@
     8
 """
 
+# pylint: disable=E1101:no-member, W0201:attribute-defined-outside-init, W0511:fixme
+# pylint: disable=C0103:invalid-name
+# pylint: disable=C0116:missing-function-docstring
+# pylint: disable=R0913:too-many-arguments
+# pylint: disable=R0914:too-many-locals, R0915:too-many-statements
+# pylint: disable=W0106:expression-not-assigned, R1702:too-many-branches
+
 import networkx as nx
 import numpy as np
 
@@ -266,8 +273,7 @@ def _binary_adj_matrix(
     def f(m, threshold, absolute):
         if absolute:
             return (np.abs(m) > threshold).astype(np.int16)
-        else:
-            return (m > threshold).astype(np.int16)
+        return (m > threshold).astype(np.int16)
 
     return f(m, threshold, absolute)
 
@@ -294,7 +300,7 @@ def _adjacency(G: AnyGraph, order: List = None, threshold=0.0, absolute=False):
     """
     if order is None:
         order = sorted(list(G.nodes()))
-    if nx.is_weighted(G):
+    if nx.is_weighted(G) and all([x[-1]['weight'] != None for x in G.edges(data=True)]):
         result = _binary_adj_matrix(G, order, threshold, absolute)
     else:
         # Scipy adjacency sometimes throws an exception based on type.
@@ -328,7 +334,7 @@ def _weighted_adjacency(G: AnyGraph, order: List = None, threshold=0.0, absolute
         if value(w) < threshold:
             F.remove_edge(p, q)
 
-    adj_matrix = nx.to_numpy_matrix(F, nodelist=order)
+    adj_matrix = nx.to_numpy_array(F, nodelist=order)
     adj_matrix[np.isnan(adj_matrix)] = 0
 
     return adj_matrix
@@ -402,7 +408,7 @@ def _conf_mat_directed(truth, est, feature_names):
     Tp = (np.minimum(truePositives == estPositives, truePositives)).sum()
     Tn = (truePositives == estPositives).sum() - Tp - num_elems
     Tn = 0 if Tn < 0 else Tn
-    
+
     Fp = int((np.maximum(estPositives - truePositives, zeros)).sum())
     Fn = int((np.maximum(truePositives - estPositives, zeros)).sum())
 

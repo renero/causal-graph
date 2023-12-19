@@ -18,10 +18,9 @@ from causalgraph.common import utils
 from causalgraph.estimators.pc.ci_tests import chi_square, pearsonr
 from causalgraph.estimators.pc.estimators import StructureEstimator
 from causalgraph.estimators.pc.pdag import PDAG
+from causalgraph.metrics.compare_graphs import evaluate_graph
 
 SHOW_PROGRESS = True
-
-# TODO: Make PC work as SKLearn methods, with constructor and `fit` method.
 
 
 class PC(StructureEstimator):
@@ -43,8 +42,10 @@ class PC(StructureEstimator):
 
     dag = None
     pdag = None
+    is_fitted = False
+    metrics = None
 
-    def __init__(self, independencies=None, **kwargs):
+    def __init__(self, name: str, independencies=None, **kwargs):
         """
         Class intialization.
 
@@ -62,22 +63,19 @@ class PC(StructureEstimator):
             will be tested.
         kwargs: key-value arguments
             Additional arguments passed to the `StructureEstimator` base class.
+            - variant: str (one of "orig", "stable", "parallel")ss
         """
-        # super().__init__(data=data, independencies=independencies, **kwargs)
-        super().__init__(independencies=independencies, **kwargs)
+        super().__init__(independencies=independencies)
+        self.name = name
+        self.variant = kwargs.get("variant", "stable")
+        self.ci_test = kwargs.get("ci_test", "chi_square")
+        self.max_cond_vars = kwargs.get("max_cond_vars", 5)
+        self.return_type = kwargs.get("return_type", "dag")
+        self.significance_level = kwargs.get("significance_level", 0.01)
+        self.n_jobs = kwargs.get("n_jobs", -1)
+        self.show_progress = kwargs.get("show_progress", True)
 
-    def fit(
-        self,
-        data,
-        variant="stable",
-        ci_test="chi_square",
-        max_cond_vars=5,
-        return_type="dag",
-        significance_level=0.01,
-        n_jobs=-1,
-        show_progress=True,
-        **kwargs,
-    ):
+    def fit(self, X, **kwargs):
         """
         Estimates a DAG/PDAG from the given dataset using the PC algorithm which
         is a constraint-based structure learning algorithm[1]. The independencies
@@ -174,43 +172,40 @@ class PC(StructureEstimator):
         [('Z', 'sum'), ('X', 'sum'), ('Y', 'sum')]
         """
 
-        self.data = data
+        assert isinstance(
+            X, pd.DataFrame), "X must be a pandas DataFrame object"
+
+        self.data = X
+        self.feature_names = list(X.columns)
         state_names = kwargs.get("state_names", None)
         complete_samples_only = kwargs.get("complete_samples_only", True)
-        self._init_data(data=data, state_names=state_names,
+        self._init_data(data=self.data, state_names=state_names,
                         complete_samples_only=complete_samples_only)
 
         # Step 0: Do checks that the specified parameters are correct, else
         # throw meaningful error.
-        if variant not in ("orig", "stable", "parallel"):
+        if self.variant not in ("orig", "stable", "parallel"):
             raise ValueError(
-                f"variant must be one of: orig, stable, or parallel. Got: {variant}"
+                f"variant must be one of: orig, stable, or parallel. "
+                f"Got: {self.variant}"
             )
-        if (not callable(ci_test)) and (
-                ci_test not in ("chi_square", "independence_match", "pearsonr")):
+        if (not callable(self.ci_test)) and (self.ci_test not in (
+                "chi_square", "independence_match", "pearsonr")):
             raise ValueError(
                 "ci_test must be a callable or one of: chi_square, pearsonr, "
                 "independence_match"
             )
 
-        if (ci_test in ("chi_square", "pearsonr")) and (self.data is None):
+        if (self.ci_test in ("chi_square", "pearsonr")) and (self.data is None):
             raise ValueError(
                 "For using Chi Square or Pearsonr, data arguement must be specified"
             )
 
         # Step 1: Run the PC algorithm to build the skeleton and get the separating
         # sets.
-        skel, separating_sets = self.build_skeleton(
-            ci_test=ci_test,
-            max_cond_vars=max_cond_vars,
-            significance_level=significance_level,
-            variant=variant,
-            n_jobs=n_jobs,
-            show_progress=show_progress,
-            **kwargs,
-        )
+        skel, separating_sets = self.build_skeleton(**kwargs)
 
-        if return_type.lower() == "skeleton":
+        if self.return_type.lower() == "skeleton":
             return skel, separating_sets
 
         # Step 2: Orient the edges based on build the PDAG/CPDAG.
@@ -219,26 +214,23 @@ class PC(StructureEstimator):
         self.dag = self.pdag.to_dag()
 
         # Step 3: Either return the CPDAG or fully orient the edges to build a DAG.
-        if return_type.lower() in ("pdag", "cpdag"):
+        if self.return_type.lower() in ("pdag", "cpdag"):
+            self.is_fitted = True
             return self.pdag
-        if return_type.lower() == "dag":
+        if self.return_type.lower() == "dag":
+            self.is_fitted = True
             return nx.DiGraph(self.pdag.to_dag())
-        else:
-            raise ValueError(
-                f"return_type must be one of: dag, pdag, cpdag, or skeleton. "
-                f"Got: {return_type}"
-            )
+        raise ValueError(
+            f"return_type must be one of: dag, pdag, cpdag, or skeleton. "
+            f"Got: {self.return_type}"
+        )
 
-    def build_skeleton(
-        self,
-        ci_test="chi_square",
-        max_cond_vars=5,
-        significance_level=0.01,
-        variant="stable",
-        n_jobs=-1,
-        show_progress=True,
-        **kwargs,
-    ):
+    def fit_predict(self, X, ref_graph: nx.DiGraph = None, **kwargs):
+        self.fit(X, **kwargs)
+        self.metrics = evaluate_graph(self.dag, ref_graph, self.feature_names)
+        return self.dag
+
+    def build_skeleton(self, **kwargs):
         """
         Estimates a graph skeleton (UndirectedGraph) from a set of independencies
         using (the first part of) the PC algorithm. The independencies can either be
@@ -295,19 +287,20 @@ class PC(StructureEstimator):
         # Initialize initial values and structures.
         lim_neighbors = 0
         separating_sets = dict()
-        if ci_test == "chi_square":
-            ci_test = chi_square
-        elif ci_test == "pearsonr":
-            ci_test = pearsonr
-        elif callable(ci_test):
-            ci_test = ci_test
+        if self.ci_test == "chi_square":
+            ci_test_fn = chi_square
+        elif self.ci_test == "pearsonr":
+            ci_test_fn = pearsonr
+        elif callable(self.ci_test):
+            ci_test_fn = self.ci_test
         else:
             raise ValueError(
-                f"ci_test must either be chi_square, pearsonr, independence_match, or a function. Got: {ci_test}"
+                f"ci_test must either be chi_square, pearsonr, independence_match, "
+                f"or a function. Got: {ci_test_fn}"
             )
 
-        if show_progress and SHOW_PROGRESS:
-            pbar = tqdm(total=max_cond_vars, leave=False)
+        if self.show_progress and SHOW_PROGRESS:
+            pbar = tqdm(total=self.max_cond_vars, leave=False)
             pbar.set_description("PC:")
 
         # Step 1: Initialize a fully connected undirected graph
@@ -323,7 +316,7 @@ class PC(StructureEstimator):
 
             # Step 2: Iterate over the edges and find a conditioning set of
             # size `lim_neighbors` which makes u and v independent.
-            if variant == "orig":
+            if self.variant == "orig":
                 for (u, v) in graph.edges():
                     for separating_set in chain(
                         combinations(set(graph.neighbors(u)) -
@@ -334,20 +327,20 @@ class PC(StructureEstimator):
                         # If a conditioning set exists remove the edge, store
                         # the separating set and move on to finding conditioning set for
                         # next edge.
-                        if ci_test(
+                        if ci_test_fn(
                             u,
                             v,
                             separating_set,
                             data=self.data,
                             independencies=self.independencies,
-                            significance_level=significance_level,
+                            significance_level=self.significance_level,
                             **kwargs,
                         ):
                             separating_sets[frozenset((u, v))] = separating_set
                             graph.remove_edge(u, v)
                             break
 
-            elif variant == "stable":
+            elif self.variant == "stable":
                 # In case of stable, precompute neighbors as this is the stable
                 # algorithm.
                 neighbors = {node: set(graph[node]) for node in graph.nodes()}
@@ -361,20 +354,20 @@ class PC(StructureEstimator):
                         # If a conditioning set exists remove the edge, store the
                         # separating set and move on to finding conditioning set for
                         # next edge.
-                        if ci_test(
+                        if ci_test_fn(
                             u,
                             v,
                             separating_set,
                             data=self.data,
                             independencies=self.independencies,
-                            significance_level=significance_level,
+                            significance_level=self.significance_level,
                             **kwargs,
                         ):
                             separating_sets[frozenset((u, v))] = separating_set
                             graph.remove_edge(u, v)
                             break
 
-            elif variant == "parallel":
+            elif self.variant == "parallel":
                 neighbors = {node: set(graph[node]) for node in graph.nodes()}
 
                 def _parallel_fun(u, v):
@@ -384,18 +377,18 @@ class PC(StructureEstimator):
                         combinations(set(graph.neighbors(v)) -
                                      set([u]), lim_neighbors),
                     ):
-                        if ci_test(
+                        if ci_test_fn(
                             u,
                             v,
                             separating_set,
                             data=self.data,
                             independencies=self.independencies,
-                            significance_level=significance_level,
+                            significance_level=self.significance_level,
                             **kwargs,
                         ):
                             return (u, v), separating_set
 
-                results = Parallel(n_jobs=n_jobs, prefer="threads")(
+                results = Parallel(n_jobs=self.n_jobs, prefer="threads")(
                     delayed(_parallel_fun)(u, v) for (u, v) in graph.edges()
                 )
                 for result in results:
@@ -406,25 +399,26 @@ class PC(StructureEstimator):
 
             else:
                 raise ValueError(
-                    f"variant must be one of (orig, stable, parallel). Got: {variant}"
+                    f"variant must be one of (orig, stable, parallel). "
+                    f"Got: {self.variant}"
                 )
 
             # Step 3: After iterating over all the edges, expand the search space by
             # increasing the size of conditioning set by 1.
-            if lim_neighbors >= max_cond_vars:
+            if lim_neighbors >= self.max_cond_vars:
                 logging.info(
                     "Reached maximum number of allowed conditional variables. Exiting"
                 )
                 break
             lim_neighbors += 1
 
-            if show_progress and SHOW_PROGRESS:
+            if self.show_progress and SHOW_PROGRESS:
                 pbar.update(1)
                 pbar.set_description(
                     f"PC: Working for n conditional variables: {lim_neighbors}"
                 )
 
-        if show_progress and SHOW_PROGRESS:
+        if self.show_progress and SHOW_PROGRESS:
             pbar.close()
         return graph, separating_sets
 
@@ -553,12 +547,13 @@ def main(dataset_name,
     train = data.sample(frac=0.8, random_state=42)
     test = data.drop(train.index)
 
-    pc = PC()
-    model = pc.fit(data=data, ci_test="pearsonr",
-                   variant="stable", max_cond_vars=5)
+    pc = PC(name=dataset_name, variant="stable",
+            ci_test="pearsonr", max_cond_vars=5)
+    pc.fit_predict(X=data, ref_graph=ref_graph)
 
     for edge in pc.dag.edges():
         print(edge)
+    print(pc.metrics)
 
     # if save:
     #     where_to = utils.save_experiment(rex.name, output_path, rex)

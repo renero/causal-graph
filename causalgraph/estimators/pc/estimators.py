@@ -1,9 +1,24 @@
-import pandas as pd
-
+"""
+StructureEstimator base class for PC and PC-stable algorithms.
+"""
 from functools import lru_cache
+import pandas as pd
 
 
 def convert_args_tuple(func):
+    """
+    Convert the arguments of a function to tuples.
+
+    Args:
+        obj: The object on which the function is called.
+        variable: The variable of interest.
+        parents: The parents of the variable.
+        complete_samples_only: Flag indicating whether to use only complete samples.
+        weighted: Flag indicating whether to use weighted samples.
+
+    Returns:
+        The result of the function with converted arguments.
+    """
     def _convert_param_to_tuples(
         obj, variable, parents=tuple(), complete_samples_only=None, weighted=False
     ):
@@ -13,27 +28,10 @@ def convert_args_tuple(func):
     return _convert_param_to_tuples
 
 
-class BaseEstimator(object):
+class StructureEstimator():
     """
     Base class for estimators in pgmpy; `ParameterEstimator`,
     `StructureEstimator` and `StructureScore` derive from this class.
-
-    Parameters
-    ----------
-    data: pandas DataFrame object datafame object where each column represents one variable.
-        (If some values in the data are missing the data cells should be set to `numpy.NaN`.
-        Note that pandas converts each column containing `numpy.NaN`s to dtype `float`.)
-
-    state_names: dict (optional)
-        A dict indicating, for each variable, the discrete set of states (or values)
-        that the variable can take. If unspecified, the observed values in the data set
-        are taken to be the only possible states.
-
-    complete_samples_only: bool (optional, default `True`)
-        Specifies how to deal with missing data, if present. If set to `True` all rows
-        that contain `np.Nan` somewhere are ignored. If `False` then, for each variable,
-        every row where neither the variable nor its parents are `np.NaN` is used.
-        This sets the behavior of the `state_count`-method.
     """
 
     data = None
@@ -41,11 +39,32 @@ class BaseEstimator(object):
     variables = None
     state_names = None
 
-    def __init__(self):
-        return
+    def __init__(self, independencies=None):
+        self.independencies = independencies
+        if self.independencies is not None:
+            self.variables = self.independencies.get_all_variables()
 
     def _init_data(self, data=None, state_names=None, complete_samples_only=True):
+        """
+        Initialize the data for the estimator.
 
+        Parameters
+        ----------
+        data: pandas DataFrame object datafame object where each column represents one variable.
+            (If some values in the data are missing the data cells should be set to `numpy.NaN`.
+            Note that pandas converts each column containing `numpy.NaN`s to dtype `float`.)
+
+        state_names: dict (optional)
+            A dict indicating, for each variable, the discrete set of states (or values)
+            that the variable can take. If unspecified, the observed values in the data set
+            are taken to be the only possible states.
+
+        complete_samples_only: bool (optional, default `True`)
+            Specifies how to deal with missing data, if present. If set to `True` all rows
+            that contain `np.Nan` somewhere are ignored. If `False` then, for each variable,
+            every row where neither the variable nor its parents are `np.NaN` is used.
+            This sets the behavior of the `state_count`-method.
+        """
         self.data = data
         # data can be None in the case when learning structre from
         # independence conditions. Look into PC.py.
@@ -199,40 +218,3 @@ class BaseEstimator(object):
             ).fillna(0)
 
         return state_counts
-
-
-class StructureEstimator(BaseEstimator):
-    """
-    Base class for structure estimators in pgmpy.
-
-    Parameters
-    ----------
-    data: pandas DataFrame object
-        datafame object where each column represents one variable.
-        (If some values in the data are missing the data cells should be set to `numpy.NaN`.
-        Note that pandas converts each column containing `numpy.NaN`s to dtype `float`.)
-
-    state_names: dict (optional)
-        A dict indicating, for each variable, the discrete set of states (or values)
-        that the variable can take. If unspecified, the observed values in the data set
-        are taken to be the only possible states.
-
-    complete_samples_only: bool (optional, default `True`)
-        Specifies how to deal with missing data, if present. If set to `True` all rows
-        that contain `np.Nan` somewhere are ignored. If `False` then, for each variable,
-        every row where neither the variable nor its parents are `np.NaN` is used.
-        This sets the behavior of the `state_count`-method.
-    """
-
-    def __init__(
-            self,
-            independencies=None):
-
-        self.independencies = independencies
-        if self.independencies is not None:
-            self.variables = self.independencies.get_all_variables()
-        super().__init__()
-
-    def _init_data(self, data=None, state_names=None, complete_samples_only=True):
-        super()._init_data(data=data, state_names=state_names,
-                           complete_samples_only=complete_samples_only)

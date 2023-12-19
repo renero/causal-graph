@@ -316,6 +316,27 @@ class Experiment(BaseExperiment):
 
 
 class Experiments(BaseExperiment):
+    """
+    Class representing a collection of experiments.
+
+    Parameters:
+    - input_pattern: str
+        The pattern used to match input files for the experiments.
+    - input_path: str, optional
+        The path to the input files. Default is "/Users/renero/phd/data/RC3/".
+    - output_path: str, optional
+        The path to save the output files. Default is "/Users/renero/phd/output/RC3/".
+    - train_anyway: bool, optional
+        Whether to train the experiment even if it already exists. Default is False.
+    - save_anyway: bool, optional
+        Whether to save the experiment even if it already exists. Default is False.
+    - train_size: float, optional
+        The proportion of the data to use for training. Default is 0.9.
+    - random_state: int, optional
+        The random state for reproducibility. Default is 42.
+    - verbose: bool, optional
+        Whether to print verbose output. Default is True.
+    """
 
     def __init__(
             self,
@@ -340,7 +361,16 @@ class Experiments(BaseExperiment):
 
     def load(self, pattern=None) -> dict:
         """
-        Loads all the experiments matching the input pattern
+        Loads all the experiments matching the input pattern.
+
+        Parameters:
+        - pattern: str, optional
+            The pattern used to match output files for loading experiments.
+            If not provided, the input pattern will be used.
+
+        Returns:
+        - dict
+            A dictionary containing the loaded experiments, where the keys are the experiment names.
         """
         if pattern is not None:
             pickle_files = self.list_files(pattern, where='output')
@@ -370,7 +400,22 @@ class Experiments(BaseExperiment):
         self.experiments = list(self.experiment.values())
         return self
 
-    def fit(self, save_as_pattern=None, **kwargs) -> list:
+    def fit(self, estimator="rex", save_as_pattern=None, **kwargs) -> list:
+        """
+        Fits the experiments.
+
+        Parameters:
+        - estimator: str, optional
+            The estimator to use. Default is "rex". Other options are "pc", "lingam",
+            "ges" and "fci".
+        - save_as_pattern: str, optional
+            The pattern used to save the experiments. "*" will be replaced with the experiment name.
+            If not provided, the experiment name will be used.
+
+        Returns:
+        - list
+            A list of the fitted experiments.
+        """
         self.experiment = {}
         for filename in self.input_files:
             self.prepare_experiment_input(filename)
