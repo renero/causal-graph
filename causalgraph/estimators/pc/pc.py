@@ -227,7 +227,9 @@ class PC(StructureEstimator):
 
     def fit_predict(self, X, ref_graph: nx.DiGraph = None, **kwargs):
         self.fit(X, **kwargs)
-        self.metrics = evaluate_graph(self.dag, ref_graph, self.feature_names)
+        if ref_graph:
+            self.metrics = evaluate_graph(
+                self.dag, ref_graph, self.feature_names)
         return self.dag
 
     def build_skeleton(self, **kwargs):

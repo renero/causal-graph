@@ -5,11 +5,14 @@ The LiNGAM Project: https://sites.google.com/site/sshimizu06/lingam
 
 import numpy as np
 import pandas as pd
+import networkx as nx
+
 from sklearn.preprocessing import StandardScaler
 from sklearn.preprocessing import scale
 from sklearn.utils import check_array
 
 from causalgraph.common import utils
+from causalgraph.metrics.compare_graphs import evaluate_graph
 from causalgraph.estimators.lingam.base import _BaseLiNGAM
 
 
@@ -27,6 +30,10 @@ class DirectLiNGAM(_BaseLiNGAM):
            of non-Gaussian structural eauation models.
        Journal of Machine Learning Research 14:111-152, 2013.
     """
+
+    is_fitted_ = False
+    metrics = None
+    dag = None
 
     def __init__(
             self,
@@ -90,7 +97,7 @@ class DirectLiNGAM(_BaseLiNGAM):
         self : object
             Returns the instance itself.
         """
-        column_names = list(X.columns) if hasattr(X, "columns") else None
+        self.feature_names = list(X.columns) if hasattr(X, "columns") else None
         # Check parameters
         X = check_array(X)
         n_features = X.shape[1]
@@ -127,12 +134,33 @@ class DirectLiNGAM(_BaseLiNGAM):
         self._estimate_adjacency_matrix(X, prior_knowledge=self._Aknw)
         self.dag = utils.graph_from_adjacency(
             self.adjacency_matrix_,
-            node_labels=column_names,
+            node_labels=self.feature_names,
             th=self.th,
             inverse=self.inverse,
             absolute_values=self.absolute_values)
 
+        self.is_fitted_ = True
         return self
+
+    def fit_predict(self, X, ref_graph: nx.DiGraph = None):
+        """Fit the model to X and return the estimated DAG.
+
+        Parameters
+        ----------
+        X : array-like, shape (n_samples, n_features)
+            Training data, where ``n_samples`` is the number of samples
+            and ``n_features`` is the number of features.
+
+        Returns
+        -------
+        self : object
+            Returns the instance itself.
+        """
+        self.fit(X)
+        if ref_graph:
+            self.metrics = evaluate_graph(
+                self.dag, ref_graph, self.feature_names)
+        return self.dag
 
     def _extract_partial_orders(self, pk):
         """Extract partial orders from prior knowledge."""
@@ -324,10 +352,11 @@ def main(dataset_name,
     test = data.drop(train.index)
 
     lingam = DirectLiNGAM()
-    lingam.fit(train)
+    lingam.fit_predict(train, ref_graph=ref_graph)
 
     for edge in lingam.dag.edges():
         print(edge)
+    print(lingam.metrics)
 
 
 if __name__ == '__main__':
