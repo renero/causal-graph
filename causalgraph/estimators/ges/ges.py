@@ -69,11 +69,14 @@ Additional modules / packages:
 
 import numpy as np
 import pandas as pd
+import networkx as nx
+
 from sklearn.discriminant_analysis import StandardScaler
 
 from causalgraph.estimators.ges.scores import GaussObsL0Pen
 from causalgraph.estimators.ges import utils
 from causalgraph.common.utils import graph_from_adjacency, graph_from_dot_file
+from causalgraph.metrics.compare_graphs import evaluate_graph
 
 
 class GES(object):
@@ -137,6 +140,9 @@ class GES(object):
     phases = None
     iterate = None
     debug = 0
+    is_fitted_ = False
+    feature_names = None
+    metrics = None
 
     def __init__(
             self,
@@ -149,17 +155,54 @@ class GES(object):
         self.iterate = iterate
         self.debug = debug
 
-    def fit(self, data, labels=None, A0=None):
-        assert isinstance(data, (pd.DataFrame, np.ndarray)), \
-            "Data must be a pandas DataFrame or Numpy Array"
-
-        X = data.values if isinstance(data, pd.DataFrame) else data
+    def fit(self, X, A0=None):
+        assert isinstance(X, pd.DataFrame), "Data must be a pandas DataFrame"
+        self.feature_names = list(X.columns)
+        X = X.values
         self.ges_adjmat, self.ges_score = self.fit_bic(X, A0=A0)
         self.dag = graph_from_adjacency(
-            self.ges_adjmat, node_labels=list(
-                data) if labels is None else labels
-        )
+            self.ges_adjmat, node_labels=self.feature_names)
+        self.is_fitted_ = True
         return self
+
+    def fit_predict(self, X, ref_graph: nx.DiGraph = None, A0=None):
+        """
+        Fit the GES algorithm to the given data and return the
+        adjacency matrix of the estimated CPDAG.
+
+        Parameters
+        ----------
+        data : numpy.ndarray
+            The n x p array containing the observations, where columns
+            correspond to variables and rows to observations.
+        labels : list, optional
+            The list of variable names. If not given, the columns of
+            data are used as labels.
+        A0 : numpy.ndarray, optional
+            The initial CPDAG on which GES will run, where where `A0[i,j]
+            != 0` implies the edge `i -> j` and `A[i,j] != 0 & A[j,i] !=
+            0` implies the edge `i - j`. Defaults to the empty graph
+            (i.e. matrix of zeros).
+
+        Returns
+        -------
+        estimate : numpy.ndarray
+            The adjacency matrix of the estimated CPDAG.
+
+        Raises
+        ------
+        TypeError:
+            If the type of some of the parameters was not expected,
+            e.g. if data is not a numpy array.
+        ValueError:
+            If the value of some of the parameters is not appropriate,
+            e.g. a wrong phase is specified.
+        """
+        self.fit(X, A0)
+        if ref_graph:
+            self.metrics = evaluate_graph(
+                self.dag, ref_graph, self.feature_names)
+        return self.dag
 
     def fit_bic(self, data, A0=None):
         """
@@ -1023,10 +1066,11 @@ def main(dataset_name,
     test = data.drop(train.index)
 
     ges = GES(phases=["forward", "backward", "turning"], debug=0)
-    ges.fit(train)
+    ges.fit_predict(train, ref_graph=ref_graph)
 
     for edge in ges.dag.edges():
         print(edge)
+    print(ges.metrics)
 
     # if save:
     #     where_to = utils.save_experiment(rex.name, output_path, rex)

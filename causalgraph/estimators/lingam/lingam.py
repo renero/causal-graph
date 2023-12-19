@@ -3,6 +3,13 @@ Python implementation of the LiNGAM algorithms.
 The LiNGAM Project: https://sites.google.com/site/sshimizu06/lingam
 """
 
+# pylint: disable=E1101:no-member, W0201:attribute-defined-outside-init, W0511:fixme
+# pylint: disable=C0103:invalid-name
+# pylint: disable=C0116:missing-function-docstring
+# pylint: disable=R0913:too-many-arguments
+# pylint: disable=R0914:too-many-locals, R0915:too-many-statements
+# pylint: disable=W0106:expression-not-assigned, R1702:too-many-branches
+
 import numpy as np
 import pandas as pd
 import networkx as nx
@@ -34,6 +41,7 @@ class DirectLiNGAM(_BaseLiNGAM):
     is_fitted_ = False
     metrics = None
     dag = None
+    feature_names = None
 
     def __init__(
             self,
@@ -360,4 +368,4 @@ def main(dataset_name,
 
 
 if __name__ == '__main__':
-    main("rex_generated_linear_0", inverse=False, absolute_values=False)
+    main("rex_generated_linear_1", inverse=False, absolute_values=False)
