@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Dict, Optional, Tuple, Union
 
 import pandas as pd
+import networkx as nx
 from networkx import Graph
 from sklearn.discriminant_analysis import StandardScaler
 from tqdm.auto import tqdm
@@ -36,6 +37,7 @@ from causalgraph.estimators.fci.initialization import (dsep_set_from_csv,
                                                        save_graph, save_sepset)
 from causalgraph.estimators.fci.pag import PAG
 from causalgraph.independence.hsic import HSIC
+from causalgraph.metrics.compare_graphs import evaluate_graph
 
 #
 # TODO: No control over max_samples to be used in HSIC `check_independence`
@@ -50,10 +52,13 @@ class FCI(GraphLearner):
     data = None
     pag = None
     dag = None
+    is_fitted_ = False
+    metrics = None
+    feature_names = None
 
     def __init__(
             self,
-            data_file: str,
+            name: str,
             output_path: Union[Path, str],
             **kwargs):
         """
@@ -87,7 +92,8 @@ class FCI(GraphLearner):
         FCI object.
         """
 
-        self.data_file = data_file
+        self.data_file = name
+        self.name = name
         self.output_path = output_path
         self.indep_test = kwargs.get("indep_test", HSIC)
         self.load_final_skeleton = kwargs.get("load_final_skeleton", False)
@@ -102,7 +108,7 @@ class FCI(GraphLearner):
         self.log = kwargs.get("logger", None)
 
         super().__init__(logger=self.log,
-                         data_file=data_file,
+                         data_file=self.data_file,
                          indep_test=self.indep_test,
                          parallel=self.njobs > 1,
                          verbose=self.verbose,
@@ -111,7 +117,7 @@ class FCI(GraphLearner):
         if self.verbose:
             self.debug = DebugFCI(self.verbose)
 
-    def fit(self, data: pd.DataFrame):
+    def fit(self, X: pd.DataFrame):
         """
         function to learn a causal network from data
 
@@ -120,7 +126,9 @@ class FCI(GraphLearner):
         PAG
             causal network learned from data
         """
-        self.data = data
+        assert isinstance(X, pd.DataFrame), "Data must be a pandas DataFrame"
+        self.data = X
+        self.feature_names = list(X.columns)
         super()._init_data(self.data)
         if self.verbose:
             print("Getting Skeleton of graph...")
@@ -131,13 +139,34 @@ class FCI(GraphLearner):
         self.pag = orientEdges(skeleton, sepset, data_file=self.data_file,
                                output_path=self.output_path, log=self.log,
                                verbose=self.verbose, debug=self.debug)
-        self.dag = self.pag
+        self.dag = self.pag.to_dag(self.feature_names)
 
         if self.verbose:
             print("Learning complete")
         self.debug.bm(f"Total time: {time.time() - start_time:.1f} secs.")
 
         return self
+
+    def fit_predict(self, X: pd.DataFrame, ref_graph: nx.DiGraph = None):
+        """
+        Method to fit the data and evaluate the learned graph against a reference graph.
+
+        Parameters
+        ----------
+        X (pd.DataFrame): data to be used for learning the causal graph
+        ref_graph (nx.DiGraph): reference graph to be used for evaluation
+
+        Returns
+        -------
+        nx.DiGraph
+            learned causal graph
+        """
+        self.fit(X)
+        if ref_graph and self.dag:
+            self.metrics = evaluate_graph(
+                ref_graph, self.dag, self.feature_names)
+
+        return self.dag
 
     def learn_or_load_final_skeleton(self) -> Tuple[Graph, Dict]:
         """
@@ -327,10 +356,19 @@ def main(dataset_name,
     train = data.sample(frac=0.8, random_state=42)
     test = data.drop(train.index)
 
-    fci = FCI(data_file=dataset_name, output_path=output_path, **kwargs)
-    fci.fit(data)
-    for edge in fci.dag.edges():
-        print(edge)
+    fci = FCI(name=dataset_name, output_path=output_path, **kwargs)
+    fci.fit_predict(data, ref_graph=ref_graph)
+
+    if fci.dag:
+        for edge in fci.dag.edges():
+            print(edge)
+    else:
+        for edge in fci.pag.edges():
+            print(edge)
+    if fci.metrics:
+        print(fci.metrics)
+    else:
+        print("No metrics available")
 
     # if save:
     #     where_to = utils.save_experiment(rex.name, output_path, rex)
@@ -339,4 +377,4 @@ def main(dataset_name,
 
 # Create a call to FCI with a sample dataset.
 if __name__ == "__main__":
-    main("rex_generated_linear_0", njobs=1)
+    main("rex_generated_linear_1", njobs=1)

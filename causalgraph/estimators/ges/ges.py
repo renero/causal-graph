@@ -201,7 +201,7 @@ class GES(object):
         self.fit(X, A0)
         if ref_graph:
             self.metrics = evaluate_graph(
-                self.dag, ref_graph, self.feature_names)
+                ref_graph, self.dag, self.feature_names)
         return self.dag
 
     def fit_bic(self, data, A0=None):

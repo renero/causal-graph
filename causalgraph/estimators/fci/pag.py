@@ -1,8 +1,41 @@
+"""
+Directed Edges (A → B):
+    This edge type indicates a direct causal effect from node A to node B.
+    It means that A is a direct cause of B.
+Bidirected Edges (A ↔ B):
+    This edge suggests that there is a common cause (confounder) affecting both A and B.
+    It is usually used to indicate that A and B have a correlation due to a latent 
+    variable.
+Partially Directed Edges (A o-> B or A <-o B):
+    These edges represent uncertainty about the direction of causation.
+    A o-> B indicates that there might be a causal effect from A to B, but it's not 
+    certain.
+    A <-o B indicates that there might be a causal effect from B to A, but it's not 
+    certain.
+Nondirected Edges (A -- B):
+    This edge type represents an uncertain relationship between A and B.
+    It's unclear whether there is a direct cause, a common cause, or some other type 
+    of relationship.
+Partially Bidirected Edges (A o-o B):
+    This edge suggests that there is uncertainty about whether there is a direct causal 
+    effect, a common cause, or both.
+    It represents a high level of uncertainty about the nature of the relationship 
+    between A and B.
+
+"""
+
+# pylint: disable=E1101:no-member
+# pylint: disable=W0201:attribute-defined-outside-init, W0511:fixme
+# pylint: disable=W0106:expression-not-assigned
+# pylint: disable=C0103:invalid-name, C0116:missing-function-docstring
+# pylint: disable=R0913:too-many-arguments, R0902:too-many-instance-attributes
+# pylint: disable=R0914:too-many-locals, R0915:too-many-statements
+# pylint: disable=R1702:too-many-branches
+
+from typing import List
+
 import networkx as nx
 import numpy as np
-
-from causalgraph.common.utils import graph_to_adjacency
-from causalgraph.estimators.ges.utils import pdag_to_dag
 
 
 class PAG(nx.Graph):
@@ -11,27 +44,10 @@ class PAG(nx.Graph):
     all edge types of a partial ancestral graph
     """
 
-    def add_edge(self, u, v, utag="o", vtag="o"):
+    def has_partially_directed_edge(self, u, v):
         """
-        A method to add an edge to a graph
-
-        Parameters
-        ----------
-        u : str
-            the from node of an edge
-        v: str
-            the to node of an edge
-        utag: str
-            the tag of the from node of an edge
-        vtag: str
-            the tag of the to node of an edge
-        """
-        super().add_edges_from([(u, v, {u: utag, v: vtag})])
-
-    def has_directed_edge(self, u, v):
-        """
-        A method to check the graph for a directed edge
-        (an edge with a > tag on the to node)
+        A method to check the graph for a partially directed edge
+        (an edge with a o tag on the to node)
 
         Parameters
         ----------
@@ -43,17 +59,67 @@ class PAG(nx.Graph):
         Returns
         -------
         bool
-            True if has directed edge, false if not
+            True if has partially directed edge, false if not
 
         """
         if super().has_edge(u, v):
             tags = super().get_edge_data(u, v)
-            if tags[v] == ">":
+            if tags[u] == 'o' and tags[v] == ">":
                 return True
-            else:
-                return False
-        else:
             return False
+        return False
+
+    def has_bidirected_edge(self, u, v):
+        """
+        A method to check the graph for a bidirectional edge
+        (an edge with a > tag on the to node and
+        a > tag on the from node)
+
+        Parameters
+        ----------
+        u : str
+            the from node of the edge
+        v: str
+            the to node of the edge
+
+        Returns
+        -------
+        bool
+            True if has bidirectional edge, false if not
+
+        """
+        if super().has_edge(u, v):
+            tags = super().get_edge_data(u, v)
+            if tags[u] == ">" and tags[v] == ">":
+                return True
+            return False
+        return False
+
+    def has_partially_bidirected_edge(self, u, v):
+        """
+        A method to check the graph for a partially bidirectional edge
+        (an edge with a o tag on the to node and
+        a > tag on the from node)
+
+        Parameters
+        ----------
+        u : str
+            the from node of the edge
+        v: str
+            the to node of the edge
+
+        Returns
+        -------
+        bool
+            True if has partially bidirectional edge, false if not
+
+        """
+        if super().has_edge(u, v):
+            tags = super().get_edge_data(u, v)
+            if tags[u] == "o" and tags[v] == "o":
+                return True
+            return False
+        return False
 
     def has_fully_directed_edge(self, u, v):
         """
@@ -109,6 +175,48 @@ class PAG(nx.Graph):
                 return False
         else:
             return False
+
+    def has_directed_edge(self, u, v):
+        """
+        A method to check the graph for a directed edge
+        (an edge with a > tag on the to node)
+
+        Parameters
+        ----------
+        u : str
+            the from node of the edge
+        v: str
+            the to node of the edge
+
+        Returns
+        -------
+        bool
+            True if has directed edge, false if not
+
+        """
+        if super().has_edge(u, v):
+            tags = super().get_edge_data(u, v)
+            if tags[v] == ">":
+                return True
+            return False
+        return False
+
+    def add_edge(self, u, v, utag="o", vtag="o"):
+        """
+        A method to add an edge to a graph
+
+        Parameters
+        ----------
+        u : str
+            the from node of an edge
+        v: str
+            the to node of an edge
+        utag: str
+            the tag of the from node of an edge
+        vtag: str
+            the tag of the to node of an edge
+        """
+        super().add_edges_from([(u, v, {u: utag, v: vtag})])
 
     def add_edges_from(self, bunch, **attr):
         """
@@ -431,7 +539,36 @@ class PAG(nx.Graph):
                 f.write(",".join([str(int(point)) for point in mat[i]]))
                 f.write("\n")
 
-    def to_dag(self):
+    def to_dag(self, node_names: List[str] = None):
+        dag = nx.DiGraph()
+        if node_names is None:
+            dag.add_nodes_from(self.nodes)
+        else:
+            dag.add_nodes_from(node_names)
+        for u, v in self.edges:
+            # Easy case - fully directed edge: u -> v
+            if self.has_fully_directed_edge(u, v):
+                dag.add_edge(u, v)
+                continue
+            # Bi-directed edge: u <-> v
+            if self.has_bidirected_edge(u, v):
+                dag.add_edge(u, v)
+                dag.add_edge(v, u)
+                continue
+            # Partially directed edge: u o-> v
+            if self.has_partially_directed_edge(u, v):
+                dag.add_edge(u, v)
+                continue
+            # Partially bi-directed edge: u o-o v
+            if self.has_partially_bidirected_edge(u, v):
+                continue
+            # Non-directed edge: u - v
+            if self.has_fully_undirected_edge(u, v):
+                continue
+
+        return dag
+
+    def to_dag_old(self):
         """
         Converts a Partially Directed Acyclic Graph (PDAG) to a Directed Acyclic Graph (DAG).
         Args:
@@ -470,7 +607,7 @@ class PAG(nx.Graph):
                 # Check if reversing the edge creates a cycle
                 if not nx.is_directed_acyclic_graph(dag):
                     print(
-                        "Unable to orient the graph into a DAG without creating a cycle.")
+                        "Unable to orient graph into a DAG without creating a cycle.")
                     return None
 
         return dag

@@ -42,7 +42,7 @@ class PC(StructureEstimator):
 
     dag = None
     pdag = None
-    is_fitted = False
+    is_fitted_ = False
     metrics = None
 
     def __init__(self, name: str, independencies=None, **kwargs):
@@ -215,10 +215,10 @@ class PC(StructureEstimator):
 
         # Step 3: Either return the CPDAG or fully orient the edges to build a DAG.
         if self.return_type.lower() in ("pdag", "cpdag"):
-            self.is_fitted = True
+            self.is_fitted_ = True
             return self.pdag
         if self.return_type.lower() == "dag":
-            self.is_fitted = True
+            self.is_fitted_ = True
             return nx.DiGraph(self.pdag.to_dag())
         raise ValueError(
             f"return_type must be one of: dag, pdag, cpdag, or skeleton. "
@@ -229,7 +229,7 @@ class PC(StructureEstimator):
         self.fit(X, **kwargs)
         if ref_graph:
             self.metrics = evaluate_graph(
-                self.dag, ref_graph, self.feature_names)
+                ref_graph, self.dag, self.feature_names)
         return self.dag
 
     def build_skeleton(self, **kwargs):

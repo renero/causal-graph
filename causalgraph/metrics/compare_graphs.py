@@ -300,7 +300,8 @@ def _adjacency(G: AnyGraph, order: List = None, threshold=0.0, absolute=False):
     """
     if order is None:
         order = sorted(list(G.nodes()))
-    if nx.is_weighted(G) and all([x[-1]['weight'] != None for x in G.edges(data=True)]):
+    if nx.is_weighted(G) and all(
+            [x[-1]['weight'] != None for x in G.edges(data=True)]):
         result = _binary_adj_matrix(G, order, threshold, absolute)
     else:
         # Scipy adjacency sometimes throws an exception based on type.
@@ -487,8 +488,11 @@ def _recall(metrics):
 def _aupr(metrics):
     true_labels = np.squeeze(np.asarray(metrics["_Gm"].ravel()))
     predicted = np.squeeze(np.asarray(metrics["_preds"].ravel()))
-    _sk_precision, _sk_recall, _sk_ths = precision_recall_curve(
-        true_labels, predicted)
+    try:
+        _sk_precision, _sk_recall, _ = precision_recall_curve(
+            true_labels, predicted)
+    except ValueError:
+        return 0.0
     return auc(_sk_recall, _sk_precision)
 
 

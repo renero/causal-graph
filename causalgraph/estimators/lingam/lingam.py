@@ -167,7 +167,7 @@ class DirectLiNGAM(_BaseLiNGAM):
         self.fit(X)
         if ref_graph:
             self.metrics = evaluate_graph(
-                self.dag, ref_graph, self.feature_names)
+                ref_graph, self.dag, self.feature_names)
         return self.dag
 
     def _extract_partial_orders(self, pk):

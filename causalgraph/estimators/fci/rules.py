@@ -17,7 +17,7 @@ def rule1(pag, i, j, k):
     """
     if pag.has_directed_edge(i, j) and pag.has_o(j, k, j) and not pag.has_edge(i, k):
         pag.fully_direct_edge(j, k)
-        print(f"Orienting edge {j},{k} with rule 1")
+        # print(f"Orienting edge {j},{k} with rule 1")
         return True
     return False
 
