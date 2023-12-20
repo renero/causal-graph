@@ -26,6 +26,10 @@ from causalgraph.common import utils
 from causalgraph.common.utils import (graph_from_dot_file, load_experiment,
                                       save_experiment)
 from causalgraph.estimators.rex import Rex
+from causalgraph.estimators.fci.fci import FCI
+from causalgraph.estimators.pc.pc import PC
+from causalgraph.estimators.ges.ges import GES
+from causalgraph.estimators.lingam.lingam import DirectLiNGAM as LiNGAM
 from causalgraph.metrics.compare_graphs import evaluate_graph
 
 warnings.filterwarnings('ignore')
@@ -60,6 +64,14 @@ metric_labels = {
     'intersection_nc': '∩',
     'union_nc': '∪',
     'union_all_nc': 'all'
+}
+
+estimators = {
+    'rex': Rex,
+    'fci': FCI,
+    'pc': PC,
+    'lingam': LiNGAM,
+    'ges': GES
 }
 
 
@@ -400,6 +412,27 @@ class Experiments(BaseExperiment):
         self.experiments = list(self.experiment.values())
         return self
 
+    def create_estimator(self, estimator_name: str, name: str, **kwargs):
+        """
+        Dynamically creates an instance of a class based on the estimator name.
+
+        Args:
+        estimator_name (str): The name of the estimator (key in the 'estimators' 
+            dictionary).
+        name (str): The name of the estimator instance.
+        *args: Variable length argument list to be passed to the class constructor.
+        **kwargs: Arbitrary keyword arguments to be passed to the class constructor.
+
+        Returns:
+        An instance of the specified class, or None if the class does not exist.
+        """
+        estimator_class = estimators.get(estimator_name)
+        if estimator_class is None:
+            print(f"Estimator '{estimator_name}' not found.")
+            return None
+
+        return estimator_class(name=name, **kwargs)
+
     def fit(self, estimator="rex", save_as_pattern=None, **kwargs) -> list:
         """
         Fits the experiments.
@@ -428,11 +461,13 @@ class Experiments(BaseExperiment):
                 print(f"Experiment {save_as} already exists, skipping...")
                 continue
 
-            print(f"Training Rex on {filename}...")
-            self.experiment[self.experiment_name] = Rex(
-                name=self.experiment_name, **kwargs)
+            print(f"Training '{estimator}' on {filename}...")
+            # self.experiment[self.experiment_name] = Rex(
+            #     name=self.experiment_name, **kwargs)
+            self.experiment[self.experiment_name] = self.create_estimator(
+                estimator, name=self.experiment_name, **kwargs)
             self.experiment[self.experiment_name].fit_predict(
-                self.train_data, self.test_data, self.ref_graph)
+                train=self.train_data, test=self.test_data, ref_graph=self.ref_graph)
 
             saved_to = save_experiment(
                 save_as, self.output_path, self.experiment[self.experiment_name])

@@ -225,8 +225,8 @@ class PC(StructureEstimator):
             f"Got: {self.return_type}"
         )
 
-    def fit_predict(self, X, ref_graph: nx.DiGraph = None, **kwargs):
-        self.fit(X, **kwargs)
+    def fit_predict(self, train, test, ref_graph: nx.DiGraph = None, **kwargs):
+        self.fit(train, **kwargs)
         if ref_graph:
             self.metrics = evaluate_graph(
                 ref_graph, self.dag, self.feature_names)
@@ -551,7 +551,7 @@ def main(dataset_name,
 
     pc = PC(name=dataset_name, variant="stable",
             ci_test="pearsonr", max_cond_vars=5)
-    pc.fit_predict(X=data, ref_graph=ref_graph)
+    pc.fit_predict(train=data, test=None, ref_graph=ref_graph)
 
     for edge in pc.dag.edges():
         print(edge)

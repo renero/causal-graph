@@ -146,9 +146,11 @@ class GES(object):
 
     def __init__(
             self,
+            name: str,
             phases=None,
             iterate=False,
             debug=0):
+        self.name = name
         self.phases = [
             'forward', 'backward', 'turning'
         ] if phases is None else phases
@@ -165,7 +167,7 @@ class GES(object):
         self.is_fitted_ = True
         return self
 
-    def fit_predict(self, X, ref_graph: nx.DiGraph = None, A0=None):
+    def fit_predict(self, train, test, ref_graph: nx.DiGraph = None, A0=None):
         """
         Fit the GES algorithm to the given data and return the
         adjacency matrix of the estimated CPDAG.
@@ -198,7 +200,7 @@ class GES(object):
             If the value of some of the parameters is not appropriate,
             e.g. a wrong phase is specified.
         """
-        self.fit(X, A0)
+        self.fit(train, A0)
         if ref_graph:
             self.metrics = evaluate_graph(
                 ref_graph, self.dag, self.feature_names)
@@ -1065,8 +1067,8 @@ def main(dataset_name,
     train = data.sample(frac=0.8, random_state=42)
     test = data.drop(train.index)
 
-    ges = GES(phases=["forward", "backward", "turning"], debug=0)
-    ges.fit_predict(train, ref_graph=ref_graph)
+    ges = GES(dataset_name, phases=["forward", "backward", "turning"], debug=0)
+    ges.fit_predict(train=data, test=None, ref_graph=ref_graph)
 
     for edge in ges.dag.edges():
         print(edge)

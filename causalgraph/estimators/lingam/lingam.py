@@ -45,6 +45,7 @@ class DirectLiNGAM(_BaseLiNGAM):
 
     def __init__(
             self,
+            name: str,
             random_state=None,
             prior_knowledge=None,
             apply_prior_knowledge_softly=False,
@@ -76,6 +77,7 @@ class DirectLiNGAM(_BaseLiNGAM):
             Measure to evaluate independence: 'pwling' [2]_ or 'kernel' [1]_.
         """
         super().__init__(random_state)
+        self.name = name
         self._Aknw = prior_knowledge
         self._apply_prior_knowledge_softly = apply_prior_knowledge_softly
         self._measure = measure
@@ -150,7 +152,7 @@ class DirectLiNGAM(_BaseLiNGAM):
         self.is_fitted_ = True
         return self
 
-    def fit_predict(self, X, ref_graph: nx.DiGraph = None):
+    def fit_predict(self, train, test, ref_graph: nx.DiGraph = None):
         """Fit the model to X and return the estimated DAG.
 
         Parameters
@@ -164,7 +166,7 @@ class DirectLiNGAM(_BaseLiNGAM):
         self : object
             Returns the instance itself.
         """
-        self.fit(X)
+        self.fit(train)
         if ref_graph:
             self.metrics = evaluate_graph(
                 ref_graph, self.dag, self.feature_names)
@@ -359,8 +361,8 @@ def main(dataset_name,
     train = data.sample(frac=0.8, random_state=42)
     test = data.drop(train.index)
 
-    lingam = DirectLiNGAM()
-    lingam.fit_predict(train, ref_graph=ref_graph)
+    lingam = DirectLiNGAM(dataset_name)
+    lingam.fit_predict(train=data, test=None, ref_graph=ref_graph)
 
     for edge in lingam.dag.edges():
         print(edge)

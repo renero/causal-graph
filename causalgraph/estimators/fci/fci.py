@@ -147,7 +147,7 @@ class FCI(GraphLearner):
 
         return self
 
-    def fit_predict(self, X: pd.DataFrame, ref_graph: nx.DiGraph = None):
+    def fit_predict(self, train: pd.DataFrame, test: pd.DataFrame, ref_graph: nx.DiGraph = None):
         """
         Method to fit the data and evaluate the learned graph against a reference graph.
 
@@ -161,7 +161,7 @@ class FCI(GraphLearner):
         nx.DiGraph
             learned causal graph
         """
-        self.fit(X)
+        self.fit(train)
         if ref_graph and self.dag:
             self.metrics = evaluate_graph(
                 ref_graph, self.dag, self.feature_names)
@@ -357,7 +357,7 @@ def main(dataset_name,
     test = data.drop(train.index)
 
     fci = FCI(name=dataset_name, output_path=output_path, **kwargs)
-    fci.fit_predict(data, ref_graph=ref_graph)
+    fci.fit_predict(train=data, test=None, ref_graph=ref_graph)
 
     if fci.dag:
         for edge in fci.dag.edges():
