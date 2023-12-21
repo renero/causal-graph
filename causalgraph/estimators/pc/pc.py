@@ -14,7 +14,7 @@ from joblib import Parallel, delayed
 from sklearn.preprocessing import StandardScaler
 from tqdm.auto import tqdm
 
-from causalgraph.common import utils
+from causalgraph.common import tqdm_params, utils
 from causalgraph.estimators.pc.ci_tests import chi_square, pearsonr
 from causalgraph.estimators.pc.estimators import StructureEstimator
 from causalgraph.estimators.pc.pdag import PDAG
@@ -73,7 +73,7 @@ class PC(StructureEstimator):
         self.return_type = kwargs.get("return_type", "dag")
         self.significance_level = kwargs.get("significance_level", 0.01)
         self.n_jobs = kwargs.get("n_jobs", -1)
-        self.show_progress = kwargs.get("show_progress", True)
+        self.prog_bar = kwargs.get("prog_bar", False)
 
     def fit(self, X, **kwargs):
         """
@@ -301,9 +301,8 @@ class PC(StructureEstimator):
                 f"or a function. Got: {ci_test_fn}"
             )
 
-        if self.show_progress and SHOW_PROGRESS:
-            pbar = tqdm(total=self.max_cond_vars, leave=False)
-            pbar.set_description("PC:")
+        pbar = tqdm(
+            total=self.max_cond_vars, **tqdm_params("PC algorithm", self.prog_bar))
 
         # Step 1: Initialize a fully connected undirected graph
         graph = nx.complete_graph(n=self.variables, create_using=nx.Graph)
@@ -414,13 +413,13 @@ class PC(StructureEstimator):
                 break
             lim_neighbors += 1
 
-            if self.show_progress and SHOW_PROGRESS:
+            if self.prog_bar and SHOW_PROGRESS:
                 pbar.update(1)
                 pbar.set_description(
                     f"PC: Working for n conditional variables: {lim_neighbors}"
                 )
 
-        if self.show_progress and SHOW_PROGRESS:
+        if self.prog_bar and SHOW_PROGRESS:
             pbar.close()
         return graph, separating_sets
 
