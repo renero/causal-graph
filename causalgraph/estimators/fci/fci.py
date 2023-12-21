@@ -26,6 +26,7 @@ from networkx import Graph
 from sklearn.discriminant_analysis import StandardScaler
 from tqdm.auto import tqdm
 
+from causalgraph.common import tqdm_params
 from causalgraph.common.utils import (graph_from_adjacency_file,
                                       graph_from_dot_file)
 from causalgraph.estimators.fci.colliders import (get_dsep_combs,
@@ -106,6 +107,8 @@ class FCI(GraphLearner):
         self.base_skeleton = kwargs.get("base_skeleton", None)
         self.base_sepset = kwargs.get("base_sepset", None)
         self.log = kwargs.get("logger", None)
+        self.prog_bar = kwargs.get("progbar", True)
+        self.silent = kwargs.get("silent", False)
 
         super().__init__(logger=self.log,
                          data_file=self.data_file,
@@ -138,7 +141,8 @@ class FCI(GraphLearner):
             print("Orienting Edges...")
         self.pag = orientEdges(skeleton, sepset, data_file=self.data_file,
                                output_path=self.output_path, log=self.log,
-                               verbose=self.verbose, debug=self.debug)
+                               verbose=self.verbose, debug=self.debug,
+                               prog_bar=self.prog_bar, silent=self.silent)
         self.dag = self.pag.to_dag(self.feature_names)
 
         if self.verbose:
@@ -223,15 +227,16 @@ class FCI(GraphLearner):
         pag, dseps = init_pag(skeleton, sepSet, self.verbose, self.debug)
         if self.verbose:
             print("Finding colliders...", flush=True)
-        pbar = tqdm(pag, disable=self.verbose, leave=False)
-        pbar.set_description(f"Learn Skeleton")
+
+        pbar = tqdm(
+            pag,
+            **tqdm_params("Learn Skeleton", self.prog_bar, silent=self.silent))
+
         for lx, x in enumerate(pag):
-            # if x not in ["F", "J"]:
-            #     continue
-            pbar.update()
+            pbar.refresh()
             neighbors = get_neighbors(x, pag)
             self.debug.neighbors(x, lx, neighbors, pag)
-            if not len(neighbors):
+            if len(neighbors) == 0:
                 continue
             for ny, y in enumerate(neighbors):
                 tup = self.find_colliders(x, y, pag, ny, dseps, sepSet,
@@ -239,7 +244,7 @@ class FCI(GraphLearner):
                 if tup:
                     self.update_actions(pag_actions, tup)
             self.debug.stack(pag_actions)
-            pbar.refresh()
+            pbar.update(1)
         pbar.close()
         return pag, sepSet
 
@@ -278,8 +283,10 @@ class FCI(GraphLearner):
         if self.verbose:
             print("Finding colliders...", flush=True)
         pool = mp.Pool(self.njobs)
-        pbar = tqdm(total=len(pag), disable=self.verbose, leave=False)
-        pbar.set_description("Learn skeleton")
+
+        pbar = tqdm(
+            len(pag), **tqdm_params("Learn Skeleton", self.prog_bar, silent=self.silent))
+
         results = []
         for lx, x in enumerate(pag):
             # if x not in ["F", "J"]:
@@ -377,4 +384,5 @@ def main(dataset_name,
 
 # Create a call to FCI with a sample dataset.
 if __name__ == "__main__":
-    main("rex_generated_linear_1", njobs=1)
+    main("short_linear_1", njobs=1)
+    # main("rex_generated_linear_1", njobs=1)

@@ -1,8 +1,15 @@
 """
 This file contains all the methods related to colliders and d-separation sets.
 
-
 """
+# pylint: disable=E1101:no-member
+# pylint: disable=W0201:attribute-defined-outside-init, W0511:fixme
+# pylint: disable=W0106:expression-not-assigned
+# pylint: disable=C0103:invalid-name, C0116:missing-function-docstring
+# pylint: disable=R0913:too-many-arguments, R0902:too-many-instance-attributes
+# pylint: disable=R0914:too-many-locals, R0915:too-many-statements
+# pylint: disable=R1702:too-many-branches
+
 import itertools
 
 import networkx as nx
@@ -13,9 +20,22 @@ from causalgraph.estimators.fci import rules
 from causalgraph.estimators.fci.debug import Debug
 from causalgraph.estimators.fci.initialization import save_graph
 from causalgraph.estimators.fci.pag import PAG
+from causalgraph.common import tqdm_params
 
 
 def init_pag(skeleton, sepSet, verbose, debug):
+    """
+    Initializes the PAG (Partially Ancestral Graph) from the base skeleton.
+
+    Args:
+        skeleton (networkx.Graph): The base skeleton graph.
+        sepSet (dict): The dictionary containing the separation sets.
+        verbose (bool): Flag indicating whether to print verbose output.
+        debug (Debug): The debug object for debugging purposes.
+
+    Returns:
+        tuple: A tuple containing the initialized PAG and the possible d-separation sets.
+    """
     if verbose:
         print("2nd Stage Skeleton")
     debug.dbg("Initializing PAG from base skeleton")
@@ -32,7 +52,7 @@ def init_pag(skeleton, sepSet, verbose, debug):
 
 
 def orientEdges(skeleton, sepSet, log, verbose, debug, data_file, output_path,
-                save_intermediate: bool = False):
+                save_intermediate: bool = False, prog_bar=False, silent=False):
     """
     A function to orient the edges of a skeleton using the orientation
     rules of the FCI algorithm
@@ -62,12 +82,14 @@ def orientEdges(skeleton, sepSet, log, verbose, debug, data_file, output_path,
         three_tuples = list(itertools.permutations(pag, 3))
         if verbose:
             print("Applying rules...")
-        pbar = tqdm(total=len(three_tuples),
-                    disable=debug.verbose, leave=False)
-        pbar.set_description("App.Rules")
+
+        pbar = tqdm(
+            total=len(three_tuples),
+            **tqdm_params("App.Rules", prog_bar, silent=silent))
+
         pbar.reset()
         for i, j, k in three_tuples:
-            pbar.update(1)
+            pbar.refresh()
             changed_pag = rules.rule1(pag, i, j, k)
             changed_pag |= rules.rule2(pag, i, j, k)
             for node in (node for node in pag if node not in [i, j, k]):
@@ -78,7 +100,7 @@ def orientEdges(skeleton, sepSet, log, verbose, debug, data_file, output_path,
                 changed_pag |= rules.rule8(pag, i, j, k)
                 changed_pag |= rules.rule9(pag, i, j, k, node)
                 changed_pag |= rules.rule10(pag, i, j, k, node)
-            pbar.refresh()
+            pbar.update(1)
         pbar.close()
     if save_intermediate:
         save_graph(pag, "adjmat_FCI_ruled", data_file, output_path, log)
@@ -86,12 +108,24 @@ def orientEdges(skeleton, sepSet, log, verbose, debug, data_file, output_path,
 
 
 def get_dsep_combs(dseps, x, y, i):
+    """
+    Get combinations of d-separating variables for a given variable pair.
+
+    Parameters:
+    dseps (dict): A dictionary containing d-separating variables for each variable.
+    x (str): The first variable.
+    y (str): The second variable.
+    i (int): The number of variables to combine.
+
+    Returns:
+    list: A list of combinations of d-separating variables where "y" is not present.
+    """
     dsep_combinations = list(
         itertools.combinations(dseps[x], i))
     # Keep only those combinations where "y" is not present
     dsep_combinations = [tuple(filter(lambda e: e != y, t))
                          for t in dsep_combinations]
-    return list(filter(lambda ℷ: len(ℷ) != 0, dsep_combinations))
+    return list(filter(lambda comb: len(comb) != 0, dsep_combinations))
 
 
 def orient_V(pag, sepSet, debug):
@@ -165,12 +199,17 @@ def possible_d_seps(pag, debug: Debug):
     ----------
         pag: (PAG) PAG to find dseps for
         debug: (Debug) Debugger
+
     Returns
     -------
         dict
             keys: nodes
             values: nodes which could d-seperate other nodes from key node
 
+    Raises
+    ------
+        TimeoutError
+            If the timeout is reached.
     """
     dseps = dict((i, []) for i in pag)
     tuples = list(itertools.permutations(pag, 2))
@@ -180,9 +219,8 @@ def possible_d_seps(pag, debug: Debug):
                   end="")
         try:
             potential_dsep = is_possible_d_sep(i, j, pag, debug)
-        except:
+        except TimeoutError:
             debug.dbg(" ** Timeout **")
-            pass
         else:
             if potential_dsep:
                 dseps[i].append(j)

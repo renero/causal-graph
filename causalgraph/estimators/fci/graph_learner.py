@@ -24,9 +24,10 @@ from pygam import pygam
 
 from tqdm.auto import tqdm
 
+from causalgraph.common import tqdm_params
+from causalgraph.common.utils import graph_from_adjacency_file
 from causalgraph.estimators.fci.initialization import (dsep_set_from_csv,
                                                        save_graph, save_sepset)
-from causalgraph.common.utils import graph_from_adjacency_file
 from causalgraph.estimators.fci.debug import *
 
 
@@ -143,8 +144,10 @@ class GraphLearner():
         actions, condlen, condsize, graph, sepset = self.init_learning()
 
         # Iterate over each pair of adjacent nodes
-        pbar = tqdm(self.labels, desc="Base skeleton",
-                    disable=self.verbose, leave=False)
+        pbar = tqdm(
+            self.labels,
+            **tqdm_params("Base Skeleton", self.prog_bar, silent=self.silent))
+
         while condlen != 0:
             # condlen controls the amount of potential dependencies to explore
             # at each iteration the nr of cond. sets are added to this variable
@@ -157,7 +160,7 @@ class GraphLearner():
                 self.oo(f" + x = {x}; {lx + 1}/{len(self.all_labels_but(x))}")
                 condlen, actions = self.check_independence(
                     x, graph, condlen, condsize, sepset, actions)
-                pbar.update()
+                pbar.update(1)
             condsize += 1
         pbar.close()
         self.debug.stack(actions)
@@ -209,7 +212,10 @@ class GraphLearner():
                 pbar.update(1)
 
         # Iterate over each pair of adjacent nodes
-        pbar = tqdm(total=len(self.labels), disable=self.verbose, leave=False)
+        pbar = tqdm(
+            len(self.labels),
+            **tqdm_params("Base Skeleton", self.prog_bar, silent=self.silent))
+
         pbar.set_description("Base skeleton")
         while condlen != 0:
             # condlen controls the amount of potential dependencies to explore
