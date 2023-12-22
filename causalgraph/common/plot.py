@@ -298,7 +298,7 @@ def draw_graph_subplot(
                 ax=ax)
 
     if title is not None:
-        ax.set_title(title, y=-0.1)
+        ax.set_title(title, y=-0.1, fontsize=12)
 
 
 def cleanup_graph(G: nx.DiGraph) -> nx.DiGraph:
@@ -506,7 +506,7 @@ def dag(
         graph: nx.DiGraph,
         reference: nx.DiGraph = None,
         root_causes: list = None,
-        show_metrics: bool = True,
+        show_metrics: bool = False,
         title: str = None,
         ax: plt.Axes = None,
         figsize: Tuple[int, int] = (5, 5),
@@ -590,6 +590,7 @@ def dag(
         draw_graph_subplot(
             G, root_causes=root_causes, layout=ref_layout, ax=axis, title=title,
             **formatting_kwargs)
+
         if show_metrics:
             plt.rcParams["font.family"] = "monospace"
             text_axis.text(0.1, 0.5, metric.matplotlib_repr(),

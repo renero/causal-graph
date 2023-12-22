@@ -98,6 +98,19 @@ def list_files(input_pattern: str, where: str) -> list:
 
 
 class BaseExperiment:
+    """
+    Base class for experiments.
+
+    Args:
+    input_path (str): The path to the input data.
+    output_path (str): The path to save the experiment output.
+    train_anyway (bool, optional): Whether to train the model even if the experiment exists. Defaults to False.
+    save_anyway (bool, optional): Whether to save the experiment even if it exists. Defaults to False.
+    train_size (float, optional): The proportion of data to use for training. Defaults to 0.9.
+    random_state (int, optional): The random state for reproducibility. Defaults to 42.
+    verbose (bool, optional): Whether to display verbose output. Defaults to False.
+    """
+
     def __init__(
             self,
             input_path: str,

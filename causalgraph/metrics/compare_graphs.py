@@ -100,6 +100,24 @@ class Metrics:
         self.sid_lower = sid['sidLowerBound']
         self.sid_upper = sid['sidUpperBound']
 
+    def to_dict(self) -> Dict[str, Union[int, float]]:
+        """
+        Convert the metrics to a dictionary.
+        """
+        dictionary = {}
+        dictionary["Tp"] = self.Tp
+        dictionary["Tn"] = self.Tn
+        dictionary["Fn"] = self.Fn
+        dictionary["Fp"] = self.Fp
+        dictionary["precision"] = self.precision
+        dictionary["recall"] = self.recall
+        dictionary["f1"] = self.f1
+        dictionary["aupr"] = self.aupr
+        dictionary["shd"] = self.shd
+        dictionary["sid"] = self.sid
+
+        return dictionary
+
     def __str__(self):
         s = ""
         s += f"Predicted    1     0      Precision: {self.precision:.3g}\n"
