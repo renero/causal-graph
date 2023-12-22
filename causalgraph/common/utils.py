@@ -29,7 +29,12 @@ from causalgraph.independence.edge_orientation import get_edge_orientation
 AnyGraph = Union[nx.Graph, nx.DiGraph]
 
 
-def save_experiment(obj_name: str, folder: str, results: dict, overwrite: bool = False):
+def save_experiment(
+        obj_name: str,
+        folder: str,
+        results: object,
+        overwrite: bool = False
+):
     """
     Creates a folder for the experiment and saves results. Results is a
     dictionary that will be saved as an opaque pickle. When the experiment will
@@ -44,6 +49,9 @@ def save_experiment(obj_name: str, folder: str, results: dict, overwrite: bool =
         results (obj): the object to be saved as experiment. This is typically a
             dictionary with different items representing different parts of the
             experiment.
+        overwrite (bool): If True, then the experiment is saved even if a file
+            with the same name already exists. If False, then the experiment is
+            saved only if a file with the same name does not exist.
 
     Return:
         (str) The name under which the experiment has been saved

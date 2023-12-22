@@ -60,7 +60,7 @@ class FCI(GraphLearner):
     def __init__(
             self,
             name: str,
-            output_path: Union[Path, str],
+            output_path: Union[Path, str] = "./",
             **kwargs):
         """
         Initialize the FCI algorithm creating an FCI learner.
@@ -237,6 +237,7 @@ class FCI(GraphLearner):
             neighbors = get_neighbors(x, pag)
             self.debug.neighbors(x, lx, neighbors, pag)
             if len(neighbors) == 0:
+                pbar.update(1)
                 continue
             for ny, y in enumerate(neighbors):
                 tup = self.find_colliders(x, y, pag, ny, dseps, sepSet,

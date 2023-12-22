@@ -6,7 +6,7 @@ This file includes all the plot methods for the causal graph
 
 # pylint: disable=E1101:no-member, W0201:attribute-defined-outside-init, W0511:fixme
 # pylint: disable=C0103:invalid-name, E1121:too-many-function-args
-# pylint: disable=C0116:missing-function-docstring
+# pylint: disable=C0116:missing-function-docstring, W0212:protected-access
 # pylint: disable=R0913:too-many-arguments, disable:W0212:protected-access
 # pylint: disable=R0914:too-many-locals, R0915:too-many-statements
 # pylint: disable=W0106:expression-not-assigned, R1702:too-many-branches
@@ -27,6 +27,7 @@ from matplotlib.ticker import MultipleLocator
 from pydot import Dot
 
 from causalgraph.explainability.shapley import ShapEstimator
+from causalgraph.metrics.compare_graphs import evaluate_graph
 
 
 # Defaults for the graphs plotted
@@ -505,6 +506,7 @@ def dag(
         graph: nx.DiGraph,
         reference: nx.DiGraph = None,
         root_causes: list = None,
+        show_metrics: bool = True,
         title: str = None,
         ax: plt.Axes = None,
         figsize: Tuple[int, int] = (5, 5),
@@ -516,10 +518,14 @@ def dag(
 
     Parameters:
     -----------
-    reference: The reference DAG.
     graph: The DAG to compare.
-    names: The names of the reference graph and the dag.
+    reference: The reference DAG.
+    root_causes: The root causes of the graph.
+    show_metrics: Whether to show the metrics of the graph.
+    title: The title of the graph.
+    ax: The axis in which to draw the graph.
     figsize: The size of the figure.
+    dpi: The dots per inch of the figure.
     **kwargs: Additional arguments to format the graphs:
         - "node_size": 500
         - "node_color": 'white'
@@ -533,6 +539,10 @@ def dag(
 
     # Overwrite formatting_kwargs with kwargs if they are provided
     formatting_kwargs.update(kwargs)
+
+    # Check consistency
+    if show_metrics and reference is None:
+        show_metrics = False
 
     G = nx.DiGraph()
     G.add_nodes_from(graph.nodes(data=True))
@@ -550,8 +560,14 @@ def dag(
 
     ref_layout = None
     setup_plot(dpi=dpi)
-    if ax is None:
+    if ax is None and show_metrics is False:
         f, axis = plt.subplots(ncols=ncols, figsize=figsize)
+    elif ax is None and show_metrics is True:
+        metric = evaluate_graph(reference, graph, list(reference.nodes))
+        ax = plt.figure(
+            figsize=(6, 4), layout="constrained").subplot_mosaic('AAB')
+        axis = ax["A"]
+        text_axis = ax["B"]
     else:
         axis = ax
     if save_to_pdf is not None:
@@ -574,6 +590,11 @@ def dag(
         draw_graph_subplot(
             G, root_causes=root_causes, layout=ref_layout, ax=axis, title=title,
             **formatting_kwargs)
+        if show_metrics:
+            plt.rcParams["font.family"] = "monospace"
+            text_axis.text(0.1, 0.5, metric.matplotlib_repr(),
+                           ha='left', va='center', size=12)
+            text_axis.axis('off')
 
         if ax is None:
             plt.show()

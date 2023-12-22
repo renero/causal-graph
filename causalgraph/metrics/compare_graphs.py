@@ -113,6 +113,37 @@ class Metrics:
             s += f"                          SID......: {self.sid:.3g} [{self.sid_lower}..{self.sid_upper}]\n"
         return s
 
+    def matplotlib_repr(self):
+        """
+        Generates a formatted string representation of the metrics for display 
+        in a matplotlib plot.
+
+        Returns:
+            str: The formatted string representation of the metrics.
+        """
+        s_Tp = f"{self.Tp:^5d}"
+        s_Tn = f"{self.Tn:^5d}"
+        s_Fp = f"{self.Fp:^5d}"
+        s_Fn = f"{self.Fn:^5d}"
+        s_Tp = s_Tp.replace(" ", r"\ ")
+        s_Tn = s_Tn.replace(" ", r"\ ")
+        s_Fp = s_Fp.replace(" ", r"\ ")
+        s_Fn = s_Fn.replace(" ", r"\ ")
+
+        s = r"> Predicted\ \ \ 1\ \ \ \ \ 0" + "\n"
+        s += r"> Actual\ \ \ \ -----------" + "\n"
+        s += r">\ \ 1\ \ \ \ \ \ \ |" + s_Tp + r"\ " + s_Fn + "|" + "\n"
+        s += r">\ \ 0\ \ \ \ \ \ \ |" + s_Fp + r"\ " + s_Tn + "|" + "\n"
+        s += r">\ \ \ \ \ \ \ \ \ \ \ -----------" + "\n"
+        s += f"> Precision: {self.precision:.3g}" + "\n"
+        s += f"> Recall...: {self.recall:.3g}" + "\n"
+        s += f"> F1.......: {self.f1:.3g}" + "\n"
+        s += f"> AuPR.....: {self.aupr:.3g}" + "\n"
+        s += f"> SHD......: {self.shd:.1f}" + "\n"
+        s += f"> SID......: {self.sid}"
+
+        return s
+
 
 def _shallow_copy(G: AnyGraph):
     """

@@ -68,7 +68,7 @@ class PC(StructureEstimator):
         super().__init__(independencies=independencies)
         self.name = name
         self.variant = kwargs.get("variant", "stable")
-        self.ci_test = kwargs.get("ci_test", "chi_square")
+        self.ci_test = kwargs.get("ci_test", "pearsonr")
         self.max_cond_vars = kwargs.get("max_cond_vars", 5)
         self.return_type = kwargs.get("return_type", "dag")
         self.significance_level = kwargs.get("significance_level", 0.01)

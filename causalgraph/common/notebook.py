@@ -218,6 +218,27 @@ class BaseExperiment:
 
         return sorted(list(set(input_files)))
 
+    def create_estimator(self, estimator_name: str, name: str, **kwargs):
+        """
+        Dynamically creates an instance of a class based on the estimator name.
+
+        Args:
+        estimator_name (str): The name of the estimator (key in the 'estimators' 
+            dictionary).
+        name (str): The name of the estimator instance.
+        *args: Variable length argument list to be passed to the class constructor.
+        **kwargs: Arbitrary keyword arguments to be passed to the class constructor.
+
+        Returns:
+        An instance of the specified class, or None if the class does not exist.
+        """
+        estimator_class = estimators.get(estimator_name)
+        if estimator_class is None:
+            print(f"Estimator '{estimator_name}' not found.")
+            return None
+
+        return estimator_class(name=name, **kwargs)
+
 
 class Experiment(BaseExperiment):
     """
@@ -228,6 +249,8 @@ class Experiment(BaseExperiment):
         fit: Fits the experiment data.
         save: Saves the experiment data.
     """
+
+    estimator_name = None
 
     def __init__(
         self,
@@ -269,6 +292,28 @@ class Experiment(BaseExperiment):
         self.prepare_experiment_input(
             experiment_name, csv_filename, dot_filename)
 
+    def fit(self, estimator='rex', **kwargs):
+        """
+        Fits the experiment data.
+
+        Args:
+            **kwargs: Additional keyword arguments to pass to the Rex constructor.
+
+        Returns:
+            Rex: The fitted experiment data.
+        """
+
+        # self.rex = Rex(name=self.experiment_name, **kwargs)
+        # self.rex.fit_predict(self.train_data, self.test_data, self.ref_graph)
+        self.estimator_name = estimator
+        estimator_object = self.create_estimator(
+            estimator, name=self.experiment_name, **kwargs)
+        estimator_object.fit_predict(
+            self.train_data, self.test_data, self.ref_graph)
+        setattr(self, estimator, estimator_object)
+
+        return self
+
     def load(self, exp_name=None) -> Rex:
         """
         Loads the experiment data.
@@ -281,31 +326,32 @@ class Experiment(BaseExperiment):
             Rex: The loaded experiment data.
         """
 
-        if exp_name is not None:
-            self.rex = load_experiment(exp_name, self.output_path)
-            if self.verbose:
-                print(f"Loaded '{exp_name}' from '{self.output_path}'")
+        if exp_name is None:
+            exp_name = self.experiment_name
+
+        exp_object = load_experiment(exp_name, self.output_path)
+
+        # A priori, I don't know which estimator was used to train the experiment
+        # so I have to check the type of the object
+        if isinstance(exp_object, Rex):
+            self.estimator_name = 'rex'
+        elif isinstance(exp_object, PC):
+            self.estimator_name = 'pc'
+        elif isinstance(exp_object, LiNGAM):
+            self.estimator_name = 'lingam'
+        elif isinstance(exp_object, GES):
+            self.estimator_name = 'ges'
+        elif isinstance(exp_object, FCI):
+            self.estimator_name = 'fci'
         else:
-            self.rex = load_experiment(self.experiment_name, self.output_path)
-            if self.verbose:
-                print(
-                    f"Loaded '{self.experiment_name}' from '{self.output_path}'")
+            raise ValueError(
+                f"Estimator '{exp_name}' not recognized.")
 
-        return self
+        setattr(self, self.estimator_name, exp_object)
+        setattr(self, 'estimator', exp_object)
 
-    def fit(self, **kwargs) -> Rex:
-        """
-        Fits the experiment data.
-
-        Args:
-            **kwargs: Additional keyword arguments to pass to the Rex constructor.
-
-        Returns:
-            Rex: The fitted experiment data.
-        """
-
-        self.rex = Rex(name=self.experiment_name, **kwargs)
-        self.rex.fit_predict(self.train_data, self.test_data, self.ref_graph)
+        if self.verbose:
+            print(f"Loaded '{exp_name}' from '{self.output_path}'")
 
         return self
 
@@ -320,10 +366,10 @@ class Experiment(BaseExperiment):
         - overwrite (bool, optional): Whether to overwrite an existing 
             experiment with the same name. Defaults to False.
         """
-
+        # estimator_object = getattr(self, self.estimator)
         save_as = exp_name if exp_name is not None else self.experiment_name
         where_to = save_experiment(
-            save_as, self.output_path, self.rex, overwrite)
+            save_as, self.output_path, getattr(self, self.estimator_name), overwrite)
         print(f"Saved '{self.experiment_name}' to '{where_to}'")
 
 
@@ -349,6 +395,8 @@ class Experiments(BaseExperiment):
     - verbose: bool, optional
         Whether to print verbose output. Default is True.
     """
+
+    estimator_name = None
 
     def __init__(
             self,
@@ -412,27 +460,6 @@ class Experiments(BaseExperiment):
         self.experiments = list(self.experiment.values())
         return self
 
-    def create_estimator(self, estimator_name: str, name: str, **kwargs):
-        """
-        Dynamically creates an instance of a class based on the estimator name.
-
-        Args:
-        estimator_name (str): The name of the estimator (key in the 'estimators' 
-            dictionary).
-        name (str): The name of the estimator instance.
-        *args: Variable length argument list to be passed to the class constructor.
-        **kwargs: Arbitrary keyword arguments to be passed to the class constructor.
-
-        Returns:
-        An instance of the specified class, or None if the class does not exist.
-        """
-        estimator_class = estimators.get(estimator_name)
-        if estimator_class is None:
-            print(f"Estimator '{estimator_name}' not found.")
-            return None
-
-        return estimator_class(name=name, **kwargs)
-
     def fit(self, estimator="rex", save_as_pattern=None, **kwargs) -> list:
         """
         Fits the experiments.
@@ -442,8 +469,8 @@ class Experiments(BaseExperiment):
             The estimator to use. Default is "rex". Other options are "pc", "lingam",
             "ges" and "fci".
         - save_as_pattern: str, optional
-            The pattern used to save the experiments. "*" will be replaced with the experiment name.
-            If not provided, the experiment name will be used.
+            The pattern used to save the experiments. "*" will be replaced with the 
+            experiment name. If not provided, the experiment name will be used.
 
         Returns:
         - list
@@ -461,6 +488,7 @@ class Experiments(BaseExperiment):
                 print(f"Experiment {save_as} already exists, skipping...")
                 continue
 
+            self.estimator_name = estimator
             print(f"Training '{estimator}' on {filename}...")
             # self.experiment[self.experiment_name] = Rex(
             #     name=self.experiment_name, **kwargs)
@@ -615,7 +643,10 @@ def plot_combined_metrics(
 
 
 if __name__ == "__main__":
-    experiments = Experiments("rex_generated_linear_*.csv", verbose=False)
-    experiments.load("rex_generated_linear_*_gbt.pickle")
-    main_metrics = experiments.metrics()
-    print(main_metrics)
+    # experiments = Experiments("rex_generated_linear_*.csv", verbose=False)
+    # experiments.load("rex_generated_linear_*_gbt.pickle")
+    # main_metrics = experiments.metrics()
+    # print(main_metrics)
+
+    e = Experiment('rex_generated_linear_1')\
+        .load(exp_name="rex_generated_linear_1_nn")
