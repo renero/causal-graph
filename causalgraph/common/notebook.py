@@ -21,6 +21,7 @@ import numpy as np
 import pandas as pd
 
 from sklearn.preprocessing import StandardScaler
+from rich.progress import Progress
 
 from causalgraph.common import utils
 from causalgraph.common.utils import (graph_from_dot_file, load_experiment,
@@ -65,7 +66,35 @@ metric_labels = {
     'union_nc': '∪',
     'union_all_nc': 'all'
 }
-
+score_titles = {
+    'f1': 'F1',
+    'precision': 'Precision',
+    'recall': 'Recall',
+    'aupr': 'AuPR',
+    'Tp': 'TP',
+    'Tn': 'TN',
+    'Fp': 'FP',
+    'Fn': 'FN',
+    'shd': 'SHD',
+    'sid': 'SID',
+    'n_edges': 'Nr. Edges',
+    'ref_n_edges': 'Edges in Ground Truth',
+    'diff_edges': 'Diff. Edges'
+}
+method_labels = {
+    'nn': r'$\textrm{REX}_{\textrm{\tiny MLP}}$',
+    'rex_mlp': r'$\textrm{REX}_{\textrm{\tiny MLP}}$',
+    'gbt': r'$\textrm{REX}_{\textrm{\tiny GBT}}$',
+    'rex_gbt': r'$\textrm{REX}_{\textrm{\tiny GBT}}$',
+    'union': r'$\textrm{REX}_{\cup}$',
+    'rex_union': r'$\textrm{REX}_{\cup}$',
+    'intersection': r'$\textrm{REX}_{\cap}$',
+    'rex_intersection': r'$\textrm{REX}_{\cap}$',
+    'pc': r'$\textrm{PC}$',
+    'fci': r'$\textrm{FCI}$',
+    'ges': r'$\textrm{GES}$',
+    'lingam': r'$\textrm{LiNGAM}$'
+}
 estimators = {
     'rex': Rex,
     'fci': FCI,
@@ -73,6 +102,11 @@ estimators = {
     'lingam': LiNGAM,
     'ges': GES
 }
+method_names = ['pc', 'fci', 'ges', 'lingam']
+synth_data_types = ['linear', 'polynomial', 'gp_add', 'gp_mix', 'sigmoid_add']
+metric_columns = ['method', 'data_type', 'f1', 'precision',
+                  'recall', 'aupr', 'Tp', 'Tn', 'Fp', 'Fn', 'shd', 'sid',
+                  'n_edges', 'ref_n_edges', 'diff_edges', 'name']
 
 
 def list_files(input_pattern: str, where: str) -> list:
@@ -208,14 +242,14 @@ class BaseExperiment:
                     f"    +-> Experiment '{self.experiment_name}' will be TRAINED")
 
         self.save_experiment = True
-        if self.save_experiment and not experiment_exists:
-            print("    +-> Experiment will be saved.") if self.verbose else None
-        elif self.save_experiment and experiment_exists:
-            print("    +-> Experiment exists and will be overwritten.") \
-                if self.verbose else None
-        else:
-            print("    +-> Experiment will NOT be saved.") if self.verbose else None
-            self.save_experiment = False
+        # if self.save_experiment and not experiment_exists:
+        #     print("    +-> Experiment will be saved.") if self.verbose else None
+        # elif self.save_experiment and experiment_exists:
+        #     print("        +-> Experiment exists and will be overwritten.") \
+        #         if self.verbose else None
+        # else:
+        #     print("    +-> Experiment will NOT be saved.") if self.verbose else None
+        #     self.save_experiment = False
 
     def list_files(self, input_pattern, where='input') -> list:
         """
@@ -451,22 +485,30 @@ class Experiments(BaseExperiment):
             pickle_files = self.input_files
 
         self.experiment = {}
-        for input_filename, pickle_filename in zip(self.input_files, pickle_files):
-            self.experiment_name = path.basename(pickle_filename)
-            self.input_name = path.basename(input_filename)
-            self.decide_what_to_do()
+        with Progress(transient=True) as progress:
+            task = progress.add_task(
+                "Loading experiments...", total=len(pickle_files))
+            for input_filename, pickle_filename in zip(self.input_files, pickle_files):
+                self.experiment_name = path.basename(pickle_filename)
+                self.input_name = path.basename(input_filename)
+                self.decide_what_to_do()
 
-            if self.load_experiment:
-                self.experiment[self.experiment_name] = load_experiment(
-                    self.experiment_name, self.output_path)
-                self.experiment[self.experiment_name].ref_graph = graph_from_dot_file(
-                    f"{path.join(self.input_path, self.input_name)}.dot")
-                if self.verbose:
-                    print(f"        +-> Loaded {self.experiment_name} "
-                          f"({type(self.experiment[self.experiment_name])})")
-            else:
-                print(
-                    f"No trained experiment for {pickle_filename}...") if self.verbose else None
+                if self.load_experiment:
+                    self.experiment[self.experiment_name] = load_experiment(
+                        self.experiment_name, self.output_path)
+                    self.experiment[self.experiment_name].ref_graph = \
+                        graph_from_dot_file(
+                            f"{path.join(self.input_path, self.input_name)}.dot")
+                    if self.verbose:
+                        print(f"        +-> Loaded {self.experiment_name} "
+                              f"({type(self.experiment[self.experiment_name])})")
+                    progress.update(task, advance=1, refresh=True,
+                                    visible=not self.verbose)
+                else:
+                    if self.verbose:
+                        print(
+                            f"No trained experiment for {pickle_filename}...")
+            progress.stop()
 
         self.is_fitted = True
         self.names = list(self.experiment.keys())
@@ -527,7 +569,7 @@ def get_combined_metrics(subtype: str):
     Parameters
     ----------
     subtype : str
-        The subtype of the experiment, e.g. "linear" or "nonlinear"
+        The subtype of the experiment, e.g. "linear" or "polynomial"
 
     Returns
     -------
@@ -640,8 +682,135 @@ def plot_combined_metrics(
             labels=[metric_labels[key] for key in metric_types])
         # check if any value is above 1
         if np.all(np.array(metric_values) <= 1.0):
-            ax.set_ylim([0, 1])
-        ax.set_title(metric.upper())
+            ax.set_ylim([0, 1.05])
+        ax.set_title(score_titles[metric])
+
+    if title is not None:
+        fig = plt.gcf()
+        fig.suptitle(title)
+
+    if pdf_filename is not None:
+        plt.savefig(pdf_filename, bbox_inches='tight')
+        plt.close()
+    else:
+        plt.tight_layout()
+        plt.show()
+
+
+def plot_score_by_subtype(
+        metrics: pd.DataFrame,
+        score_name: str,
+        methods=['rex_intersection', 'rex_union',
+                 'pc', 'fci', 'ges', 'lingam'],
+        **kwargs):
+    """
+    Plots the score by subtype.
+
+    Parameters:
+    - score_name (str): The name of the score to plot.
+    - figsize (tuple, optional): The size of the figure. Default is (2, 1).
+    - dpi (int, optional): The resolution of the figure in dots per inch. Default is 300.
+    - ylim (tuple, optional): The y-axis limits of the plot. Default is None.
+
+    Returns:
+    None
+    """
+    figsize_ = kwargs.get('figsize', (10, 5))
+    dpi_ = kwargs.get('dpi', 300)
+    ylim_ = kwargs.get('ylim', None)
+
+    x_labels = [method_labels[m] for m in methods]
+    f, ax = plt.subplots(nrows=2, ncols=3, figsize=figsize_, dpi=dpi_,
+                         gridspec_kw={'hspace': 0.5, 'wspace': 0.2})
+
+    # Loop through all the subtypes
+    for i, subtype in enumerate(synth_data_types + ['all']):
+        axe = ax[i//3, i % 3]
+        if subtype == 'all':
+            sub_df = metrics
+        else:
+            sub_df = metrics[metrics['data_type'] == subtype]
+        axe.boxplot(
+            [sub_df[sub_df['method'] == m][score_name] for m in methods])
+        axe.set_xticklabels(labels=x_labels, fontsize=7)
+
+        if ylim_ is not None:
+            axe.set_ylim(ylim_[0], ylim_[1])
+
+        axe.grid(axis='y', linestyle='--', linewidth=0.5, which='both')
+
+        #  Remove the top and right axes
+        axe.spines['top'].set_visible(False)
+        axe.spines['right'].set_visible(False)
+
+        # Set the title to the score name, in Latex math mode
+        if subtype == 'all':
+            axe.set_title(rf'$\textrm{{{score_titles[score_name]}}} '
+                          rf'\textrm{{ score for }} \textrm{{all data}}$',
+                          fontsize=10, y=-0.25)
+        else:
+            axe.set_title(rf'$\textrm{{{score_titles[score_name]}}} '
+                          rf'\textrm{{ score for }} \texttt{{{subtype}}} '
+                          rf'\textrm{{ data}}$', fontsize=10, y=-0.25)
+
+    plt.suptitle(score_titles[score_name])
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_scores_by_method(
+        metrics: pd.DataFrame,
+        method_types: list = ['rex_mlp', 'rex_gbt',
+                              'rex_intersection', 'rex_union'],
+        title: str = None,
+        pdf_filename=None,
+        **kwargs):
+    """
+    Plot the metrics for all the experiments matching the input pattern
+
+    Parameters
+    ----------
+    metrics : pandas DataFrame
+        A DataFrame with the metrics for all the experiments
+    title : str
+        The title of the plot
+
+    Returns
+    -------
+    None
+    """
+    figsize_ = kwargs.get('figsize', (7, 5))
+    dpi_ = kwargs.get('dpi', 300)
+
+    what = ['f1', 'precision', 'recall', 'shd', 'sid']
+    axs = plt.figure(layout="constrained", figsize=figsize_, dpi=dpi_).\
+        subplot_mosaic('AABBCC;.DDEE.')
+
+    ax_labels = list(axs.keys())
+    for i, metric in enumerate(what):
+        ax = axs[ax_labels[i]]
+        metric_values = [metrics[metrics['method'] == m][metric]
+                         for m in method_types]
+
+        ax.boxplot(metric_values)
+        ax.set_xticklabels(labels=[method_labels[key]
+                                   for key in method_types], fontsize=7)
+        ax.grid(axis='y', linestyle='--', linewidth=0.5, which='both')
+
+        #  Remove the top and right axes
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+
+        # check if any value is above 1
+        if np.all(np.array(metric_values) <= 1.0):
+            ax.set_ylim([0, 1.05])
+        ax.set_ylim(bottom=0)
+
+        yticks = ax.get_yticks()[:-1]
+        ax.set_yticklabels(labels=[f"{t:.1f}" for t in yticks], fontsize=6)
+        ax.spines['left'].set_bounds(0, yticks[-1])
+
+        ax.set_title(score_titles[metric], fontsize=10)
 
     if title is not None:
         fig = plt.gcf()

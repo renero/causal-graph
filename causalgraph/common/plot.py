@@ -298,7 +298,7 @@ def draw_graph_subplot(
                 ax=ax)
 
     if title is not None:
-        ax.set_title(title, y=-0.1, fontsize=12)
+        ax.set_title(title, fontsize=12, y=-0.1)
 
 
 def cleanup_graph(G: nx.DiGraph) -> nx.DiGraph:
