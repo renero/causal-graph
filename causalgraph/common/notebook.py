@@ -700,14 +700,43 @@ def plot_combined_metrics(
 def plot_score_by_subtype(
         metrics: pd.DataFrame,
         score_name: str,
-        methods=['rex_intersection', 'rex_union',
-                 'pc', 'fci', 'ges', 'lingam'],
+        methods=None,
+        pdf_filename=None,
         **kwargs):
     """
     Plots the score by subtype.
 
     Parameters:
-    - score_name (str): The name of the score to plot.
+    - metrics (pandas DataFrame): The metrics for all the experiments. This dataframe
+    contains the following columns:
+        - method (str): The name of the method used.
+        - data_type (str): The type of data used.
+        - f1 (float): The F1 score.
+        - precision (float): The precision score.
+        - recall (float): The recall score.
+        - aupr (float): The area under the precision-recall curve.
+        - Tp (int): The number of true positives.
+        - Tn (int): The number of true negatives.
+        - Fp (int): The number of false positives.
+        - Fn (int): The number of false negatives.
+        - shd (int): The structural Hamming distance.
+        - sid (int): The structural intervention distance.
+        - n_edges (int): The number of edges in the graph.
+        - ref_n_edges (int): The number of edges in the reference graph.
+        - diff_edges (int): The difference between the number of edges in the graph
+        and the reference graph.
+        - name (str): The name of the experiment.
+    and stores one experiment per row.
+    - score_name (str): The name of the score to plot. Valid names are 'f1', 
+    'precision', 'recall', 'aupr', 'shd', 'sid', 'n_edges', 'ref_n_edges' and 
+    'diff_edges'.
+    - methods (list, optional): The list of methods to plot. If None, all the methods
+    will be plotted. The methods included are: 'rex_intersection', 'rex_union',
+    'pc', 'fci', 'ges', 'lingam'
+    - pdf_filename (str, optional): The filename to save the plot to. If None, the plot
+    will be displayed on screen, otherwise it will be saved to the specified filename.
+
+    Optional parameters:
     - figsize (tuple, optional): The size of the figure. Default is (2, 1).
     - dpi (int, optional): The resolution of the figure in dots per inch. Default is 300.
     - ylim (tuple, optional): The y-axis limits of the plot. Default is None.
@@ -718,7 +747,9 @@ def plot_score_by_subtype(
     figsize_ = kwargs.get('figsize', (10, 5))
     dpi_ = kwargs.get('dpi', 300)
     ylim_ = kwargs.get('ylim', None)
-
+    if methods is None:
+        methods = ['rex_intersection', 'rex_union',
+                   'pc', 'fci', 'ges', 'lingam']
     x_labels = [method_labels[m] for m in methods]
     f, ax = plt.subplots(nrows=2, ncols=3, figsize=figsize_, dpi=dpi_,
                          gridspec_kw={'hspace': 0.5, 'wspace': 0.2})
@@ -754,14 +785,17 @@ def plot_score_by_subtype(
                           rf'\textrm{{ data}}$', fontsize=10, y=-0.25)
 
     plt.suptitle(score_titles[score_name])
-    plt.tight_layout()
-    plt.show()
+    if pdf_filename is not None:
+        plt.savefig(pdf_filename, bbox_inches='tight')
+        plt.close()
+    else:
+        plt.tight_layout()
+        plt.show()
 
 
 def plot_scores_by_method(
         metrics: pd.DataFrame,
-        method_types: list = ['rex_mlp', 'rex_gbt',
-                              'rex_intersection', 'rex_union'],
+        method_types=None,
         title: str = None,
         pdf_filename=None,
         **kwargs):
@@ -772,8 +806,22 @@ def plot_scores_by_method(
     ----------
     metrics : pandas DataFrame
         A DataFrame with the metrics for all the experiments
+    method_types : list
+        The list of methods to plot. If None, all the methods will be plotted
+        The methods included are: 'rex_mlp', 'rex_gbt', 'rex_intersection' and
+        'rex_union'
     title : str
         The title of the plot
+    pdf_filename : str
+        The filename to save the plot to. If None, the plot will be displayed
+        on screen, otherwise it will be saved to the specified filename.
+
+    Optional parameters:
+    - figsize (tuple, optional): The size of the figure. Default is (7, 5).
+    - dpi (int, optional): The resolution of the figure in dots per inch. 
+        Default is 300.
+    - ylim (tuple, optional): The y-axis limits of the plot. Default is None.
+
 
     Returns
     -------
@@ -781,6 +829,9 @@ def plot_scores_by_method(
     """
     figsize_ = kwargs.get('figsize', (7, 5))
     dpi_ = kwargs.get('dpi', 300)
+    if method_types is None:
+        method_types = ['rex_mlp', 'rex_gbt',
+                        'rex_intersection', 'rex_union']
 
     what = ['f1', 'precision', 'recall', 'shd', 'sid']
     axs = plt.figure(layout="constrained", figsize=figsize_, dpi=dpi_).\
