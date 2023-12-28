@@ -739,50 +739,63 @@ def plot_score_by_subtype(
     Optional parameters:
     - figsize (tuple, optional): The size of the figure. Default is (2, 1).
     - dpi (int, optional): The resolution of the figure in dots per inch. Default is 300.
-    - ylim (tuple, optional): The y-axis limits of the plot. Default is None.
 
     Returns:
     None
     """
-    figsize_ = kwargs.get('figsize', (10, 5))
+    figsize_ = kwargs.get('figsize', (7, 5))
     dpi_ = kwargs.get('dpi', 300)
-    ylim_ = kwargs.get('ylim', None)
     if methods is None:
         methods = ['rex_intersection', 'rex_union',
                    'pc', 'fci', 'ges', 'lingam']
     x_labels = [method_labels[m] for m in methods]
-    f, ax = plt.subplots(nrows=2, ncols=3, figsize=figsize_, dpi=dpi_,
-                         gridspec_kw={'hspace': 0.5, 'wspace': 0.2})
+    axs = plt.figure(layout="constrained", figsize=figsize_, dpi=dpi_).\
+        subplot_mosaic('AABBCC;DDEEFF')
 
     # Loop through all the subtypes
+    ax_labels = list(axs.keys())
     for i, subtype in enumerate(synth_data_types + ['all']):
-        axe = ax[i//3, i % 3]
+        # axe = ax[i//3, i % 3]
+        ax = axs[ax_labels[i]]
         if subtype == 'all':
             sub_df = metrics
         else:
             sub_df = metrics[metrics['data_type'] == subtype]
-        axe.boxplot(
-            [sub_df[sub_df['method'] == m][score_name] for m in methods])
-        axe.set_xticklabels(labels=x_labels, fontsize=7)
+        metric_values = [sub_df[sub_df['method'] == m][score_name]
+                         for m in methods]
+        ax.boxplot(metric_values)
+        ax.set_xticklabels(labels=x_labels, fontsize=6)
 
-        if ylim_ is not None:
-            axe.set_ylim(ylim_[0], ylim_[1])
+        if np.all(np.array(metric_values) <= 1.0) and \
+                np.all(np.array(metric_values) >= 0.0):
+            ax.set_ylim([0, 1.05])
+        if not np.any(np.array(metric_values) < 0.0):
+            ax.set_ylim(bottom=0)
 
-        axe.grid(axis='y', linestyle='--', linewidth=0.5, which='both')
+        yticks = ax.get_yticks()
+        if np.max(metric_values) <= yticks[-2]:
+            yticks = ax.get_yticks()[:-1]
+        ax.set_yticklabels(labels=[f"{t:.1f}" for t in yticks], fontsize=6)
+
+        ax.grid(axis='y', linestyle='--', linewidth=0.5, which='both')
 
         #  Remove the top and right axes
-        axe.spines['top'].set_visible(False)
-        axe.spines['right'].set_visible(False)
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['left'].set_bounds(high=yticks[-1])
+        ax.spines['left'].set_visible(False)
 
         # Set the title to the score name, in Latex math mode
         if subtype == 'all':
-            axe.set_title(rf'$\textrm{{{score_titles[score_name]}}} '
-                          rf'\textrm{{ score for }} \textrm{{all data}}$',
-                          fontsize=10, y=-0.25)
+            ax.set_title(  # rf'$\textrm{{{score_titles[score_name]}}} '
+                # rf'\textrm{{ for }} '
+                r'$\textrm{{all data}}$',
+                fontsize=10)  # , y=-0.25)
         else:
-            axe.set_title(rf'$\textrm{{{score_titles[score_name]}}} '
-                          rf'\textrm{{ score for }} \texttt{{{subtype}}} '
-                          rf'\textrm{{ data}}$', fontsize=10, y=-0.25)
+            ax.set_title(  # rf'$\textrm{{{score_titles[score_name]}}} '
+                # rf'\textrm{{ for }} '
+                rf'$\texttt{{{subtype}}} \textrm{{ data}}$',
+                fontsize=10)  # , y=-0.25)
 
     plt.suptitle(score_titles[score_name])
     if pdf_filename is not None:
@@ -848,18 +861,24 @@ def plot_scores_by_method(
                                    for key in method_types], fontsize=7)
         ax.grid(axis='y', linestyle='--', linewidth=0.5, which='both')
 
+        # check if any value is above 1
+        if np.all(np.array(metric_values) <= 1.0) and \
+                np.all(np.array(metric_values) >= 0.0):
+            ax.set_ylim([0, 1.05])
+        if not np.any(np.array(metric_values) < 0.0):
+            ax.set_ylim(bottom=0)
+
+        # Set the Y tick labels and left axis bounds
+        yticks = ax.get_yticks()
+        if np.max(metric_values) <= yticks[-1]:
+            yticks = ax.get_yticks()[:-1]
+        ax.set_yticklabels(labels=[f"{t:.1f}" for t in yticks], fontsize=6)
+
         #  Remove the top and right axes
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
-
-        # check if any value is above 1
-        if np.all(np.array(metric_values) <= 1.0):
-            ax.set_ylim([0, 1.05])
-        ax.set_ylim(bottom=0)
-
-        yticks = ax.get_yticks()[:-1]
-        ax.set_yticklabels(labels=[f"{t:.1f}" for t in yticks], fontsize=6)
-        ax.spines['left'].set_bounds(0, yticks[-1])
+        ax.spines['left'].set_bounds(high=yticks[-1])
+        ax.spines['left'].set_visible(False)
 
         ax.set_title(score_titles[metric], fontsize=10)
 
