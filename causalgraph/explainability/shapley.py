@@ -7,9 +7,9 @@ is then used to build the graph.
 """
 
 # pylint: disable=E1101:no-member, W0201:attribute-defined-outside-init, W0511:fixme
-# pylint: disable=C0103:invalid-name, disable=R0902:too-many-instance-attributes
+# pylint: disable=C0103:invalid-name, R0902:too-many-instance-attributes
 # pylint: disable=C0116:missing-function-docstring
-# pylint: disable=R0913:too-many-arguments
+# pylint: disable=R0913:too-many-arguments, W0621:redefined-outer-name
 # pylint: disable=R0914:too-many-locals, R0915:too-many-statements
 # pylint: disable=W0106:expression-not-assigned, R1702:too-many-branches
 
@@ -815,8 +815,7 @@ class ShapEstimator(BaseEstimator):
         else:
             feature_names = [
                 f for f in self.feature_names if f != target_name]
-        selected_features = [
-            parent for parent in self.parents[target_name]]
+        selected_features = list(self.parents[target_name])
 
         y_pos = np.arange(len(feature_inds))
         ax.grid(True, axis='x')
@@ -840,6 +839,16 @@ class ShapEstimator(BaseEstimator):
         return fig
 
     def _plot_discrepancies(self, target_name: str, **kwargs):
+        """
+        Plot the discrepancies between the target variable and each feature.
+
+        Args:
+            target_name (str): The name of the target variable.
+            **kwargs: Additional keyword arguments for configuring the plot.
+
+        Returns:
+            None
+        """
         mpl.rcParams['figure.dpi'] = kwargs.get('dpi', 75)
         figsize_ = kwargs.get('figsize', (10, 16))
         feature_names = [
@@ -860,6 +869,21 @@ class ShapEstimator(BaseEstimator):
         fig.show()
 
     def _plot_discrepancy(self, x, y, s, target_name, parent_name, r, ax):
+        """
+        Plot the discrepancy between target and SHAP values.
+
+        Args:
+            x (array-like): The x-axis values.
+            y (array-like): The target values.
+            s (array-like): The SHAP values.
+            target_name (str): The name of the target variable.
+            parent_name (str): The name of the parent variable.
+            r (object): The result object containing model parameters and statistics.
+            ax (array-like): The array of subplots.
+
+        Returns:
+            None
+        """
         def _remove_ticks_and_box(ax):
             ax.set_xticks([])
             ax.set_xticklabels([])
@@ -871,19 +895,22 @@ class ShapEstimator(BaseEstimator):
 
         b0_s, b1_s = r.shap_model.params[0], r.shap_model.params[1]
         b0_y, b1_y = r.parent_model.params[0], r.parent_model.params[1]
-        shap_label = "HET" if r.shap_heteroskedasticity else "HOM"
-        parent_label = "HET" if r.parent_heteroskedasticity else "HOM"
+
+        mpl.rc('text', usetex=True)
+        mpl.rc('text.latex', preamble=r'\usepackage{amsmath}')
+        # mpl.rcParams["mathtext.fontset"] = "cm"
 
         # Represent scatter plots
         ax[0].scatter(x, s, alpha=0.5, marker='+')
         ax[0].scatter(x, y, alpha=0.5, marker='.')
         ax[0].plot(x, b1_s * x + b0_s, color='blue', linewidth=.5)
         ax[0].plot(x, b1_y * x + b0_y, color='red', linewidth=.5)
-        ax[0].set_title(f'$m_s$:{math.atan(b1_s)*K:.1f}°; $m_y$:{math.atan(b1_y)*K:.1f}°',
-                        fontsize=11)
-        ax[0].set_xlabel(parent_name)
+        ax[0].set_title(
+            f'$m_s$:{math.atan(b1_s)*K:.1f}°; $m_y$:{math.atan(b1_y)*K:.1f}°',
+            fontsize=10)
+        ax[0].set_xlabel(f'${parent_name}$')
         ax[0].set_ylabel(
-            fr'$$ \mathrm{{{target_name}}} / \phi_{{{target_name}}} $$')
+            fr'$ \mathrm{{{target_name}}} / \phi_{{{parent_name}}} $')
 
         # Represent distributions
         pd.DataFrame(s).plot(kind='density', ax=ax[1], label="shap")
@@ -891,9 +918,9 @@ class ShapEstimator(BaseEstimator):
         ax[1].legend().set_visible(False)
         ax[1].set_ylabel('')
         ax[1].set_xlabel(
-            fr'$$ \mathrm{{{target_name}}} /  \phi_{{{target_name}}} $$')
+            fr'$ \mathrm{{{target_name}}} /  \phi_{{{parent_name}}} $')
         # ax[1].set_title(f'KS({r.ks_pvalue:.2g}) - {r.ks_result}', fontsize=11)
-        ax[1].set_title(f'KS({r.ks_pvalue:.2g})', fontsize=11)
+        ax[1].set_title(rf'$\mathrm{{KS}}({r.ks_pvalue:.2g})$', fontsize=10)
 
         # Represent fitted vs. residuals
         s_resid = r.shap_model.get_influence().resid_studentized_internal
@@ -908,17 +935,18 @@ class ShapEstimator(BaseEstimator):
                       marker='.', color='tab:orange')
         # ax[2].set_title(
         #     f"Parent {parent_label}; Shap {shap_label}", fontsize=10)
-        ax[2].set_title("Residuals", fontsize=10)
+        ax[2].set_title(r'$\mathrm{Residuals}$', fontsize=10)
         ax[2].set_xlabel(
-            fr'$$ \mathrm{{{target_name}}} /  \phi_{{{target_name}}} $$')
-        ax[2].set_ylabel(fr'$$ \epsilon_{{{target_name}}} / \epsilon_\phi $$')
+            rf'$ \mathrm{{{target_name}}} /  \phi_{{{parent_name}}} $')
+        ax[2].set_ylabel(rf'$ \epsilon_{{{target_name}}} / \epsilon_\phi $')
 
         # Represent target vs. SHAP values
         ax[3].scatter(s, y, alpha=0.3, marker='.', color='tab:green')
-        # ax[3].set_title(f"Discrepancy: {r.shap_correlation:.2f}", fontsize=11)
-        ax[3].set_title(f"Discrepancy: {r.shap_discrepancy:.2f}", fontsize=11)
-        ax[3].set_xlabel(fr'$$ \phi_{{{target_name}}} $$')
-        ax[3].set_ylabel(fr'$$ \mathrm{{{target_name}}} $$')
+        # ax[3].set_title(f"Discrepancy: {r.shap_correlation:.2f}", fontsize=10)
+        ax[3].set_title(
+            rf'$\mathrm{{Discrepancy: }}{r.shap_discrepancy:.2f}$', fontsize=10)
+        ax[3].set_xlabel(fr'$ \phi_{{{parent_name}}} $')
+        ax[3].set_ylabel(fr'$ \mathrm{{{target_name}}} $')
 
         for ax_idx in range(4):
             _remove_ticks_and_box(ax[ax_idx])

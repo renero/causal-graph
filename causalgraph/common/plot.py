@@ -604,7 +604,7 @@ def dag(
 def dags(
         graph: nx.DiGraph,
         reference: nx.DiGraph = None,
-        names: List[str] = ["REX Prediction", "Ground truth"],
+        names: List[str] = None,
         figsize: Tuple[int, int] = (10, 5),
         dpi: int = 75,
         save_to_pdf: str = None,
@@ -628,6 +628,8 @@ def dags(
             - "with_labels": True
         """
     ncols = 1 if reference is None else 2
+    if names is None:
+        names = ["Prediction", "Ground truth"]
 
     # Overwrite formatting_kwargs with kwargs if they are provided
     formatting_kwargs.update(kwargs)
