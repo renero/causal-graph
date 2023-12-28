@@ -25,8 +25,8 @@ from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.colors import ListedColormap
 from matplotlib.ticker import MultipleLocator
 from pydot import Dot
+from sklearn.base import BaseEstimator
 
-from causalgraph.explainability.shapley import ShapEstimator
 from causalgraph.metrics.compare_graphs import evaluate_graph
 
 
@@ -675,12 +675,12 @@ def dags(
         plt.show()
 
 
-def shap_values(shaps: ShapEstimator, **kwargs):
+def shap_values(shaps: BaseEstimator, **kwargs):
     assert shaps.is_fitted_, "Model not fitted yet"
     plot_args = list(shaps.feature_names)
     return subplots(shaps._plot_shap_summary, *plot_args, **kwargs)
 
 
-def shap_discrepancies(shaps: ShapEstimator, target_name: str, **kwargs):
+def shap_discrepancies(shaps: BaseEstimator, target_name: str, **kwargs):
     assert shaps.is_fitted_, "Model not fitted yet"
     shaps._plot_discrepancies(target_name, **kwargs)

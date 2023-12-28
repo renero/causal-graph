@@ -38,8 +38,10 @@ from tqdm.auto import tqdm
 
 from causalgraph.common import *
 from causalgraph.common import utils
+from causalgraph.common import plot
 from causalgraph.explainability.hierarchies import Hierarchies
 from causalgraph.independence.feature_selection import select_features
+
 
 AnyGraph = Union[nx.DiGraph, nx.Graph]
 K = 180.0 / math.pi
@@ -194,37 +196,8 @@ class ShapEstimator(BaseEstimator):
         self._fit_desc = f"Running SHAP explainer ({self.explainer})"
         self._pred_desc = "Building graph skeleton"
 
-    def __repr__(self):
-        forbidden_attrs = [
-            'fit', 'predict', 'score', 'get_params', 'set_params']
-        ret = f"{GREEN}SHAP object attributes{RESET}\n"
-        ret += f"{GRAY}{'-'*80}{RESET}\n"
-        for attr in dir(self):
-            if attr.startswith('_') or \
-                attr in forbidden_attrs or \
-                    isinstance(getattr(self, attr), types.MethodType):
-                continue
-            elif attr == "X" or attr == "y":
-                if isinstance(getattr(self, attr), pd.DataFrame):
-                    ret += f"{attr:25} {getattr(self, attr).shape}\n"
-                    continue
-                elif isinstance(getattr(self, attr), nx.DiGraph):
-                    n_nodes = getattr(self, attr).number_of_nodes()
-                    n_edges = getattr(self, attr).number_of_edges()
-                    ret += f"{attr:25} {n_nodes} nodes, {n_edges} edges\n"
-                    continue
-            elif isinstance(getattr(self, attr), pd.DataFrame):
-                ret += f"{attr:25} DataFrame {getattr(self, attr).shape}\n"
-            elif isinstance(getattr(self, attr), dict):
-                keys_list = [
-                    f"{k}:{type(getattr(self, attr)[k])}"
-                    for k in getattr(self, attr).keys()
-                ]
-                ret += f"{attr:25} dict {keys_list}\n"
-            else:
-                ret += f"{attr:25} {getattr(self, attr)}\n"
-
-        return ret
+    def __str__(self):
+        return utils.stringfy(self)
 
     def fit(self, X):
         """
@@ -843,7 +816,7 @@ class ShapEstimator(BaseEstimator):
             feature_names = [
                 f for f in self.feature_names if f != target_name]
         selected_features = [
-            parent for parent in self.connections[target_name]]
+            parent for parent in self.parents[target_name]]
 
         y_pos = np.arange(len(feature_inds))
         ax.grid(True, axis='x')
@@ -951,7 +924,7 @@ class ShapEstimator(BaseEstimator):
             _remove_ticks_and_box(ax[ax_idx])
 
 
-def custom_main(experiment_name):
+def custom_main(exp_name):
     """
     Runs a custom main function for the given experiment name.
 
@@ -964,16 +937,16 @@ def custom_main(experiment_name):
     path = "/Users/renero/phd/data/RC3/"
     output_path = "/Users/renero/phd/output/RC3/"
 
-    ref_graph = utils.graph_from_dot_file(f"{path}{experiment_name}.dot")
-    data = pd.read_csv(f"{path}{experiment_name}.csv")
+    ref_graph = utils.graph_from_dot_file(f"{path}{exp_name}.dot")
+    data = pd.read_csv(f"{path}{exp_name}.csv")
     scaler = StandardScaler()
     data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)
     # Split the dataframe into train and test
     train = data.sample(frac=0.9, random_state=42)
     test = data.drop(train.index)
-    rex = utils.load_experiment(f"{experiment_name}_nn", output_path)
+    rex = utils.load_experiment(f"{exp_name}_nn", output_path)
     rex.is_fitted_ = True
-    print(f"Loaded experiment {experiment_name}")
+    print(f"Loaded experiment {exp_name}")
 
     rex.shaps = ShapEstimator(
         explainer="gradient",
@@ -992,4 +965,19 @@ def custom_main(experiment_name):
 
 
 if __name__ == "__main__":
-    custom_main('sachs_long')
+    # custom_main('sachs_long')
+    experiment_name = "rex_generated_polynomial_9"
+    path = "/Users/renero/phd/data/RC3/"
+    output_path = "/Users/renero/phd/output/RC3/"
+
+    ref_graph = utils.graph_from_dot_file(f"{path}{experiment_name}.dot")
+    data = pd.read_csv(f"{path}{experiment_name}.csv")
+    scaler = StandardScaler()
+    data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)
+    # Split the dataframe into train and test
+    train = data.sample(frac=0.9, random_state=42)
+    test = data.drop(train.index)
+    rex = utils.load_experiment(f"{experiment_name}_nn", output_path)
+    rex.is_fitted_ = True
+    print(f"Loaded experiment {experiment_name}")
+    plot.shap_values(rex.shaps)

@@ -4,7 +4,6 @@ Main class for the REX estimator.
 """
 
 import os
-import types
 import warnings
 from copy import copy
 from typing import List, Tuple, Union
@@ -19,11 +18,11 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.utils.validation import check_is_fitted, check_random_state
 
 from causalgraph.common import utils
-from causalgraph.common import GRAY, GREEN, RESET
 from causalgraph.common.pipeline import Pipeline
 from causalgraph.estimators.knowledge import Knowledge
-from causalgraph.explainability import (Hierarchies, PermutationImportance,
-                                        ShapEstimator)
+from causalgraph.explainability.hierarchies import Hierarchies
+from causalgraph.explainability.perm_importance import PermutationImportance
+from causalgraph.explainability.shapley import ShapEstimator
 from causalgraph.explainability.regression_quality import RegQuality
 from causalgraph.independence.graph_independence import GraphIndependence
 from causalgraph.metrics.compare_graphs import evaluate_graph
@@ -365,34 +364,8 @@ class Rex(BaseEstimator, ClassifierMixin):
         """
         return utils.break_cycles_if_present(dag, self.learnings)
 
-    def __repr__(self):
-        forbidden_attrs = [
-            'fit', 'predict', 'fit_predict', 'score', 'get_params', 'set_params']
-        ret = f"{GREEN}REX object attributes{RESET}\n"
-        ret += f"{GRAY}{'-'*80}{RESET}\n"
-        for attr in dir(self):
-            if attr.startswith('_') or \
-                attr in forbidden_attrs or \
-                    isinstance(getattr(self, attr), types.MethodType):
-                continue
-            elif attr == "X" or attr == "y":
-                if isinstance(getattr(self, attr), pd.DataFrame):
-                    ret += f"{attr:25} {getattr(self, attr).shape}\n"
-                    continue
-                if isinstance(getattr(self, attr), nx.DiGraph):
-                    n_nodes = getattr(self, attr).number_of_nodes()
-                    n_edges = getattr(self, attr).number_of_edges()
-                    ret += f"{attr:25} {n_nodes} nodes, {n_edges} edges\n"
-                    continue
-            elif isinstance(getattr(self, attr), pd.DataFrame):
-                ret += f"{attr:25} DataFrame {getattr(self, attr).shape}\n"
-            # check if attr is an object
-            elif isinstance(getattr(self, attr), BaseEstimator):
-                ret += f"{attr:25} {BaseEstimator}\n"
-            else:
-                ret += f"{attr:25} {getattr(self, attr)}\n"
-
-        return ret
+    def __str__(self):
+        return utils.stringfy(self)
 
     @staticmethod
     @deprecated.deprecated(version='0.3.0', reason="Use plot.dags instead")

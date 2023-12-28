@@ -13,6 +13,7 @@ Utility functions for causalgraph
 import glob
 import os
 import pickle
+import types
 import numpy as np
 from os.path import join
 from pathlib import Path
@@ -571,3 +572,51 @@ def graph_to_adjacency_file(graph: AnyGraph, output_file: Union[Path, str]):
             f.write(",")
             f.write(",".join([str(point) for point in mat[i]]))
             f.write("\n")
+
+
+def stringfy_object(object_: object) -> str:
+    """
+    Convert an object into a string representation, including its attributes.
+
+    Args:
+        object_ (object): The object to be converted.
+
+    Returns:
+        str: A string representation of the object and its attributes.
+    """
+    forbidden_attrs = [
+        'fit', 'predict', 'fit_predict', 'score', 'get_params', 'set_params']
+    ret = "Object attributes\n"
+    ret += f"{'-'*80}\n"
+    for attr in dir(object_):
+        if attr.startswith('_') or \
+            attr in forbidden_attrs or \
+                isinstance(getattr(object_, attr), types.MethodType):
+            continue
+        if isinstance(getattr(object_, attr), (pd.DataFrame, np.ndarray)):
+            ret += f"{attr:25} {type(getattr(object_, attr)).__name__} "
+            ret += f"{getattr(object_, attr).shape}\n"
+            continue
+        if isinstance(getattr(object_, attr), nx.DiGraph):
+            n_nodes = getattr(object_, attr).number_of_nodes()
+            n_edges = getattr(object_, attr).number_of_edges()
+            ret += f"{attr:25} {n_nodes} nodes, {n_edges} edges\n"
+            continue
+        if isinstance(getattr(object_, attr), dict):
+            keys_list = [
+                f"{k}:{type(getattr(object_, attr)[k])}"
+                for k in getattr(object_, attr).keys()
+            ]
+            ret += f"{attr:25} dict {str(keys_list)[:60]}...\n"
+            continue
+        if isinstance(getattr(object_, attr), list):
+            list_ = '[' + ', '.join(str(e)
+                                    for e in getattr(object_, attr)) + ']'
+            ret += f"{attr:25} list {list_[:60]}...\n"
+            continue
+        if isinstance(getattr(object_, attr), (int, float, str, bool)):
+            ret += f"{attr:25} {getattr(object_, attr)}\n"
+            continue
+        ret += f"{attr:25} <{getattr(object_, attr).__class__.__name__}>\n"
+
+    return ret
