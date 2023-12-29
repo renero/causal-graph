@@ -919,7 +919,6 @@ class ShapEstimator(BaseEstimator):
         ax[1].set_ylabel('')
         ax[1].set_xlabel(
             fr'$ \mathrm{{{target_name}}} /  \phi_{{{parent_name}}} $')
-        # ax[1].set_title(f'KS({r.ks_pvalue:.2g}) - {r.ks_result}', fontsize=11)
         ax[1].set_title(rf'$\mathrm{{KS}}({r.ks_pvalue:.2g})$', fontsize=10)
 
         # Represent fitted vs. residuals
@@ -933,8 +932,6 @@ class ShapEstimator(BaseEstimator):
         ax[2].scatter(s_fitted_scaled, s_resid, alpha=0.5, marker='+')
         ax[2].scatter(y_fitted_scaled, y_resid, alpha=0.5,
                       marker='.', color='tab:orange')
-        # ax[2].set_title(
-        #     f"Parent {parent_label}; Shap {shap_label}", fontsize=10)
         ax[2].set_title(r'$\mathrm{Residuals}$', fontsize=10)
         ax[2].set_xlabel(
             rf'$ \mathrm{{{target_name}}} /  \phi_{{{parent_name}}} $')
@@ -942,7 +939,6 @@ class ShapEstimator(BaseEstimator):
 
         # Represent target vs. SHAP values
         ax[3].scatter(s, y, alpha=0.3, marker='.', color='tab:green')
-        # ax[3].set_title(f"Discrepancy: {r.shap_correlation:.2f}", fontsize=10)
         ax[3].set_title(
             rf'$\mathrm{{Discrepancy: }}{r.shap_discrepancy:.2f}$', fontsize=10)
         ax[3].set_xlabel(fr'$ \phi_{{{parent_name}}} $')

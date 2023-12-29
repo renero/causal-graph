@@ -33,7 +33,7 @@ warnings.filterwarnings('ignore')
 
 
 # pylint: disable=E1101:no-member, W0201:attribute-defined-outside-init, W0511:fixme
-# pylint: disable=C0103:invalid-name
+# pylint: disable=C0103:invalid-name, W0221:arguments-differ
 # pylint: disable=C0116:missing-function-docstring
 # pylint: disable=R0913:too-many-arguments
 # pylint: disable=R0914:too-many-locals, R0915:too-many-statements
@@ -366,63 +366,6 @@ class Rex(BaseEstimator, ClassifierMixin):
 
     def __str__(self):
         return utils.stringfy(self)
-
-    @staticmethod
-    @deprecated.deprecated(version='0.3.0', reason="Use plot.dags instead")
-    def plot_dags(
-            dag: nx.DiGraph,
-            reference: nx.DiGraph = None,
-            names: List[str] = ["REX Prediction", "Ground truth"],
-            figsize: Tuple[int, int] = (10, 5),
-            dpi: int = 75,
-            save_to_pdf: str = None,
-            **kwargs):
-        pass
-        # plot.dags(dag, reference, names, figsize, dpi, save_to_pdf, **kwargs)
-
-    @staticmethod
-    @deprecated.deprecated(version='0.3.0', reason="Use plot.dag instead")
-    def plot_dag(
-            dag: nx.DiGraph,
-            reference: nx.DiGraph = None,
-            root_causes: list = None,
-            title: str = None,
-            ax: plt.Axes = None,
-            figsize: Tuple[int, int] = (5, 5),
-            dpi: int = 75,
-            save_to_pdf: str = None,
-            **kwargs):
-        """
-        pass
-        Compare two graphs using dot.
-
-        Parameters:
-        -----------
-        reference: The reference DAG.
-        dag: The DAG to compare.
-        names: The names of the reference graph and the dag.
-        figsize: The size of the figure.
-        **kwargs: Additional arguments to format the graphs:
-            - "node_size": 500
-            - "node_color": 'white'
-            - "edgecolors": "black"
-            - "font_family": "monospace"
-            - "horizontalalignment": "center"
-            - "verticalalignment": "center_baseline"
-            - "with_labels": True
-        """
-        # plot.dag(
-        # dag, reference, root_causes, title, ax, figsize, dpi, save_to_pdf, **kwargs)
-
-    @deprecated.deprecated(version='0.3.0', reason="Use plot.shap_discrepancies instead")
-    def plot_shap_discrepancies(self, target_name: str, **kwargs):
-        pass
-        # plot.shap_discrepancies(self.shaps, target_name, **kwargs)
-
-    @deprecated.deprecated(version='0.3.0', reason="Use plot.shap_values instead")
-    def plot_shap_values(self, **kwargs):
-        pass
-        # plot.shap_values(self.shaps, **kwargs)
 
 
 def custom_main(dataset_name,
