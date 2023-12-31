@@ -365,7 +365,7 @@ class Rex(BaseEstimator, ClassifierMixin):
         return utils.break_cycles_if_present(dag, self.learnings)
 
     def __str__(self):
-        return utils.stringfy(self)
+        return utils.stringfy_object(self)
 
 
 def custom_main(dataset_name,

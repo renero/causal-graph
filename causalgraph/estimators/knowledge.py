@@ -69,50 +69,51 @@ class Knowledge:
         """Returns a dataframe with the knowledge about each edge in the graph"""
         rows = []
         ci = self.indep.compute_cond_indep_pvals()
-        for origin in self.feature_names:
-            for target in self.feature_names:
-                if origin == target:
+        for target in self.feature_names:
+            for parent in self.feature_names:
+                if target == parent:
                     continue
 
                 if self.correlation_th is not None:
-                    if target in self.correlated_features[origin]:
+                    if parent in self.correlated_features[target]:
                         continue
 
                 if self.correlation_th is not None:
                     all_features = [f for f in self.feature_names if (
-                        f != origin) and (f not in self.correlated_features[origin])]
+                        f != target) and (f not in self.correlated_features[target])]
                 else:
                     all_features = [
-                        f for f in self.feature_names if f != origin]
-                feature_pos = all_features.index(target)
+                        f for f in self.feature_names if f != target]
+                feature_pos = all_features.index(parent)
 
-                sd = self.shaps.shap_discrepancies[origin][target]
-                pi = self.pi.pi[origin]['importances_mean'][feature_pos]
+                sd = self.shaps.shap_discrepancies[target][parent]
+                pi = self.pi.pi[target]['importances_mean'][feature_pos]
 
                 b0_s, beta1_s = sd.shap_model.params[0], sd.shap_model.params[1]
                 b0_y, beta1_y = sd.parent_model.params[0], sd.parent_model.params[1]
                 shap_slope = math.atan(beta1_s)*self.K
                 parent_slope = math.atan(beta1_y)*self.K
                 rows.append({
-                    'origin': origin,
+                    'origin': parent,
                     'target': target,
-                    'is_edge': int((origin, target) in self.ref_graph.edges()),
-                    'o_is_root': int(nx.ancestors(self.ref_graph, origin) == set()),
+                    'is_edge': int((parent, target) in self.ref_graph.edges()),
+                    'o_is_root': int(nx.ancestors(self.ref_graph, parent) == set()),
                     't_is_leaf': int(nx.descendants(self.ref_graph, target) == set()),
-                    'correlation': self.hierarchies.correlations[origin][target],
+                    'correlation': self.hierarchies.correlations[target][parent],
                     'shap_corr': sd.shap_correlation,
+                    'shap_gof': sd.shap_gof,
                     'ks_pval': sd.ks_pvalue,
-                    'shap_edge': int(origin in set(self.G_shap.predecessors(target))),
+                    'shap_edge': int(parent in set(self.G_shap.predecessors(target))),
                     'shap_sk_pval': sd.shap_p_value,
                     'parent_sk_pval': sd.parent_p_value,
-                    'mean_shap': self.shaps.shap_mean_values[origin][feature_pos],
+                    'mean_shap': self.shaps.shap_mean_values[target][feature_pos],
                     'mean_pi': pi,
                     'slope_shap': shap_slope,
                     'slope_target': parent_slope,
-                    'pot_root': int(origin in self.root_causes),
-                    'regr_err': self.scoring[self.feature_names.index(target)],
-                    'err_contrib': self.shaps.error_contribution.loc[origin, target],
-                    'cond_ind_pval': ci[(origin, target)]
+                    'pot_root': int(parent in self.root_causes),
+                    'regr_err': self.scoring[feature_pos],
+                    'err_contrib': self.shaps.error_contribution.loc[target, parent],
+                    'cond_ind_pval': ci[(target, parent)]
                 })
         self.results = pd.DataFrame.from_dict(rows)
         return self.results

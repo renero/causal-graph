@@ -14,7 +14,6 @@ is then used to build the graph.
 # pylint: disable=W0106:expression-not-assigned, R1702:too-many-branches
 
 import math
-import types
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Union
@@ -32,6 +31,7 @@ from matplotlib.ticker import FormatStrFormatter
 from scipy.stats import kstest, spearmanr
 from sklearn.base import BaseEstimator
 from sklearn.discriminant_analysis import StandardScaler
+from sklearn.metrics import r2_score
 from sklearn.model_selection import train_test_split
 from sklearn.utils.validation import check_is_fitted
 from tqdm.auto import tqdm
@@ -83,6 +83,7 @@ class ShapDiscrepancy:
     parent_model: sm.regression.linear_model.RegressionResultsWrapper
     shap_discrepancy: float
     shap_correlation: float
+    shap_gof: float
     ks_pvalue: float
     ks_result: str
 
@@ -197,7 +198,7 @@ class ShapEstimator(BaseEstimator):
         self._pred_desc = "Building graph skeleton"
 
     def __str__(self):
-        return utils.stringfy(self)
+        return utils.stringfy_object(self)
 
     def fit(self, X):
         """
@@ -526,6 +527,7 @@ class ShapEstimator(BaseEstimator):
             parent_model=model_y,
             shap_discrepancy=discrepancy,
             shap_correlation=corr.correlation,
+            shap_gof=r2_score(y, s),
             ks_pvalue=ks_pvalue,
             ks_result="Equal" if ks_pvalue > 0.05 else "Different"
         )
