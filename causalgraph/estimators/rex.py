@@ -251,11 +251,18 @@ class Rex(BaseEstimator, ClassifierMixin):
             ('G_indep', 'indep.fit_predict'),
             ('G_final', 'shaps.adjust', {'graph': 'G_indep'}),
             ('summarize_knowledge', {'ref_graph': ref_graph}),
+            ('G_adj', 'adjust_discrepancy', {'dag': 'G_shap'}),
             ('G_shag', 'break_cycles', {'dag': 'G_shap'}),
+            ('G_adjnc', 'break_cycles', {'dag': 'G_adj'}),
+            # Metrics Generation, here
             ('metrics_shap', 'score', {
              'ref_graph': ref_graph, 'predicted_graph': 'G_shap'}),
             ('metrics_shag', 'score', {
              'ref_graph': ref_graph, 'predicted_graph': 'G_shag'}),
+            ('metrics_adj', 'score', {
+             'ref_graph': ref_graph, 'predicted_graph': 'G_adj'}),
+            ('metrics_adjnc', 'score', {
+             'ref_graph': ref_graph, 'predicted_graph': 'G_adjnc'}),
             ('metrics_indep', 'score', {
              'ref_graph': ref_graph, 'predicted_graph': 'G_indep'}),
             ('metrics_final', 'score', {
@@ -363,6 +370,50 @@ class Rex(BaseEstimator, ClassifierMixin):
             dag (nx.DiGraph): The DAG to break the cycle from.
         """
         return utils.break_cycles_if_present(dag, self.learnings)
+
+    def adjust_discrepancy(self, dag: nx.DiGraph):
+        """
+        Adjusts the discrepancy in the directed acyclic graph (DAG) by adding new 
+        edges based on the goodness-of-fit (GOF) R2 values calculated from the 
+        learning data.
+
+        Args:
+            dag (nx.DiGraph): The original DAG.
+
+        Returns:
+            nx.DiGraph: The adjusted DAG with new edges added based on GOF values.
+        """
+        G_adj = dag.copy()
+        gof = np.zeros((len(self.feature_names), len(self.feature_names)))
+
+        # Filter rows based on the condition that origin and target are linked in DAG
+        filtered_rows = self.learnings[
+            ~self.learnings.apply(
+                lambda row: G_adj.has_edge(row['origin'], row['target']) or
+                G_adj.has_edge(row['target'], row['origin']), axis=1)]
+
+        for _, row in filtered_rows.iterrows():
+            i = self.feature_names.index(row['origin'])
+            j = self.feature_names.index(row['target'])
+            gof[i, j] = row['shap_gof']
+
+        new_edges = set()
+        # Loop through the i, j positions in the matrix `gof` that are
+        # greater than zero.
+        for i, j in zip(*np.where(gof > 0)):
+            # If the edge (i, j) is not present in the graph, then add it,
+            # but only if position (i, j) is greater than position (j, i).
+            if not G_adj.has_edge(self.feature_names[i], self.feature_names[j]) and \
+                not G_adj.has_edge(self.feature_names[j], self.feature_names[i]) \
+                    and gof[i, j] > 0.0 and gof[j, i] > 0.0:
+                if gof[j, i] < gof[i, j]:
+                    new_edges.add(
+                        (self.feature_names[i], self.feature_names[j]))
+        # Add the new edges to the graph `G_adj`, if any.
+        if new_edges:
+            G_adj.add_edges_from(new_edges)
+
+        return G_adj
 
     def __str__(self):
         return utils.stringfy_object(self)

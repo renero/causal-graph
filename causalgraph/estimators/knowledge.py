@@ -8,8 +8,9 @@ from sklearn.preprocessing import StandardScaler
 from causalgraph.common.utils import graph_from_dot_file, load_experiment
 
 # pylint: disable=E1101:no-member, W0201:attribute-defined-outside-init, W0511:fixme
-# pylint: disable=C0103:invalid_name, C0116:missing-function-docstring, R0913:too-many-arguments
-# pylint: disable=R0914:too-many-locals, R0915:too-many-statements, R1702:too-many-branches
+# pylint: disable=C0103:invalid_name, C0116:missing-function-docstring
+# pylint: disable=R0913:too-many-arguments, R1702:too-many-branches
+# pylint: disable=R0914:too-many-locals, R0915:too-many-statements
 
 
 class Knowledge:
@@ -118,7 +119,7 @@ class Knowledge:
         self.results = pd.DataFrame.from_dict(rows)
         return self.results
 
-    def get(self, origin: str, target: str, what: str = None):
+    def retrieve(self, origin: str, target: str, what: str = None):
         """Returns the knowledge about a specific edge"""
         if what is None:
             return self.results[(self.results.origin == origin) &

@@ -45,11 +45,13 @@ warnings.filterwarnings('ignore')
 
 
 global_metric_types = [
-    'mlp', 'gbt', 'intersection', 'union', 'union_all',
-    'int_indep', 'int_final', 'union_indep', 'union_final']
+    'mlp', 'gbt', 'intersection', 'union',
+    'mlp_adj', 'gbt_adj', 'intersection_adj', 'union_adj',
+    'union_all', 'int_indep', 'int_final', 'union_indep', 'union_final']
 global_nc_metric_types = [
-    'mlp_nc', 'gbt_nc', 'intersection_nc', 'union_nc', 'union_all_nc',
-    'int_indep', 'int_final', 'union_indep', 'union_final']
+    'mlp_nc', 'gbt_nc', 'intersection_nc', 'union_nc',
+    'mlp_adjnc', 'gbt_adjnc', 'intersection_adjnc', 'union_adjnc',
+    'union_all_nc', 'int_indep', 'int_final', 'union_indep', 'union_final']
 metric_labels = {
     'mlp': 'DFN',
     'gbt': 'GBT',
@@ -82,14 +84,24 @@ score_titles = {
     'diff_edges': 'Diff. Edges'
 }
 method_labels = {
-    'nn': r'$\textrm{REX}_{\textrm{\tiny MLP}}$',
-    'rex_mlp': r'$\textrm{REX}_{\textrm{\tiny MLP}}$',
-    'gbt': r'$\textrm{REX}_{\textrm{\tiny GBT}}$',
-    'rex_gbt': r'$\textrm{REX}_{\textrm{\tiny GBT}}$',
-    'union': r'$\textrm{REX}_{\cup}$',
-    'rex_union': r'$\textrm{REX}_{\cup}$',
-    'intersection': r'$\textrm{REX}_{\cap}$',
-    'rex_intersection': r'$\textrm{REX}_{\cap}$',
+    'nn': r'$\textrm{Rex}_{\textrm{\tiny MLP}}$',
+    'rex_mlp': r'$\textrm{Rex}_{\textrm{\tiny MLP}}$',
+    'nn_adj': r'$\textrm{Rex}_{\textrm{\tiny MLP}}^{\textrm{\tiny adj}}$',
+    'rex_mlp_adj': r'$\textrm{Rex}_{\textrm{\tiny MLP}}^{\textrm{\tiny adj}}$',
+    'gbt': r'$\textrm{Rex}_{\textrm{\tiny GBT}}$',
+    'rex_gbt': r'$\textrm{Rex}_{\textrm{\tiny GBT}}$',
+    'gbt_adj': r'$\textrm{Rex}_{\textrm{\tiny GBT}}^{\textrm{\tiny adj}}$',
+    'rex_gbt_adj': r'$\textrm{Rex}_{\textrm{\tiny GBT}}^{\textrm{\tiny adj}}$',
+    'union': r'$\textrm{Rex}_{\cup}$',
+    'rex_union': r'$\textrm{Rex}_{\cup}$',
+    'union_adj': r'$\textrm{Rex}_{\cup}^{\textrm{adj}}$',
+    'rex_union_adj': r'$\textrm{Rex}_{\cup}^{\textrm{\tiny adj}}$',
+    'rex_union_adjnc': r'$\overline{\textrm{Rex}}_{\cup}^{\textrm{\tiny adj}}$',
+    'intersection': r'$\textrm{Rex}_{\cap}$',
+    'rex_intersection': r'$\textrm{Rex}_{\cap}$',
+    'intersection_adj': r'$\textrm{Rex}_{\cap}^{\textrm{\tiny adj}}$',
+    'rex_intersection_adj': r'$\textrm{Rex}_{\cap}^{\textrm{\tiny adj}}$',
+    'rex_intersection_adjnc': r'$\overline{\textrm{Rex}}_{\cap}^{\textrm{\tiny adj}}$',
     'pc': r'$\textrm{PC}$',
     'fci': r'$\textrm{FCI}$',
     'ges': r'$\textrm{GES}$',
@@ -417,7 +429,8 @@ class Experiment(BaseExperiment):
         save_as = exp_name if exp_name is not None else self.experiment_name
         where_to = save_experiment(
             save_as, self.output_path, getattr(self, self.estimator_name), overwrite)
-        print(f"Saved '{self.experiment_name}' to '{where_to}'")
+        if self.verbose:
+            print(f"Saved '{self.experiment_name}' to '{where_to}'")
 
 
 class Experiments(BaseExperiment):
@@ -562,7 +575,7 @@ class Experiments(BaseExperiment):
         return self
 
 
-def get_combined_metrics(subtype: str):
+def get_combined_metrics(subtype: str, where: str = None) -> dict:
     """
     Obtain the metrics for all the experiments matching the input pattern
 
@@ -570,33 +583,61 @@ def get_combined_metrics(subtype: str):
     ----------
     subtype : str
         The subtype of the experiment, e.g. "linear" or "polynomial"
+    where : str
+        The path to use to look for the files matching the pattern
 
     Returns
     -------
     dict
         A dictionary with the metrics for all the experiments
     """
-    holder = Experiment(f"rex_generated_{subtype}_1")
-    files = [path.basename(f) for f in holder.list_files(
-        f"rex_generated_{subtype}_*")]
+    if where is None:
+        where = "/Users/renero/phd/output/RC3/"
+    files = list_files(f"rex_generated_{subtype}_*_nn.pickle", where=where)
 
     metrics = defaultdict(list)
     for exp_name in files:
+        exp_name = exp_name.replace("_nn", "")
         mlp = Experiment(exp_name).load(f"{exp_name}_nn")
         gbt = Experiment(exp_name).load(f"{exp_name}_gbt")
 
+        # Base metrics from methods before removing cycles, after removing cycles,
+        # and after adjusting from R2 discrepancy
         metrics['mlp'].append(mlp.rex.metrics_shap)
         metrics['gbt'].append(gbt.rex.metrics_shap)
         metrics['mlp_nc'].append(mlp.rex.metrics_shag)
         metrics['gbt_nc'].append(gbt.rex.metrics_shag)
+        metrics['mlp_adj'].append(mlp.rex.metrics_adj)
+        metrics['gbt_adj'].append(gbt.rex.metrics_adj)
+        metrics['mlp_adjnc'].append(mlp.rex.metrics_adjnc)
+        metrics['gbt_adjnc'].append(gbt.rex.metrics_adjnc)
+
+        # Metric from the INTERSECTION graphs
         metrics['intersection'].append(evaluate_graph(
             mlp.ref_graph, utils.graph_intersection(mlp.rex.G_shap, gbt.rex.G_shap)))
         metrics['intersection_nc'].append(evaluate_graph(
             mlp.ref_graph, utils.graph_intersection(mlp.rex.G_shag, gbt.rex.G_shag)))
+
+        # Metric from the UNION graphs
         metrics['union'].append(evaluate_graph(
             mlp.ref_graph, utils.graph_union(mlp.rex.G_shap, gbt.rex.G_shap)))
         metrics['union_nc'].append(evaluate_graph(
             mlp.ref_graph, utils.graph_union(mlp.rex.G_shag, gbt.rex.G_shag)))
+
+        # Metrics from the DAGs generated after discrepancy adjustment
+        if hasattr(mlp.rex, 'G_adj') and hasattr(gbt.rex, 'G_adj'):
+            metrics['intersection_adj'].append(evaluate_graph(
+                mlp.ref_graph, utils.graph_intersection(mlp.rex.G_adj, gbt.rex.G_adj)))
+            metrics['union_adj'].append(evaluate_graph(
+                mlp.ref_graph, utils.graph_union(mlp.rex.G_adj, gbt.rex.G_adj)))
+        if hasattr(mlp.rex, 'G_adjnc') and hasattr(gbt.rex, 'G_adjnc'):
+            metrics['intersection_adjnc'].append(evaluate_graph(
+                mlp.ref_graph, utils.graph_intersection(
+                    mlp.rex.G_adjnc, gbt.rex.G_adjnc)))
+            metrics['union_adjnc'].append(evaluate_graph(
+                mlp.ref_graph, utils.graph_union(mlp.rex.G_adjnc, gbt.rex.G_adjnc)))
+
+        # Metrics from the UNION of ALL DAGs based on explainability
         metrics['union_all'].append(evaluate_graph(
             mlp.ref_graph, utils.graph_union(
                 mlp.rex.G_pi, utils.graph_union(
@@ -609,6 +650,9 @@ def get_combined_metrics(subtype: str):
                     gbt.rex.G_pi, utils.graph_union(
                         mlp.rex.G_shag, gbt.rex.G_shag)
                 ))))
+
+        # Metrics for the intersection and union graphs after checking independence
+        # and final graphs
         metrics['int_indep'].append(evaluate_graph(
             mlp.ref_graph, utils.graph_intersection(mlp.rex.G_indep, gbt.rex.G_indep)))
         metrics['int_final'].append(evaluate_graph(
@@ -743,7 +787,7 @@ def plot_score_by_subtype(
     Returns:
     None
     """
-    figsize_ = kwargs.get('figsize', (7, 5))
+    figsize_ = kwargs.get('figsize', (9, 5))
     dpi_ = kwargs.get('dpi', 300)
     if methods is None:
         methods = ['rex_intersection', 'rex_union',
@@ -755,7 +799,6 @@ def plot_score_by_subtype(
     # Loop through all the subtypes
     ax_labels = list(axs.keys())
     for i, subtype in enumerate(synth_data_types + ['all']):
-        # axe = ax[i//3, i % 3]
         ax = axs[ax_labels[i]]
         if subtype == 'all':
             sub_df = metrics
@@ -808,7 +851,7 @@ def plot_score_by_subtype(
 
 def plot_scores_by_method(
         metrics: pd.DataFrame,
-        method_types=None,
+        methods=None,
         title: str = None,
         pdf_filename=None,
         **kwargs):
@@ -840,11 +883,10 @@ def plot_scores_by_method(
     -------
     None
     """
-    figsize_ = kwargs.get('figsize', (7, 5))
+    figsize_ = kwargs.get('figsize', (9, 5))
     dpi_ = kwargs.get('dpi', 300)
-    if method_types is None:
-        method_types = ['rex_mlp', 'rex_gbt',
-                        'rex_intersection', 'rex_union']
+    if methods is None:
+        methods = ['rex_mlp', 'rex_gbt', 'rex_intersection', 'rex_union']
 
     what = ['f1', 'precision', 'recall', 'shd', 'sid']
     axs = plt.figure(layout="constrained", figsize=figsize_, dpi=dpi_).\
@@ -854,11 +896,11 @@ def plot_scores_by_method(
     for i, metric in enumerate(what):
         ax = axs[ax_labels[i]]
         metric_values = [metrics[metrics['method'] == m][metric]
-                         for m in method_types]
+                         for m in methods]
 
         ax.boxplot(metric_values)
         ax.set_xticklabels(labels=[method_labels[key]
-                                   for key in method_types], fontsize=7)
+                                   for key in methods], fontsize=7)
         ax.grid(axis='y', linestyle='--', linewidth=0.5, which='both')
 
         # check if any value is above 1
@@ -885,6 +927,76 @@ def plot_scores_by_method(
     if title is not None:
         fig = plt.gcf()
         fig.suptitle(title)
+
+    if pdf_filename is not None:
+        plt.savefig(pdf_filename, bbox_inches='tight')
+        plt.close()
+    else:
+        plt.tight_layout()
+        plt.show()
+
+
+def plot_score_by_method(metrics, metric, methods, **kwargs):
+    """
+    Plots the score by method.
+
+    Parameters:
+    - metrics: DataFrame containing the metrics data.
+    - metric: The metric to be plotted.
+    - methods: List of methods to be included in the plot.
+    - **kwargs: Additional keyword arguments for customization, like
+        - figsize: The size of the figure. Default is (4, 3).
+        - dpi: The resolution of the figure in dots per inch. Default is 300.
+        - title: The title of the plot. Default is None.
+        - pdf_filename: The filename to save the plot to. If None, the plot
+            will be displayed on screen, otherwise it will be saved to the
+
+    Returns:
+    None
+    """
+    assert metric in list(score_titles.keys()), \
+        ValueError(f"Metric '{metric}' not recognized.")
+    figsize_ = kwargs.get('figsize', (4, 3))
+    dpi_ = kwargs.get('dpi', 300)
+    title_ = kwargs.get('title', None)
+    pdf_filename = kwargs.get('pdf_filename', None)
+
+    if methods is None:
+        methods = ['rex_mlp', 'rex_gbt', 'rex_intersection', 'rex_union']
+
+    _, ax = plt.subplots(1, 1, figsize=figsize_, dpi=dpi_)
+
+    metric_values = [metrics[metrics['method'] == m][metric]
+                     for m in methods]
+
+    plt.boxplot(metric_values)
+    ax.set_xticklabels(labels=[method_labels[key]
+                               for key in methods], fontsize=7)
+    ax.grid(axis='y', linestyle='--', linewidth=0.5, which='both')
+
+    # check if any value is above 1
+    if np.all(np.array(metric_values) <= 1.0) and \
+            np.all(np.array(metric_values) >= 0.0):
+        ax.set_ylim([0, 1.05])
+    if not np.any(np.array(metric_values) < 0.0):
+        ax.set_ylim(bottom=0)
+
+    # Set the Y tick labels and left axis bounds
+    yticks = ax.get_yticks()
+    if np.max(metric_values) <= yticks[-1]:
+        yticks = ax.get_yticks()[:-1]
+    ax.set_yticklabels(labels=[f"{t:.1f}" for t in yticks], fontsize=6)
+
+    #  Remove the top and right axes
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['left'].set_bounds(high=yticks[-1])
+    ax.spines['left'].set_visible(False)
+
+    if title_ is None:
+        ax.set_title(score_titles[metric], fontsize=10)
+    else:
+        ax.set_title(title_, fontsize=10)
 
     if pdf_filename is not None:
         plt.savefig(pdf_filename, bbox_inches='tight')

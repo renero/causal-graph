@@ -39,13 +39,13 @@
 # pylint: disable=R0914:too-many-locals, R0915:too-many-statements
 # pylint: disable=W0106:expression-not-assigned, R1702:too-many-branches
 
+from dataclasses import dataclass
+from typing import Dict, List, Union
+
 import networkx as nx
 import numpy as np
-
-from dataclasses import dataclass
 from networkx.linalg import adjacency_matrix
-from sklearn.metrics import precision_recall_curve, auc
-from typing import Dict, Union, List
+from sklearn.metrics import auc, precision_recall_curve
 
 from causalgraph.metrics.SID import SID
 

@@ -14,12 +14,12 @@ import glob
 import os
 import pickle
 import types
-import numpy as np
 from os.path import join
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union
 
 import networkx as nx
+import numpy as np
 import pandas as pd
 import pydot
 import pydotplus
@@ -119,6 +119,8 @@ def valid_output_name(filename: str, path: str, extension=None) -> str:
         of an existing file, no matter what extension it has.
     """
     if extension:
+        if extension[0] == '.':
+            extension = extension[1:]
         base_filepath = join(path, filename) + '.{}'.format(extension)
     else:
         base_filepath = join(path, filename)
@@ -413,12 +415,12 @@ def break_cycles_if_present(
                 neighbour = cycle[0]
             else:
                 neighbour = cycle[cycle.index(node)+1]
-            cycle_edges[(node, neighbour)] = knowledge.get(
-                node, neighbour, 'mean_pi')
-            # cycle_edges[(node, neighbour)] = knowledge.loc[
-            #     (knowledge['origin'] == node) & (
-            #         knowledge['target'] == neighbour),
-            #     'mean_pi'].values[0]
+            # cycle_edges[(node, neighbour)] = knowledge.retrieve(
+            #     node, neighbour, 'mean_pi')
+            cycle_edges[(node, neighbour)] = knowledge.loc[
+                (knowledge['origin'] == node) & (
+                    knowledge['target'] == neighbour),
+                'mean_pi'].values[0]
         cycles_info.append((cycle, cycle_edges))
 
         # Find the edge with the lowest permutation importance
