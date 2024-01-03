@@ -386,7 +386,7 @@ def break_cycles_if_present(
         verbose: bool = False):
     """
     Breaks cycles in a directed acyclic graph (DAG) by removing the edge with 
-    the lowest permutation importance. If there are multiple cycles, they are 
+    the lowest goodness of fit (R2). If there are multiple cycles, they are 
     all traversed and fixed.
 
     Parameters:
@@ -406,7 +406,8 @@ def break_cycles_if_present(
 
     # Traverse all cycles, fixing them
     cycles_info = []
-    for cycle in cycles:
+    while len(cycles) > 0:
+        cycle = cycles.pop(0)
         # For every pair of consecutive nodes in the cycle, store their
         # permutation importance
         cycle_edges = {}
@@ -415,18 +416,16 @@ def break_cycles_if_present(
                 neighbour = cycle[0]
             else:
                 neighbour = cycle[cycle.index(node)+1]
-            # cycle_edges[(node, neighbour)] = knowledge.retrieve(
-            #     node, neighbour, 'mean_pi')
             cycle_edges[(node, neighbour)] = knowledge.loc[
                 (knowledge['origin'] == node) & (
                     knowledge['target'] == neighbour),
-                'mean_pi'].values[0]
+                'shap_gof'].values[0]
         cycles_info.append((cycle, cycle_edges))
 
         # Find the edge with the lowest permutation importance
-        min_pi = min(cycle_edges.values())
-        min_edge = [edge for edge, pi in cycle_edges.items() if pi ==
-                    min_pi][0]
+        min_gof = min(cycle_edges.values())
+        min_edge = [edge for edge, gof in cycle_edges.items() if gof ==
+                    min_gof][0]
         if verbose:
             print(f"Breaking cycle {cycle} by removing edge {min_edge}")
 

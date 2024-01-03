@@ -206,12 +206,12 @@ def format_graph(
             elif Gt.has_edge(v, u):           # The edge exists, but reversed
                 G[u][v]['color'] = inv_color
                 G[u][v]['width'] = 2.0
-                G[u][v]['style'] = 'solid'
+                G[u][v]['style'] = 'dashed'
                 G[u][v]['alpha'] = 0.8
             else:                             # The edge does not exist
                 G[u][v]['color'] = wrong_color
                 G[u][v]['width'] = 1.0
-                G[u][v]['style'] = '--'
+                G[u][v]['style'] = 'dashdot'
                 G[u][v]['alpha'] = 0.6
         if missing_color is not None:
             for u, v in Gt.edges():
@@ -219,7 +219,7 @@ def format_graph(
                     G.add_edge(u, v)
                     G[u][v]['color'] = missing_color
                     G[u][v]['width'] = 1.0
-                    G[u][v]['style'] = '--'
+                    G[u][v]['style'] = 'dotted'
                     G[u][v]['alpha'] = 0.5
     return G
 
@@ -507,6 +507,7 @@ def dag(
         reference: nx.DiGraph = None,
         root_causes: list = None,
         show_metrics: bool = False,
+        show_node_fill: bool = True,
         title: str = None,
         ax: plt.Axes = None,
         figsize: Tuple[int, int] = (5, 5),
@@ -522,6 +523,7 @@ def dag(
     reference: The reference DAG.
     root_causes: The root causes of the graph.
     show_metrics: Whether to show the metrics of the graph.
+    show_node_fill: Whether to show the node fill (corresponding to the root causes).
     title: The title of the graph.
     ax: The axis in which to draw the graph.
     figsize: The size of the figure.
@@ -545,7 +547,10 @@ def dag(
         show_metrics = False
 
     G = nx.DiGraph()
-    G.add_nodes_from(graph.nodes(data=True))
+    if show_node_fill:
+        G.add_nodes_from(graph.nodes(data=True))
+    else:
+        G.add_nodes_from(graph.nodes())
     G.add_edges_from(graph.edges())
     if reference:
         # Clean up reference graph for inconsistencies along the DOT conversion

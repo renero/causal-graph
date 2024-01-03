@@ -853,6 +853,7 @@ class ShapEstimator(BaseEstimator):
         """
         mpl.rcParams['figure.dpi'] = kwargs.get('dpi', 75)
         figsize_ = kwargs.get('figsize', (10, 16))
+        pdf_filename = kwargs.get('pdf_filename', None)
         feature_names = [
             f for f in self.feature_names if f != target_name]
         fig, ax = plt.subplots(len(feature_names), 4, figsize=figsize_)
@@ -867,8 +868,14 @@ class ShapEstimator(BaseEstimator):
             self._plot_discrepancy(x, y, s, target_name, parent_name, r, ax[i])
 
         plt.suptitle(f"Discrepancies for {target_name}")
-        plt.tight_layout(rect=[0, 0.0, 1, 0.97])
-        fig.show()
+
+        if pdf_filename is not None:
+            plt.tight_layout(rect=[0, 0.0, 1, 0.97])
+            plt.savefig(pdf_filename, bbox_inches='tight')
+            plt.close()
+        else:
+            plt.tight_layout(rect=[0, 0.0, 1, 0.97])
+            fig.show()
 
     def _plot_discrepancy(self, x, y, s, target_name, parent_name, r, ax):
         """
@@ -908,8 +915,11 @@ class ShapEstimator(BaseEstimator):
         ax[0].plot(x, b1_s * x + b0_s, color='blue', linewidth=.5)
         ax[0].plot(x, b1_y * x + b0_y, color='red', linewidth=.5)
         ax[0].set_title(
-            f'$m_s$:{math.atan(b1_s)*K:.1f}°; $m_y$:{math.atan(b1_y)*K:.1f}°',
+            r'$ [X_i | \phi_j]\ \textrm{vs}\ X_j $',
             fontsize=10)
+        # ax[0].set_title(
+        #     f'$m_s$:{math.atan(b1_s)*K:.1f}°; $m_y$:{math.atan(b1_y)*K:.1f}°',
+        #     fontsize=10)
         ax[0].set_xlabel(f'${parent_name}$')
         ax[0].set_ylabel(
             fr'$ \mathrm{{{target_name}}} / \phi_{{{parent_name}}} $')
@@ -942,7 +952,7 @@ class ShapEstimator(BaseEstimator):
         # Represent target vs. SHAP values
         ax[3].scatter(s, y, alpha=0.3, marker='.', color='tab:green')
         ax[3].set_title(
-            rf'$\mathrm{{Discrepancy: }}{r.shap_discrepancy:.2f}$', fontsize=10)
+            rf'$\Delta \rho: {1 - r.shap_gof:.2f}$', fontsize=10)
         ax[3].set_xlabel(fr'$ \phi_{{{parent_name}}} $')
         ax[3].set_ylabel(fr'$ \mathrm{{{target_name}}} $')
 

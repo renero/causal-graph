@@ -69,19 +69,19 @@ metric_labels = {
     'union_all_nc': 'all'
 }
 score_titles = {
-    'f1': 'F1',
-    'precision': 'Precision',
-    'recall': 'Recall',
-    'aupr': 'AuPR',
-    'Tp': 'TP',
-    'Tn': 'TN',
-    'Fp': 'FP',
-    'Fn': 'FN',
-    'shd': 'SHD',
-    'sid': 'SID',
-    'n_edges': 'Nr. Edges',
-    'ref_n_edges': 'Edges in Ground Truth',
-    'diff_edges': 'Diff. Edges'
+    'f1': r'$\textrm{F1}$',
+    'precision': r'$\textrm{Precision}$',
+    'recall': r'$\textrm{Recall}$',
+    'aupr': r'$\textrm{AuPR}$',
+    'Tp': r'$\textrm{TP}$',
+    'Tn': r'$\textrm{TN}$',
+    'Fp': r'$\textrm{FP}$',
+    'Fn': r'$\textrm{FN}$',
+    'shd': r'$\textrm{SHD}$',
+    'sid': r'$\textrm{SID}$',
+    'n_edges': r'$\textrm{Nr. Edges}$',
+    'ref_n_edges': r'$\textrm{Edges in Ground Truth}$',
+    'diff_edges': r'$\textrm{Diff. Edges}$',
 }
 method_labels = {
     'nn': r'$\textrm{Rex}_{\textrm{\tiny MLP}}$',
@@ -615,14 +615,20 @@ def get_combined_metrics(subtype: str, where: str = None) -> dict:
         # Metric from the INTERSECTION graphs
         metrics['intersection'].append(evaluate_graph(
             mlp.ref_graph, utils.graph_intersection(mlp.rex.G_shap, gbt.rex.G_shap)))
+        inter_nc = utils.break_cycles_if_present(
+            utils.graph_intersection(mlp.rex.G_shag, gbt.rex.G_shag),
+            mlp.rex.learnings)
         metrics['intersection_nc'].append(evaluate_graph(
-            mlp.ref_graph, utils.graph_intersection(mlp.rex.G_shag, gbt.rex.G_shag)))
+            mlp.ref_graph, inter_nc))
 
         # Metric from the UNION graphs
         metrics['union'].append(evaluate_graph(
             mlp.ref_graph, utils.graph_union(mlp.rex.G_shap, gbt.rex.G_shap)))
+        union_nc = utils.break_cycles_if_present(
+            utils.graph_union(mlp.rex.G_shag, gbt.rex.G_shag),
+            mlp.rex.learnings)
         metrics['union_nc'].append(evaluate_graph(
-            mlp.ref_graph, utils.graph_union(mlp.rex.G_shag, gbt.rex.G_shag)))
+            mlp.ref_graph, union_nc))
 
         # Metrics from the DAGs generated after discrepancy adjustment
         if hasattr(mlp.rex, 'G_adj') and hasattr(gbt.rex, 'G_adj'):
@@ -631,11 +637,16 @@ def get_combined_metrics(subtype: str, where: str = None) -> dict:
             metrics['union_adj'].append(evaluate_graph(
                 mlp.ref_graph, utils.graph_union(mlp.rex.G_adj, gbt.rex.G_adj)))
         if hasattr(mlp.rex, 'G_adjnc') and hasattr(gbt.rex, 'G_adjnc'):
+            inter_adjnc = utils.break_cycles_if_present(
+                utils.graph_intersection(mlp.rex.G_adjnc, gbt.rex.G_adjnc),
+                mlp.rex.learnings)
             metrics['intersection_adjnc'].append(evaluate_graph(
-                mlp.ref_graph, utils.graph_intersection(
-                    mlp.rex.G_adjnc, gbt.rex.G_adjnc)))
+                mlp.ref_graph, inter_adjnc))
+            union_adjnc = utils.break_cycles_if_present(
+                utils.graph_union(mlp.rex.G_adjnc, gbt.rex.G_adjnc),
+                mlp.rex.learnings)
             metrics['union_adjnc'].append(evaluate_graph(
-                mlp.ref_graph, utils.graph_union(mlp.rex.G_adjnc, gbt.rex.G_adjnc)))
+                mlp.ref_graph, union_adjnc))
 
         # Metrics from the UNION of ALL DAGs based on explainability
         metrics['union_all'].append(evaluate_graph(
