@@ -94,7 +94,7 @@ method_labels = {
     'rex_gbt_adj': r'$\textrm{Rex}_{\textrm{\tiny GBT}}^{\textrm{\tiny adj}}$',
     'union': r'$\textrm{Rex}_{\cup}$',
     'rex_union': r'$\textrm{Rex}_{\cup}$',
-    'union_adj': r'$\textrm{Rex}_{\cup}^{\textrm{adj}}$',
+    'union_adj': r'$\textrm{Rex}_{\cup}^{\textrm{\tiny adj}}$',
     'rex_union_adj': r'$\textrm{Rex}_{\cup}^{\textrm{\tiny adj}}$',
     'rex_union_adjnc': r'$\overline{\textrm{Rex}}_{\cup}^{\textrm{\tiny adj}}$',
     'intersection': r'$\textrm{Rex}_{\cap}$',
@@ -116,6 +116,8 @@ estimators = {
 }
 method_names = ['pc', 'fci', 'ges', 'lingam']
 synth_data_types = ['linear', 'polynomial', 'gp_add', 'gp_mix', 'sigmoid_add']
+synth_data_labels = ['Linear', 'Polynomial',
+                     'Gaussian(add)', 'Gaussian(mix)', 'Sigmoid(add)']
 metric_columns = ['method', 'data_type', 'f1', 'precision',
                   'recall', 'aupr', 'Tp', 'Tn', 'Fp', 'Fn', 'shd', 'sid',
                   'n_edges', 'ref_n_edges', 'diff_edges', 'name']
@@ -1015,6 +1017,54 @@ def plot_score_by_method(metrics, metric, methods, **kwargs):
     else:
         plt.tight_layout()
         plt.show()
+
+
+def format_mean_std(data):
+    """\scalemath{0.6}{\ \pm\ 0.05}"""
+    return f"${data.mean():.2f} \scalemath{{0.6}}{{\ \pm\ {data.std():.2f}}}$"
+
+
+def latex_table_by_datatype(df, method, metrics=None):
+    if metrics is None:
+        metrics = ['precision', 'recall', 'f1', 'shd', 'sid']
+
+    table = "\\begin{tabular}{l|cccc}\n\\toprule\n"
+    table += "{} & Precision & Recall & F1 & SHD & SID \\\\ \\midrule\n"
+    for i, data_type in enumerate(synth_data_types):
+        table += synth_data_labels[i]
+        for metric in metrics:
+            data = df[(df.method == method) & (
+                df.data_type == data_type)][metric]
+            table += f" & {format_mean_std(data)}"
+        table += " \\\\\n"
+    table += "\\bottomrule\n"
+    table += "\\end{tabular}"
+    print(table)
+
+
+def latex_table_by_method(df, methods=None, metric_names=None):
+
+    if methods is None:
+        methods = ['rex_mlp', 'rex_gbt', 'rex_union',
+                   'rex_union_adjnc', 'pc', 'fci', 'ges', 'lingam']
+
+    if metric_names is None:
+        metric_names = ['precision', 'recall', 'f1', 'shd', 'sid']
+
+    table = "\\begin{tabular}{l|" + 'c'*len(metric_names) + "}\n\\toprule\n"
+    # table += "{} & Precision & Recall & F1 & SHD & SID \\\\ \\midrule\n"
+    table += "{} " + \
+        ''.join(
+            f"& {score_titles[m]}" for m in metric_names) + " \\\\ \\midrule\n"
+    for method in methods:
+        table += method_labels[method]
+        for metric in metric_names:
+            data = df[(df.method == method)][metric]
+            table += f" & {format_mean_std(data)}"
+        table += " \\\\\n"
+    table += "\\bottomrule\n"
+    table += "\\end{tabular}"
+    print(table)
 
 
 if __name__ == "__main__":
