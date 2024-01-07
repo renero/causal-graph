@@ -26,6 +26,7 @@ from rich.progress import Progress
 from causalgraph.common import utils
 from causalgraph.common.utils import (graph_from_dot_file, load_experiment,
                                       save_experiment)
+from causalgraph.common import plot
 from causalgraph.estimators.rex import Rex
 from causalgraph.estimators.fci.fci import FCI
 from causalgraph.estimators.pc.pc import PC
@@ -84,24 +85,24 @@ score_titles = {
     'diff_edges': r'$\textrm{Diff. Edges}$',
 }
 method_labels = {
-    'nn': r'$\textrm{Rex}_{\textrm{\tiny MLP}}$',
-    'rex_mlp': r'$\textrm{Rex}_{\textrm{\tiny MLP}}$',
-    'nn_adj': r'$\textrm{Rex}_{\textrm{\tiny MLP}}^{\textrm{\tiny adj}}$',
-    'rex_mlp_adj': r'$\textrm{Rex}_{\textrm{\tiny MLP}}^{\textrm{\tiny adj}}$',
-    'gbt': r'$\textrm{Rex}_{\textrm{\tiny GBT}}$',
-    'rex_gbt': r'$\textrm{Rex}_{\textrm{\tiny GBT}}$',
-    'gbt_adj': r'$\textrm{Rex}_{\textrm{\tiny GBT}}^{\textrm{\tiny adj}}$',
-    'rex_gbt_adj': r'$\textrm{Rex}_{\textrm{\tiny GBT}}^{\textrm{\tiny adj}}$',
-    'union': r'$\textrm{Rex}_{\cup}$',
-    'rex_union': r'$\textrm{Rex}_{\cup}$',
-    'union_adj': r'$\textrm{Rex}_{\cup}^{\textrm{\tiny adj}}$',
-    'rex_union_adj': r'$\textrm{Rex}_{\cup}^{\textrm{\tiny adj}}$',
-    'rex_union_adjnc': r'$\textrm{Rex}_{\cup}^{\textrm{\tiny adj}}$',
-    'intersection': r'$\textrm{Rex}_{\cap}$',
-    'rex_intersection': r'$\textrm{Rex}_{\cap}$',
-    'intersection_adj': r'$\textrm{Rex}_{\cap}^{\textrm{\tiny adj}}$',
-    'rex_intersection_adj': r'$\textrm{Rex}_{\cap}^{\textrm{\tiny adj}}$',
-    'rex_intersection_adjnc': r'$\textrm{Rex}_{\cap}^{\textrm{\tiny adj}}$',
+    'nn': r'$\textrm{R\textsc{e}X}_{\textrm{\tiny MLP}}$',
+    'rex_mlp': r'$\textrm{R\textsc{e}X}_{\textrm{\tiny MLP}}$',
+    'nn_adj': r'$\textrm{R\textsc{e}X}_{\textrm{\tiny MLP}}^{\textrm{\tiny adj}}$',
+    'rex_mlp_adj': r'$\textrm{R\textsc{e}X}_{\textrm{\tiny MLP}}^{\textrm{\tiny adj}}$',
+    'gbt': r'$\textrm{R\textsc{e}X}_{\textrm{\tiny GBT}}$',
+    'rex_gbt': r'$\textrm{R\textsc{e}X}_{\textrm{\tiny GBT}}$',
+    'gbt_adj': r'$\textrm{R\textsc{e}X}_{\textrm{\tiny GBT}}^{\textrm{\tiny adj}}$',
+    'rex_gbt_adj': r'$\textrm{R\textsc{e}X}_{\textrm{\tiny GBT}}^{\textrm{\tiny adj}}$',
+    'union': r'$\textrm{R\textsc{e}X}_{\cup}$',
+    'rex_union': r'$\textrm{R\textsc{e}X}_{\cup}$',
+    'union_adj': r'$\textrm{R\textsc{e}X}_{\cup}^{\textrm{\tiny adj}}$',
+    'rex_union_adj': r'$\textrm{R\textsc{e}X}_{\cup}^{\textrm{\tiny adj}}$',
+    'rex_union_adjnc': r'$\textrm{R\textsc{e}X}_{\cup}^{\textrm{\tiny adj}}$',
+    'intersection': r'$\textrm{R\textsc{e}X}_{\cap}$',
+    'rex_intersection': r'$\textrm{R\textsc{e}X}_{\cap}$',
+    'intersection_adj': r'$\textrm{R\textsc{e}X}_{\cap}^{\textrm{\tiny adj}}$',
+    'rex_intersection_adj': r'$\textrm{R\textsc{e}X}_{\cap}^{\textrm{\tiny adj}}$',
+    'rex_intersection_adjnc': r'$\textrm{R\textsc{e}X}_{\cap}^{\textrm{\tiny adj}}$',
     'pc': r'$\textrm{PC}$',
     'fci': r'$\textrm{FCI}$',
     'ges': r'$\textrm{GES}$',
@@ -1021,15 +1022,18 @@ def plot_score_by_method(metrics, metric, methods, **kwargs):
 
 def format_mean_std(data):
     """\scalemath{0.6}{\ \pm\ 0.05}"""
-    return f"${data.mean():.2f} \scalemath{{0.6}}{{\ \pm\ {data.std():.2f}}}$"
+    return f"${data.median():.2f} \scalemath{{0.6}}{{\ \pm\ {data.std():.2f}}}$"
 
 
 def latex_table_by_datatype(df, method, metrics=None):
     if metrics is None:
         metrics = ['precision', 'recall', 'f1', 'shd', 'sid']
 
-    table = "\\begin{tabular}{l|cccc}\n\\toprule\n"
-    table += "{} & Precision & Recall & F1 & SHD & SID \\\\ \\midrule\n"
+    table = "\\begin{tabular}{l|" + 'c'*len(metrics) + "}\n\\toprule\n"
+    # table += "{} & Precision & Recall & F1 & SHD & SID \\\\ \\midrule\n"
+    table += "{} " + \
+        ''.join(
+            f"& {score_titles[m]}" for m in metrics) + " \\\\ \\midrule\n"
     for i, data_type in enumerate(synth_data_types):
         table += synth_data_labels[i]
         for metric in metrics:
@@ -1065,6 +1069,83 @@ def latex_table_by_method(df, methods=None, metric_names=None):
     table += "\\bottomrule\n"
     table += "\\end{tabular}"
     print(table)
+
+
+def plot_all_dags(what, include_others=True, **kwargs):
+    """
+    Plot the directed acyclic graphs (DAGs) for various methods.
+
+    Parameters:
+    - what (str): The name of the experiment.
+    - include_others (bool, optional): Whether to include the DAGs for the other
+        methods. Default is True. Other methods are: 'pc', 'lingam', 'ges' and 'fci'.
+
+    Returns:
+    None
+    """
+    pdf_filename = kwargs.get("pdf_filename", None)
+    figsize_ = kwargs.get("figsize", (18, 15))
+    dpi_ = kwargs.get("dpi", 300)
+
+    if include_others:
+        pc = Experiment(f"{what}").load(f"{what}_pc")
+        lingam = Experiment(f"{what}").load(f"{what}_lingam")
+        ges = Experiment(f"{what}").load(f"{what}_ges")
+        fci = Experiment(f"{what}").load(f"{what}_fci")
+    nn = Experiment(f"{what}").load(f"{what}_nn")
+    gbt = Experiment(f"{what}").load(f"{what}_gbt")
+    union = utils.graph_union(nn.rex.G_shag, gbt.rex.G_shag)
+    union = utils.break_cycles_if_present(union, nn.rex.learnings)
+    inter = utils.graph_intersection(nn.rex.G_shag, gbt.rex.G_shag)
+    inter = utils.break_cycles_if_present(inter, nn.rex.learnings)
+    union_adj = utils.graph_union(nn.rex.G_adjnc, gbt.rex.G_adjnc)
+    union_adj = utils.break_cycles_if_present(union_adj, nn.rex.learnings)
+    inter_adj = utils.graph_intersection(nn.rex.G_adjnc, gbt.rex.G_adjnc)
+    inter_adj = utils.break_cycles_if_present(inter_adj, nn.rex.learnings)
+
+    if include_others:
+        _, ax = plt.subplots(3, 4, figsize=figsize_, dpi=dpi_,
+                             gridspec_kw={'hspace': 0.5, 'wspace': 0.2})
+    else:
+        _, ax = plt.subplots(2, 4, figsize=figsize_, dpi=dpi_,
+                             gridspec_kw={'hspace': 0.5, 'wspace': 0.2})
+
+    plot.setup_plot()
+    plot.dag(graph=nn.rex.G_shag, reference=nn.ref_graph, show_node_fill=False,
+             ax=ax[0, 0], title=method_labels["nn"])
+    plot.dag(gbt.rex.G_shag, nn.ref_graph, show_node_fill=False,
+             ax=ax[0, 1], title=method_labels["gbt"])
+    plot.dag(union, nn.ref_graph, ax=ax[0, 2], title=method_labels["union"])
+    plot.dag(inter, nn.ref_graph, ax=ax[0, 3],
+             title=method_labels["intersection"])
+
+    plot.dag(graph=nn.rex.G_adj, reference=nn.ref_graph, show_node_fill=False,
+             ax=ax[1, 0], title=method_labels["nn_adj"])
+    plot.dag(gbt.rex.G_adj, nn.ref_graph, show_node_fill=False,
+             ax=ax[1, 1], title=method_labels["gbt_adj"])
+    plot.dag(union_adj, nn.ref_graph,
+             ax=ax[1, 2], title=method_labels["union_adj"])
+    plot.dag(inter_adj, nn.ref_graph,
+             ax=ax[1, 3], title=method_labels["intersection_adj"])
+
+    if include_others:
+        plot.dag(graph=pc.pc.dag, reference=nn.ref_graph,
+                 ax=ax[2, 0], title=method_labels["pc"])
+        plot.dag(graph=lingam.lingam.dag, reference=nn.ref_graph,
+                 ax=ax[2, 1], title=method_labels["lingam"])
+        plot.dag(graph=ges.ges.dag, reference=nn.ref_graph,
+                 ax=ax[2, 2], title=method_labels["ges"])
+        plot.dag(graph=fci.fci.dag, reference=nn.ref_graph,
+                 ax=ax[2, 3], title=method_labels["fci"])
+
+    plt.suptitle(what)
+
+    if pdf_filename is not None:
+        plt.savefig(pdf_filename, bbox_inches='tight')
+        plt.close()
+    else:
+        plt.tight_layout()
+        plt.show()
 
 
 if __name__ == "__main__":

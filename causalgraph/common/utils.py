@@ -409,7 +409,7 @@ def break_cycles_if_present(
     while len(cycles) > 0:
         cycle = cycles.pop(0)
         # For every pair of consecutive nodes in the cycle, store their
-        # permutation importance
+        # SHAP discrepancy
         cycle_edges = {}
         for node in cycle:
             if node == cycle[-1]:
@@ -422,14 +422,14 @@ def break_cycles_if_present(
                 'shap_gof'].values[0]
         cycles_info.append((cycle, cycle_edges))
 
-        # Find the edge with the lowest permutation importance
+        # Find the edge with the lowest SHAP discrepancy
         min_gof = min(cycle_edges.values())
         min_edge = [edge for edge, gof in cycle_edges.items() if gof ==
                     min_gof][0]
         if verbose:
             print(f"Breaking cycle {cycle} by removing edge {min_edge}")
 
-        # Remove the edge with the lowest permutation importance, checking that
+        # Remove the edge with the lowest SHAP discrepancy, checking that
         # the edge still exists
         if min_edge in new_dag.edges:
             new_dag.remove_edge(*min_edge)

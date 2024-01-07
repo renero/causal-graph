@@ -817,7 +817,7 @@ class ShapEstimator(BaseEstimator):
         else:
             feature_names = [
                 f for f in self.feature_names if f != target_name]
-        selected_features = list(self.parents[target_name])
+        selected_features = list(self.connections[target_name])
 
         y_pos = np.arange(len(feature_inds))
         ax.grid(True, axis='x')
