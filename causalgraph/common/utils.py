@@ -399,7 +399,6 @@ def break_cycles_if_present(
     """
     new_dag = dag.copy()
     cycles = list(nx.simple_cycles(new_dag))
-    verbose = True
 
     # This might be important, to remove first double edges
     cycles.sort(key=len)
