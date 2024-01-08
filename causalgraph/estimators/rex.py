@@ -369,7 +369,7 @@ class Rex(BaseEstimator, ClassifierMixin):
         -----------
             dag (nx.DiGraph): The DAG to break the cycle from.
         """
-        return utils.break_cycles_if_present(dag, self.learnings)
+        return utils.break_cycles_if_present(dag, self.learnings, verbose=self.verbose)
 
     def adjust_discrepancy(self, dag: nx.DiGraph):
         """

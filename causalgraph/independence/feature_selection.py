@@ -87,7 +87,12 @@ def select_features(
     # Get a copy of the sorted_shap_values into a new variable called kk
     sorted_impact_values = copy(sorted_shap_values)
     selected_features = []
+    max_iterations = len(sorted_impact_values)
+    iteration = 0
     while np.any(sorted_impact_values > threshold):
+        if iteration >= max_iterations:
+            break
+
         limit_idx = cluster_change(sorted_impact_values, verbose=verbose)
         selected_features = list(reversed(
             [feature_names[i] for i in feature_order[limit_idx:]]))
@@ -96,10 +101,7 @@ def select_features(
             break
 
         sorted_impact_values = sorted_impact_values[:limit_idx]
-
-        # limit_idx = cluster_change(sorted_impact_values, verbose=verbose)
-        # selected_features = list(reversed(
-        #     [feature_names[i] for i in feature_order[limit_idx:]]))
+        iteration += 1
 
     if verbose:
         print(f"  Limit_idx(cut-off).: {limit_idx}")

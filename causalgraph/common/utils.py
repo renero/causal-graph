@@ -399,6 +399,11 @@ def break_cycles_if_present(
     """
     new_dag = dag.copy()
     cycles = list(nx.simple_cycles(new_dag))
+    verbose = True
+
+    # This might be important, to remove first double edges
+    cycles.sort(key=len)
+
     if len(cycles) == 0:
         if verbose:
             print("No cycles found")
@@ -433,6 +438,10 @@ def break_cycles_if_present(
         # the edge still exists
         if min_edge in new_dag.edges:
             new_dag.remove_edge(*min_edge)
+
+        # Recompute whether there're cycles in the DAG after this change
+        cycles = list(nx.simple_cycles(new_dag))
+        cycles.sort(key=len)
 
     return new_dag
 
