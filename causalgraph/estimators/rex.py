@@ -211,7 +211,7 @@ class Rex(BaseEstimator, ClassifierMixin):
             ('models.score', {'X': X}),
             ('root_causes', 'compute_regression_quality'),
             ('shaps', ShapEstimator, {'models': 'models'}),
-            ('shaps.fit'),  # , {'exhaustive': False}),
+            ('shaps.fit'),
             ('pi', PermutationImportance, {'models': 'models'}),
             ('pi.fit'),
         ]

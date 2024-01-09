@@ -89,6 +89,7 @@ def select_features(
     selected_features = []
     max_iterations = len(sorted_impact_values)
     iteration = 0
+    limit_idx = 0
     while np.any(sorted_impact_values > threshold):
         if iteration >= max_iterations:
             break

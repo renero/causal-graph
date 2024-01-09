@@ -1002,7 +1002,7 @@ def custom_main(exp_name):
 
 if __name__ == "__main__":
     # custom_main('sachs_long')
-    experiment_name = "rex_generated_polynomial_9"
+    experiment_name = "sachs_long"
     path = "/Users/renero/phd/data/RC3/"
     output_path = "/Users/renero/phd/output/RC3/"
 
@@ -1010,10 +1010,18 @@ if __name__ == "__main__":
     data = pd.read_csv(f"{path}{experiment_name}.csv")
     scaler = StandardScaler()
     data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)
+
     # Split the dataframe into train and test
     train = data.sample(frac=0.9, random_state=42)
     test = data.drop(train.index)
-    rex = utils.load_experiment(f"{experiment_name}_nn", output_path)
+
+    rex = utils.load_experiment(f"{experiment_name}_gbt", output_path)
     rex.is_fitted_ = True
+    rex.shaps.is_fitted_ = True
     print(f"Loaded experiment {experiment_name}")
-    plot.shap_values(rex.shaps)
+
+    rex.shaps.prog_bar = False
+    rex.shaps.verbose = True
+    rex.shaps.iters = 100
+    rex.shaps.predict(test, rex.root_causes)
+    print("fininshed")

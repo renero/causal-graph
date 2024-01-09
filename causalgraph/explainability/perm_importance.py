@@ -252,6 +252,7 @@ class PermutationImportance(BaseEstimator):
             **tqdm_params(self._fit_desc, self.prog_bar, silent=self.silent))
         print("Computing permutation loss (PyTorch)") if self.verbose else None
 
+        self.all_pi = []
         num_vars = len(self.feature_names)
         for target in self.feature_names:
             pbar.refresh()

@@ -1,4 +1,5 @@
 """
+Module for the edge orientation algorithm.
 """
 from hyppo.independence import Hsic
 
