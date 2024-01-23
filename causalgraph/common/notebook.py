@@ -85,10 +85,10 @@ score_titles = {
     'diff_edges': r'$\textrm{Diff. Edges}$',
 }
 method_labels = {
-    'nn': r'$\textrm{R\textsc{e}X}_{\textrm{\tiny MLP}}$',
-    'rex_mlp': r'$\textrm{R\textsc{e}X}_{\textrm{\tiny MLP}}$',
-    'nn_adj': r'$\textrm{R\textsc{e}X}_{\textrm{\tiny MLP}}^{\textrm{\tiny adj}}$',
-    'rex_mlp_adj': r'$\textrm{R\textsc{e}X}_{\textrm{\tiny MLP}}^{\textrm{\tiny adj}}$',
+    'nn': r'$\textrm{R\textsc{e}X}_{\textrm{\tiny DFN}}$',
+    'rex_mlp': r'$\textrm{R\textsc{e}X}_{\textrm{\tiny DFN}}$',
+    'nn_adj': r'$\textrm{R\textsc{e}X}_{\textrm{\tiny DFN}}^{\textrm{\tiny adj}}$',
+    'rex_mlp_adj': r'$\textrm{R\textsc{e}X}_{\textrm{\tiny DFN}}^{\textrm{\tiny adj}}$',
     'gbt': r'$\textrm{R\textsc{e}X}_{\textrm{\tiny GBT}}$',
     'rex_gbt': r'$\textrm{R\textsc{e}X}_{\textrm{\tiny GBT}}$',
     'gbt_adj': r'$\textrm{R\textsc{e}X}_{\textrm{\tiny GBT}}^{\textrm{\tiny adj}}$',
@@ -1022,7 +1022,7 @@ def plot_score_by_method(metrics, metric, methods, **kwargs):
 
 def format_mean_std(data):
     """\scalemath{0.6}{\ \pm\ 0.05}"""
-    return f"${data.median():.2f} \scalemath{{0.6}}{{\ \pm\ {data.std():.2f}}}$"
+    return rf"${data.median():.2f} \scalemath{{0.6}}{{\ \pm\ {data.std():.1f}}}$"
 
 
 def latex_table_by_datatype(df, method, metrics=None):
@@ -1056,7 +1056,6 @@ def latex_table_by_method(df, methods=None, metric_names=None):
         metric_names = ['precision', 'recall', 'f1', 'shd', 'sid']
 
     table = "\\begin{tabular}{l|" + 'c'*len(metric_names) + "}\n\\toprule\n"
-    # table += "{} & Precision & Recall & F1 & SHD & SID \\\\ \\midrule\n"
     table += "{} " + \
         ''.join(
             f"& {score_titles[m]}" for m in metric_names) + " \\\\ \\midrule\n"
