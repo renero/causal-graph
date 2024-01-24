@@ -1021,8 +1021,8 @@ def plot_score_by_method(metrics, metric, methods, **kwargs):
 
 
 def format_mean_std(data):
-    """\scalemath{0.6}{\ \pm\ 0.05}"""
-    return rf"${data.median():.2f} \scalemath{{0.6}}{{\ \pm\ {data.std():.1f}}}$"
+    # """\scalemath{0.6}{\ \pm\ 0.05}"""
+    return rf'${data.mean():.2f} \scalemath{{0.6}}{{\ \pm\ {data.std():.1f}}}$'
 
 
 def latex_table_by_datatype(df, method, metrics=None):

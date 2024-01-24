@@ -615,23 +615,23 @@ def dags(
         save_to_pdf: str = None,
         **kwargs):
     """
-        Compare two graphs using dot.
+    Compare two graphs using dot.
 
-        Parameters:
-        -----------
-        reference: The reference DAG.
-        graph: The DAG to compare.
-        names: The names of the reference graph and the dag.
-        figsize: The size of the figure.
-        **kwargs: Additional arguments to format the graphs:
-            - "node_size": 500
-            - "node_color": 'white'
-            - "edgecolors": "black"
-            - "font_family": "monospace"
-            - "horizontalalignment": "center"
-            - "verticalalignment": "center_baseline"
-            - "with_labels": True
-        """
+    Parameters:
+    -----------
+    reference: The reference DAG.
+    graph: The DAG to compare.
+    names: The names of the reference graph and the dag.
+    figsize: The size of the figure.
+    **kwargs: Additional arguments to format the graphs:
+        - "node_size": 500
+        - "node_color": 'white'
+        - "edgecolors": "black"
+        - "font_family": "monospace"
+        - "horizontalalignment": "center"
+        - "verticalalignment": "center_baseline"
+        - "with_labels": True
+    """
     ncols = 1 if reference is None else 2
     if names is None:
         names = ["Prediction", "Ground truth"]
