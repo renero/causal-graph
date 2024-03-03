@@ -1,6 +1,7 @@
 import networkx as nx
 import pandas as pd
 import pytest
+import torch
 
 from causalgraph.common import utils
 from causalgraph.estimators.knowledge import Knowledge
@@ -21,7 +22,10 @@ def test_returns_cuda_when_force_is_cuda_and_cuda_is_not_available():
 # Tests that the function returns 'mps' when force is 'mps' and mps is available
 def test_returns_mps_when_force_is_mps_and_mps_is_available():
     result = utils.select_device(force='mps')
-    assert result == 'mps'
+    if torch.backends.mps.is_available():
+        assert result == 'mps'
+    else:
+        assert result == 'cpu'
 
 
 # Tests that the function returns 'cpu' when force is 'cpu' and no other options are available
@@ -33,7 +37,10 @@ def test_returns_cpu_when_force_is_cpu_and_no_other_options_are_available():
 # Tests that the function returns 'mps' when mps is available and no force is specified
 def test_returns_mps_when_mps_is_available_and_no_force_is_specified():
     result = utils.select_device()
-    assert result == 'mps'
+    if torch.backends.mps.is_available():
+        assert result == 'mps'
+    else:
+        assert result == 'cpu'
 
 
 # Tests that the function returns 'cpu' when no other options are available and no force is specified
