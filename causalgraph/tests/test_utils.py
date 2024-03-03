@@ -199,9 +199,9 @@ def test_break_cycle_if_present_one_cycle():
 
     # Create a knowledge DataFrame with some permutation importances
     learnings = pd.DataFrame([
-        {'origin': '1', 'target': '2', 'mean_pi': 0.5},
-        {'origin': '2', 'target': '3', 'mean_pi': 0.4},
-        {'origin': '3', 'target': '1', 'mean_pi': 0.3}])
+        {'origin': '1', 'target': '2', 'shap_gof': 0.5},
+        {'origin': '2', 'target': '3', 'shap_gof': 0.4},
+        {'origin': '3', 'target': '1', 'shap_gof': 0.3}])
     rex = Rex(name="test")
     rex.hierarchies = Hierarchies()
     models = NNRegressor()
@@ -219,7 +219,7 @@ def test_break_cycle_if_present_one_cycle():
     knowledge.results = learnings
 
     # Call the break_cycle_if_present function
-    result = utils.break_cycles_if_present(dag, knowledge)
+    result = utils.break_cycles_if_present(dag, knowledge.results)
 
     # Check if the result is a DAG with no cycles
     assert nx.is_directed_acyclic_graph(result)
@@ -241,11 +241,11 @@ def test_break_cycle_if_present_multiple_cycles():
 
     # Create a knowledge DataFrame with some permutation importances
     learnings = pd.DataFrame([
-        {'origin': '1', 'target': '2', 'mean_pi': 0.5},
-        {'origin': '2', 'target': '3', 'mean_pi': 0.4},
-        {'origin': '3', 'target': '1', 'mean_pi': 0.3},
-        {'origin': '3', 'target': '4', 'mean_pi': 0.2},
-        {'origin': '4', 'target': '2', 'mean_pi': 0.1}
+        {'origin': '1', 'target': '2', 'shap_gof': 0.5},
+        {'origin': '2', 'target': '3', 'shap_gof': 0.4},
+        {'origin': '3', 'target': '1', 'shap_gof': 0.3},
+        {'origin': '3', 'target': '4', 'shap_gof': 0.2},
+        {'origin': '4', 'target': '2', 'shap_gof': 0.1}
     ])
     rex = Rex(name="test")
     rex.hierarchies = Hierarchies()
@@ -264,7 +264,7 @@ def test_break_cycle_if_present_multiple_cycles():
     knowledge.results = learnings
 
     # Call the break_cycle_if_present function
-    result = utils.break_cycles_if_present(dag, knowledge)
+    result = utils.break_cycles_if_present(dag, knowledge.results)
 
     # Check if the result is a DAG with no cycles
     assert nx.is_directed_acyclic_graph(result)
