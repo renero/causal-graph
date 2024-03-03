@@ -15,5 +15,6 @@
     "python.formatting.provider": "none",
     "python.testing.unittestEnabled": false,
     "python.testing.pytestEnabled": true,
-    "editor.wordWrap": "off"
+    "editor.wordWrap": "off",
+    "esbonio.sphinx.confDir": ""
 }
