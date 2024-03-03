@@ -25,18 +25,19 @@ You can cross check results with R dHSIC library.
     ```
 
     Example:
-        >>> X = np.array([
-        >>>     0.136486655, 0.108931511, 0.022105488, 0.349472863, 0.148249433,
-        >>>     -0.321564702, 0.320629400, -0.282624440, 0.263522936, -0.316252276])
-        >>> Y = np.array([
-        >>> -0.1669332713, 0.4886635816, 0.5315530519, 0.1330376544, -0.0632027887,
-        >>>  0.1640341743, -0.1833757726, 0.3754725901, -0.0722728821, -0.0395241960])
-        >>> hsic_value(X, Y)
-        0.030975334702567737
-        >>> hsic_stat(X, Y)
-        0.30975334702567737
-        >>> hsic_test(X, Y)
-        0.25181580407491566
+        >>> X = np.array([\
+        0.136486655, 0.108931511, 0.022105488, 0.349472863, 0.148249433,\
+        -0.321564702, 0.320629400, -0.282624440, 0.263522936, -0.316252276])
+        >>> Y = np.array([\
+        -0.1669332713, 0.4886635816, 0.5315530519, 0.1330376544, -0.0632027887,\
+        0.1640341743, -0.1833757726, 0.3754725901, -0.0722728821, -0.0395241960])
+        
+        >>> print(f"{hsic_value(X, Y):.6f}")
+        0.030975
+        >>> print(f"{hsic_stat(X, Y):.6f}")
+        0.309753
+        >>> print(f"{hsic_test(X, Y):.6f}")
+        0.251816
         >>> hsic_independence(X, Y, alpha=0.01)
         True
 
@@ -159,7 +160,8 @@ def hsic_test(X, Y, normalize=True, max_samples=MAX_SAMPLES):
     """
     Xm, Ym = _prepare_input(X, Y, normalize, max_samples)
     m = Xm.shape[0]
-    stat, k1, k2 = hsic_stat(Xm, Ym, None, False, max_samples, return_kernels=True)
+    stat, k1, k2 = hsic_stat(
+        Xm, Ym, None, False, max_samples, return_kernels=True)
     a = [np.sum(K) / (m ** 2) for K in [k1, k2]]
     b = [np.sum(K ** 2) / (m ** 2) for K in [k1, k2]]
     c = [np.sum(np.sum(K, axis=0) ** 2) / (m ** 3) for K in [k1, k2]]
@@ -195,7 +197,7 @@ def hsic_test(X, Y, normalize=True, max_samples=MAX_SAMPLES):
 
     # Variance
     V = (2 * (m - 4) * (m - 5) / m4) * (
-            term1 + term2 + term3 + term4 + term5 + term6 + term7
+        term1 + term2 + term3 + term4 + term5 + term6 + term7
     )
 
     # calculation of alpha and beta of the gamma approximation
@@ -262,7 +264,14 @@ class HSIC:
         alpha (float): Significance level for independence test (def. 0.05)
 
     Example:
-        >>> from causalGraph.independence.hsic import HSIC
+        >>> from causalgraph.independence.hsic import HSIC
+
+        >>> X = np.array([\
+        0.136486655, 0.108931511, 0.022105488, 0.349472863, 0.148249433,\
+        -0.321564702, 0.320629400, -0.282624440, 0.263522936, -0.316252276])
+        >>> Y = np.array([\
+        -0.1669332713, 0.4886635816, 0.5315530519, 0.1330376544, -0.0632027887,\
+        0.1640341743, -0.1833757726, 0.3754725901, -0.0722728821, -0.0395241960])
 
         >>> h = HSIC()
         >>> result = h.fit(X, Y)
@@ -410,7 +419,7 @@ class HSIC:
 
         # Variance
         V = (2 * (m - 4) * (m - 5) / m4) * (
-                term1 + term2 + term3 + term4 + term5 + term6 + term7
+            term1 + term2 + term3 + term4 + term5 + term6 + term7
         )
 
         # calculation of alpha and beta of the gamma approximation

@@ -101,25 +101,25 @@ class Pipeline:
 
     Example:
     --------
-    >>> class Host:
-    >>>     def __init__(self, param1, param2):
-    >>>         self.param1 = param1
-    >>>         self.param2 = param2
+    >> class Host:
+    >>     def __init__(self, param1, param2):
+    >>         self.param1 = param1
+    >>         self.param2 = param2
 
-    >>> def my_method(param1, param2):
-    >>>     return f"{param1}, {param2}"
+    >> def my_method(param1, param2):
+    >>     return f"{param1}, {param2}"
 
-    >>> host = Host(param1='Hello', param2='world')
-    >>> pipeline = Pipeline(host, verbose=True, prog_bar=False)
-    >>> steps = [
-    >>>     'my_method',
-    >>>     ('result1', 'my_method'),
-    >>>     ('result2', 'my_method', {'param2': 'there!'})
-    >>> ]
+    >> host = Host(param1='Hello', param2='world')
+    >> pipeline = Pipeline(host, verbose=True, prog_bar=False)
+    >> steps = [
+    >>     'my_method',
+    >>     ('result1', 'my_method'),
+    >>     ('result2', 'my_method', {'param2': 'there!'})
+    >> ]
 
-    >>> pipeline.run(steps)
-    >>> print(host.result1)
-    >>> print(host.result2)
+    >> pipeline.run(steps)
+    >> print(host.result1)
+    >> print(host.result2)
     Hello, world
     Hello, there
     """

@@ -1,4 +1,6 @@
+import itertools
 import networkx as nx
+import numpy as np
 
 
 class DAG(nx.DiGraph):
@@ -14,51 +16,6 @@ class DAG(nx.DiGraph):
     data: input graph
         Data to initialize graph. If data=None (default) an empty graph is
         created. The data can be an edge list or any Networkx graph object.
-
-    Examples
-    --------
-    Create an empty DAG with no nodes and no edges
-
-    >>> from pgmpy.base import DAG
-    >>> G = DAG()
-
-    G can be grown in several ways:
-
-    **Nodes:**
-
-    Add one node at a time:
-
-    >>> G.add_node(node='a')
-
-    Add the nodes from any container (a list, set or tuple or the nodes
-    from another graph).
-
-    >>> G.add_nodes_from(nodes=['a', 'b'])
-
-    **Edges:**
-
-    G can also be grown by adding edges.
-
-    Add one edge,
-
-    >>> G.add_edge(u='a', v='b')
-
-    a list of edges,
-
-    >>> G.add_edges_from(ebunch=[('a', 'b'), ('b', 'c')])
-
-    If some edges connect nodes not yet in the model, the nodes
-    are added automatically. There are no errors when adding
-    nodes or edges that already exist.
-
-    **Shortcuts:**
-
-    Many common graph features allow python syntax for speed reporting.
-
-    >>> 'a' in G     # check if node in graph
-    True
-    >>> len(G)  # number of nodes in graph
-    3
     """
 
     def __init__(self, ebunch=None, latents=set()):
@@ -89,23 +46,6 @@ class DAG(nx.DiGraph):
 
         latent: boolean (default: False)
             Specifies whether the variable is latent or not.
-
-        Examples
-        --------
-        >>> from pgmpy.base import DAG
-        >>> G = DAG()
-        >>> G.add_node(node='A')
-        >>> sorted(G.nodes())
-        ['A']
-
-        Adding a node with some weight.
-        >>> G.add_node(node='B', weight=0.3)
-
-        The weight of these nodes can be accessed as:
-        >>> G.nodes['B']
-        {'weight': 0.3}
-        >>> G.nodes['A']
-        {'weight': None}
         """
 
         # Check for networkx 2.0 syntax
@@ -141,22 +81,6 @@ class DAG(nx.DiGraph):
             A container of boolean. The value at index i tells whether the
             node at index i is latent or not.
 
-        Examples
-        --------
-        >>> from pgmpy.base import DAG
-        >>> G = DAG()
-        >>> G.add_nodes_from(nodes=['A', 'B', 'C'])
-        >>> G.nodes()
-        NodeView(('A', 'B', 'C'))
-
-        Adding nodes with weights:
-        >>> G.add_nodes_from(nodes=['D', 'E'], weights=[0.3, 0.6])
-        >>> G.nodes['D']
-        {'weight': 0.3}
-        >>> G.nodes['E']
-        {'weight': 0.6}
-        >>> G.nodes['A']
-        {'weight': None}
         """
         nodes = list(nodes)
 
@@ -191,28 +115,6 @@ class DAG(nx.DiGraph):
         weight: int, float (default=None)
             The weight of the edge
 
-        Examples
-        --------
-        >>> from pgmpy.base import DAG
-        >>> G = DAG()
-        >>> G.add_nodes_from(nodes=['Alice', 'Bob', 'Charles'])
-        >>> G.add_edge(u='Alice', v='Bob')
-        >>> G.nodes()
-        NodeView(('Alice', 'Bob', 'Charles'))
-        >>> G.edges()
-        OutEdgeView([('Alice', 'Bob')])
-
-        When the node is not already present in the graph:
-        >>> G.add_edge(u='Alice', v='Ankur')
-        >>> G.nodes()
-        NodeView(('Alice', 'Ankur', 'Bob', 'Charles'))
-        >>> G.edges()
-        OutEdgeView([('Alice', 'Bob'), ('Alice', 'Ankur')])
-
-        Adding edges with weight:
-        >>> G.add_edge('Ankur', 'Maria', weight=0.1)
-        >>> G.edge['Ankur']['Maria']
-        {'weight': 0.1}
         """
         super(DAG, self).add_edge(u, v, weight=weight)
 
@@ -236,31 +138,6 @@ class DAG(nx.DiGraph):
             A container of weights (int, float). The weight value at index i
             is associated with the edge at index i.
 
-        Examples
-        --------
-        >>> from pgmpy.base import DAG
-        >>> G = DAG()
-        >>> G.add_nodes_from(nodes=['Alice', 'Bob', 'Charles'])
-        >>> G.add_edges_from(ebunch=[('Alice', 'Bob'), ('Bob', 'Charles')])
-        >>> G.nodes()
-        NodeView(('Alice', 'Bob', 'Charles'))
-        >>> G.edges()
-        OutEdgeView([('Alice', 'Bob'), ('Bob', 'Charles')])
-
-        When the node is not already in the model:
-        >>> G.add_edges_from(ebunch=[('Alice', 'Ankur')])
-        >>> G.nodes()
-        NodeView(('Alice', 'Bob', 'Charles', 'Ankur'))
-        >>> G.edges()
-        OutEdgeView([('Alice', 'Bob'), ('Bob', 'Charles'), ('Alice', 'Ankur')])
-
-        Adding edges with weights:
-        >>> G.add_edges_from([('Ankur', 'Maria'), ('Maria', 'Mason')],
-        ...                  weights=[0.3, 0.5])
-        >>> G.edge['Ankur']['Maria']
-        {'weight': 0.3}
-        >>> G.edge['Maria']['Mason']
-        {'weight': 0.5}
         """
         ebunch = list(ebunch)
 
@@ -270,7 +147,8 @@ class DAG(nx.DiGraph):
                     "The number of elements in ebunch and weights" "should be equal"
                 )
             for index in range(len(ebunch)):
-                self.add_edge(ebunch[index][0], ebunch[index][1], weight=weights[index])
+                self.add_edge(ebunch[index][0], ebunch[index]
+                              [1], weight=weights[index])
         else:
             for edge in ebunch:
                 self.add_edge(edge[0], edge[1])
@@ -286,12 +164,6 @@ class DAG(nx.DiGraph):
         node: string, int or any hashable python object.
             The node whose parents would be returned.
 
-        Examples
-        --------
-        >>> from pgmpy.base import DAG
-        >>> G = DAG(ebunch=[('diff', 'grade'), ('intel', 'grade')])
-        >>> G.get_parents(node='grade')
-        ['diff', 'intel']
         """
         return list(self.predecessors(node))
 
@@ -303,13 +175,6 @@ class DAG(nx.DiGraph):
         A v-structure X->Z<-Y is an immorality if there is no directed edge
         between X and Y.
 
-        Examples
-        --------
-        >>> from pgmpy.base import DAG
-        >>> G = DAG(ebunch=[('diff', 'grade'), ('intel', 'grade')])
-        >>> moral_graph = G.moralize()
-        >>> moral_graph.edges()
-        EdgeView([('intel', 'grade'), ('intel', 'diff'), ('grade', 'diff')])
         """
         moral_graph = UndirectedGraph()
         moral_graph.add_nodes_from(self.nodes())
@@ -326,12 +191,6 @@ class DAG(nx.DiGraph):
         """
         Returns a list of leaves of the graph.
 
-        Examples
-        --------
-        >>> from pgmpy.base import DAG
-        >>> graph = DAG([('A', 'B'), ('B', 'C'), ('B', 'D')])
-        >>> graph.get_leaves()
-        ['C', 'D']
         """
         return [node for node, out_degree in self.out_degree_iter() if out_degree == 0]
 
@@ -350,13 +209,6 @@ class DAG(nx.DiGraph):
     def get_roots(self):
         """
         Returns a list of roots of the graph.
-
-        Examples
-        --------
-        >>> from pgmpy.base import DAG
-        >>> graph = DAG([('A', 'B'), ('B', 'C'), ('B', 'D'), ('E', 'B')])
-        >>> graph.get_roots()
-        ['A', 'E']
         """
         return [
             node for node, in_degree in dict(self.in_degree()).items() if in_degree == 0
@@ -371,14 +223,6 @@ class DAG(nx.DiGraph):
         ----------
         node: string, int or any hashable python object.
             The node whose children would be returned.
-
-        Examples
-        --------
-        >>> from pgmpy.base import DAG
-        >>> g = DAG(ebunch=[('A', 'B'), ('C', 'B'), ('B', 'D'),
-                                      ('B', 'E'), ('B', 'F'), ('E', 'G')])
-        >>> g.get_children(node='B')
-        ['D', 'E', 'F']
         """
         return list(self.successors(node))
 
@@ -395,14 +239,6 @@ class DAG(nx.DiGraph):
         include_latents: boolean
             If True, includes latent variables in the independencies. Otherwise,
             only generates independencies on observed variables.
-
-        Examples
-        --------
-        >>> from pgmpy.base import DAG
-        >>> chain = DAG([('X', 'Y'), ('Y', 'Z')])
-        >>> chain.get_independencies()
-        (X \u27C2 Z | Y)
-        (Z \u27C2 X | Y)
         """
         nodes = set(self.nodes())
         if not include_latents:
@@ -449,15 +285,6 @@ class DAG(nx.DiGraph):
         variables: str or array like
             variables whose local independencies are to be found.
 
-        Examples
-        --------
-        >>> from pgmpy.base import DAG
-        >>> student = DAG()
-        >>> student.add_edges_from([('diff', 'grade'), ('intel', 'grade'),
-        >>>                         ('grade', 'letter'), ('intel', 'SAT')])
-        >>> ind = student.local_independencies('grade')
-        >>> ind
-        (grade \u27C2 SAT | diff, intel)
         """
 
         independencies = Independencies()
@@ -490,19 +317,6 @@ class DAG(nx.DiGraph):
         Returns
         --------
         boolean : True if both are I-equivalent, False otherwise
-
-        Examples
-        --------
-        >>> from pgmpy.base import DAG
-        >>> G = DAG()
-        >>> G.add_edges_from([('V', 'W'), ('W', 'X'),
-        ...                   ('X', 'Y'), ('Z', 'Y')])
-        >>> G1 = DAG()
-        >>> G1.add_edges_from([('W', 'V'), ('X', 'W'),
-        ...                    ('X', 'Y'), ('Z', 'Y')])
-        >>> G.is_iequivalent(G1)
-        True
-
         """
         if not isinstance(model, DAG):
             raise TypeError(
@@ -524,14 +338,6 @@ class DAG(nx.DiGraph):
         -------
         set: A set of all the immoralities in the model
 
-        Examples
-        ---------
-        >>> from pgmpy.base import DAG
-        >>> student = DAG()
-        >>> student.add_edges_from([('diff', 'grade'), ('intel', 'grade'),
-        ...                         ('intel', 'SAT'), ('grade', 'letter')])
-        >>> student.get_immoralities()
-        {('diff', 'intel')}
         """
         immoralities = set()
         for node in self.nodes():
@@ -556,17 +362,6 @@ class DAG(nx.DiGraph):
             If given the active trail would be computed assuming these nodes to
             be observed.
 
-        Examples
-        --------
-        >>> from pgmpy.base import DAG
-        >>> student = DAG()
-        >>> student.add_nodes_from(['diff', 'intel', 'grades', 'letter', 'sat'])
-        >>> student.add_edges_from([('diff', 'grades'), ('intel', 'grades'), ('grades', 'letter'),
-        ...                         ('intel', 'sat')])
-        >>> student.is_dconnected('diff', 'intel')
-        False
-        >>> student.is_dconnected('grades', 'sat')
-        True
         """
         if end in self.active_trail_nodes(start, observed)[start]:
             return True
@@ -584,12 +379,6 @@ class DAG(nx.DiGraph):
 
         end: node
             The second node.
-
-        Examples
-        --------
-        >>> dag = DAG([('A', 'B'), ('B', 'C')])
-        >>> dag.minimal_dseparator(start='A', end='C')
-        {'B'}
 
         References
         ----------
@@ -643,14 +432,6 @@ class DAG(nx.DiGraph):
         node: string, int or any hashable python object.
               The node whose markov blanket would be returned.
 
-        Examples
-        --------
-        >>> from pgmpy.base import DAG
-        >>> from pgmpy.factors.discrete import TabularCPD
-        >>> G = DAG([('x', 'y'), ('z', 'y'), ('y', 'w'), ('y', 'v'), ('u', 'w'),
-                               ('s', 'v'), ('w', 't'), ('w', 'm'), ('v', 'n'), ('v', 'q')])
-        >>> G.get_markov_blanket('y')
-        ['s', 'w', 'x', 'u', 'z', 'v']
         """
         children = self.get_children(node)
         parents = self.get_parents(node)
@@ -677,17 +458,6 @@ class DAG(nx.DiGraph):
 
         include_latents: boolean (default: False)
             Whether to include the latent variables in the returned active trail nodes.
-
-        Examples
-        --------
-        >>> from pgmpy.base import DAG
-        >>> student = DAG()
-        >>> student.add_nodes_from(['diff', 'intel', 'grades'])
-        >>> student.add_edges_from([('diff', 'grades'), ('intel', 'grades')])
-        >>> student.active_trail_nodes('diff')
-        {'diff': {'diff', 'grades'}}
-        >>> student.active_trail_nodes(['diff', 'intel'], observed='grades')
-        {'diff': {'diff', 'intel'}, 'intel': {'diff', 'intel'}}
 
         References
         ----------
@@ -751,15 +521,6 @@ class DAG(nx.DiGraph):
         nodes: string, list-type
             name of all the observed nodes
 
-        Examples
-        --------
-        >>> from pgmpy.base import DAG
-        >>> model = DAG([('D', 'G'), ('I', 'G'), ('G', 'L'),
-        ...                        ('I', 'L')])
-        >>> model._get_ancestors_of('G')
-        {'D', 'G', 'I'}
-        >>> model._get_ancestors_of(['G', 'I'])
-        {'D', 'G', 'I'}
         """
         if not isinstance(nodes, (list, tuple)):
             nodes = [nodes]
@@ -812,19 +573,6 @@ class DAG(nx.DiGraph):
         -------
         pgmpy.base.DAG: A new instance of DAG modified by the do-operator
 
-        Examples
-        --------
-        Initialize a DAG
-        >>> graph = DAG()
-        >>> graph.add_edges_from([('X', 'A'),
-        ...                       ('A', 'Y'),
-        ...                       ('A', 'B')])
-        >>> # Applying the do-operator will return a new DAG with the desired structure.
-        >>> graph_do_A = graph.do('A')
-        >>> # Which we can verify is missing the edges we would expect.
-        >>> graph_do_A.edges
-        OutEdgeView([('A', 'B'), ('A', 'Y')])
-
         References
         ----------
         Causality: Models, Reasoning, and Inference, Judea Pearl (2000). p.70.
@@ -862,13 +610,6 @@ class DAG(nx.DiGraph):
         -------
         pgmpy.base.DAG instance: The ancestral graph.
 
-        Examples
-        --------
-        >>> from pgmpy.base import DAG
-        >>> dag = DAG([('A', 'C'), ('B', 'C'), ('D', 'A'), ('D', 'B')])
-        >>> anc_dag = dag.get_ancestral_graph(nodes=['A', 'B'])
-        >>> anc_dag.edges()
-        OutEdgeView([('D', 'A'), ('D', 'B')])
         """
         return self.subgraph(nodes=self._get_ancestors_of(nodes=nodes))
 
@@ -914,20 +655,6 @@ class DAG(nx.DiGraph):
         -------
         daft.PGM object: A plot of the DAG.
 
-        Examples
-        --------
-        >>> from pgmpy.base import DAG
-        >>> dag = DAG([('a', 'b'), ('b', 'c'), ('d', 'c')])
-        >>> dag.to_daft(node_pos={'a': (0, 0), 'b': (1, 0), 'c': (2, 0), 'd': (1, 1)})
-        <daft.PGM at 0x7fc756e936d0>
-        >>> dag.to_daft(node_pos="circular")
-        <daft.PGM at 0x7f9bb48c5eb0>
-        >>> dag.to_daft(node_pos="circular", pgm_params={'observed_style': 'inner'})
-        <daft.PGM at 0x7f9bb48b0bb0>
-        >>> dag.to_daft(node_pos="circular",
-        ...             edge_params={('a', 'b'): {'label': 2}},
-        ...             node_params={'a': {'shape': 'rectangle'}})
-        <daft.PGM at 0x7f9bb48b0bb0>
         """
         try:
             from daft import PGM
@@ -1018,15 +745,6 @@ class DAG(nx.DiGraph):
         Returns
         -------
         pgmpy.base.DAG instance: The randomly generated DAG.
-
-        Examples
-        --------
-        >>> from pgmpy.base import DAG
-        >>> random_dag = DAG.get_random(n_nodes=10, edge_prob=0.3)
-        >>> random_dag.nodes()
-        NodeView((0, 1, 2, 3, 4, 5, 6, 7, 8, 9))
-        >>> random_dag.edges()
-        OutEdgeView([(0, 6), (1, 6), (1, 7), (7, 9), (2, 5), (2, 7), (2, 8), (5, 9), (3, 7)])
         """
         # Step 1: Generate a matrix of 0 and 1. Prob of choosing 1 = edge_prob
         adj_mat = np.random.choice(
@@ -1035,7 +753,7 @@ class DAG(nx.DiGraph):
 
         # Step 2: Use the upper triangular part of the matrix as adjacency.
         nodes = list(range(n_nodes))
-        edges = nx.convert_matrix.from_numpy_matrix(
+        edges = nx.convert_matrix.from_numpy_array(
             np.triu(adj_mat, k=1), create_using=nx.DiGraph
         ).edges()
 

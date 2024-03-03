@@ -65,7 +65,9 @@ def power_divergence(X, Y, Z, data, boolean=True, lambda_="cressie-read", **kwar
 
     References
     ----------
-    [1] Cressie, Noel, and Timothy RC Read. "Multinomial goodness‐of‐fit tests." Journal of the Royal Statistical Society: Series B (Methodological) 46.3 (1984): 440-464.
+    [1] Cressie, Noel, and Timothy RC Read. "Multinomial goodness‐of‐fit tests." \
+        Journal of the Royal Statistical Society: Series B (Methodological) 46.3 \
+            (1984): 440-464.
 
     Examples
     --------
@@ -112,16 +114,9 @@ def power_divergence(X, Y, Z, data, boolean=True, lambda_="cressie-read", **kwar
                 dof += d
             except ValueError:
                 # If one of the values is 0 in the 2x2 table.
-                if isinstance(z_state, str):
-                    logging.info(
-                        f"Skipping the test {X} \u27C2 {Y} | {Z[0]}={z_state}. Not enough samples"
-                    )
-                else:
+                if not isinstance(z_state, str):
                     z_str = ", ".join(
                         [f"{var}={state}" for var, state in zip(Z, z_state)]
-                    )
-                    logging.info(
-                        f"Skipping the test {X} \u27C2 {Y} | {z_str}. Not enough samples"
                     )
         p_value = 1 - stats.chi2.cdf(chi, df=dof)
 
@@ -247,7 +242,8 @@ def pearsonr(X, Y, Z, data, boolean=True, **kwargs):
     """
     # Step 1: Test if the inputs are correct
     if not hasattr(Z, "__iter__"):
-        raise ValueError(f"Variable Z. Expected type: iterable. Got type: {type(Z)}")
+        raise ValueError(
+            f"Variable Z. Expected type: iterable. Got type: {type(Z)}")
     else:
         Z = list(Z)
 

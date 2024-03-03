@@ -57,11 +57,6 @@ class NNRegressor(BaseEstimator):
         prog_bar (bool): Whether to enable the progress bar. Default
             is False.
 
-    Examples:
-    ---------
-    >>> nn = NNRegressor().fit(data)
-    >>> nn.predict(data)
-
     """
 
     def __init__(

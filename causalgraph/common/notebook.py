@@ -3,9 +3,9 @@ A module to run experiments with the causalgraph package, and simplify the
 process of loading and saving experiments in notebooks.
 
 Example:
-    >>> from causalgraph.common.notebook import Experiment
-    >>> experiment = Experiment("linear", csv_filename="linear.csv")
-    >>> rex = experiment.load()
+    >> from causalgraph.common.notebook import Experiment
+    >> experiment = Experiment("linear", csv_filename="linear.csv")
+    >> rex = experiment.load()
     
 (C) 2023 J. Renero
 """

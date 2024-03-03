@@ -817,7 +817,7 @@ def cartesian(arrays, out=None, dtype=np.byte):
            [3, 4, 6],
            [3, 4, 7],
            [3, 5, 6],
-           [3, 5, 7]])
+           [3, 5, 7]], dtype=int8)
 
     """
     arrays = [np.asarray(x) for x in arrays]
