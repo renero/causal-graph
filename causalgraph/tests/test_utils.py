@@ -46,7 +46,10 @@ def test_returns_mps_when_mps_is_available_and_no_force_is_specified():
 # Tests that the function returns 'cpu' when no other options are available and no force is specified
 def test_returns_cpu_when_no_other_options_are_available_and_no_force_is_specified():
     result = utils.select_device()
-    assert result == 'mps'
+    if torch.backends.mps.is_available():
+        assert result == 'mps'
+    else:
+        assert result == 'cpu'
 
 
 # Test with two identical graphs
