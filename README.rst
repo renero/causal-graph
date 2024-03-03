@@ -11,9 +11,6 @@
 .. |Codecov| image:: https://codecov.io/gh/renero/causal-graph/graph/badge.svg?token=HCV0IJDFLQ 
 .. _Codecov: https://codecov.io/gh/renero/causal-graph
 
-.. |CircleCI| image:: https://circleci.com/gh/scikit-learn-contrib/project-template.svg?style=shield&circle-token=:circle-token
-.. _CircleCI: https://circleci.com/gh/scikit-learn-contrib/project-template/tree/master
-
 .. |ReadTheDocs| image:: https://readthedocs.org/projects/sklearn-template/badge/?version=latest
 .. _ReadTheDocs: https://sklearn-template.readthedocs.io/en/latest/?badge=latest
 
