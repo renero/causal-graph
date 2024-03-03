@@ -345,7 +345,7 @@ class Pipeline:
                 setattr(self.host, vble_name, return_value)
                 # Check if the new attribute created is an object and if so,
                 # add it to the list of objects.
-                if isinstance(return_value, not) type:
+                if not isinstance(return_value, type):
                     self.objects_[vble_name] = return_value
                 print(
                     f"      New attribute: <{vble_name}>") if self.verbose else None
@@ -374,7 +374,7 @@ class Pipeline:
         return_value = None
         if list_of_params is None:
             list_of_params = []
-            
+
         # Check if step_name is a function or a class already in globals
         if step_name in globals():
             step_name = globals()[step_name]
