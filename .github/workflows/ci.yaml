@@ -1,9 +1,15 @@
-name: Causal-graph repo
+name: Causal graph repo
+
 on: [push, pull_request]
+
 jobs:
-  run:
-  - name: Upload coverage reports to Codecov
-    uses: codecov/codecov-action@v4.0.1
-    with:
-      token: ${{ secrets.CODECOV_TOKEN }}
-      slug: renero/causal-graph
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v4.0.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: renero/causal-graph
