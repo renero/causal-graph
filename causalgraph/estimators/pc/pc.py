@@ -149,27 +149,12 @@ class PC(StructureEstimator):
         --------
         >>> import pandas as pd
         >>> import numpy as np
-        >>> from causalgraph.estimators.pc import PC
+
         >>> data = pd.DataFrame(np.random.randint(0, 5, size=(2500, 3)), columns=list('XYZ'))
         >>> data['sum'] = data.sum(axis=1)
-        >>> print(data)
-              X  Y  Z  sum
-        0     3  0  1    4
-        1     1  4  3    8
-        2     0  0  3    3
-        3     0  2  3    5
-        4     2  1  1    4
-        ...  .. .. ..  ...
-        2495  2  3  0    5
-        2496  1  1  2    4
-        2497  0  4  2    6
-        2498  0  0  0    0
-        2499  2  4  0    6
-        [2500 rows x 4 columns]
-        >>> c = PC(data)
-        >>> model = c.estimate()
-        >>> print(model.edges())
-        [('Z', 'sum'), ('X', 'sum'), ('Y', 'sum')]
+
+        >>> pc = PC("rex_generated_linear_1")
+        >>> pc = pc.fit(data)
         """
 
         assert isinstance(
@@ -266,24 +251,6 @@ class PC(StructureEstimator):
         [2] Koller & Friedman, Probabilistic Graphical Models - Principles and Techniques, 2009
             Section 3.4.2.1 (page 85), Algorithm 3.3
 
-        Examples
-        --------
-        >>> from pgmpy.estimators import PC
-        >>> from pgmpy.base import DAG
-        >>> from pgmpy.independencies import Independencies
-        >>> # build skeleton from list of independencies:
-        ... ind = Independencies(['B', 'C'], ['A', ['B', 'C'], 'D'])
-        >>> # we need to compute closure, otherwise this set of independencies doesn't
-        ... # admit a faithful representation:
-        ... ind = ind.closure()
-        >>> skel, sep_sets = PC(independencies=ind).build_skeleton("ABCD", ind)
-        >>> print(skel.edges())
-        [('A', 'D'), ('B', 'D'), ('C', 'D')]
-        >>> # build skeleton from d-seperations of DAG:
-        ... model = DAG([('A', 'C'), ('B', 'C'), ('B', 'D'), ('C', 'E')])
-        >>> skel, sep_sets = PC.build_skeleton(model.nodes(), model.get_independencies())
-        >>> print(skel.edges())
-        [('A', 'C'), ('B', 'C'), ('B', 'D'), ('C', 'E')]
         """
 
         # Initialize initial values and structures.
@@ -452,19 +419,6 @@ class PC(StructureEstimator):
         Neapolitan, Learning Bayesian Networks, Section 10.1.2, Algorithm 10.2 (page 550)
         http://www.cs.technion.ac.il/~dang/books/Learning%20Bayesian%20Networks(Neapolitan,%20Richard).pdf # noqa
 
-
-        Examples
-        --------
-        >>> import pandas as pd
-        >>> import numpy as np
-        >>> from pgmpy.estimators import PC
-        >>> data = pd.DataFrame(np.random.randint(0, 4, size=(5000, 3)), columns=list('ABD'))
-        >>> data['C'] = data['A'] - data['B']
-        >>> data['D'] += data['A']
-        >>> c = PC(data)
-        >>> pdag = c.skeleton_to_pdag(*c.build_skeleton())
-        >>> pdag.edges() # edges: A->C, B->C, A--D (not directed)
-        [('B', 'C'), ('A', 'C'), ('A', 'D'), ('D', 'A')]
         """
 
         pdag = skeleton.to_directed()

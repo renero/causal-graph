@@ -1,6 +1,7 @@
 import networkx as nx
 import pandas as pd
 import pytest
+import torch
 
 from causalgraph.common import utils
 from causalgraph.estimators.knowledge import Knowledge
@@ -21,7 +22,10 @@ def test_returns_cuda_when_force_is_cuda_and_cuda_is_not_available():
 # Tests that the function returns 'mps' when force is 'mps' and mps is available
 def test_returns_mps_when_force_is_mps_and_mps_is_available():
     result = utils.select_device(force='mps')
-    assert result == 'mps'
+    if torch.backends.mps.is_available():
+        assert result == 'mps'
+    else:
+        assert result == 'cpu'
 
 
 # Tests that the function returns 'cpu' when force is 'cpu' and no other options are available
@@ -33,13 +37,19 @@ def test_returns_cpu_when_force_is_cpu_and_no_other_options_are_available():
 # Tests that the function returns 'mps' when mps is available and no force is specified
 def test_returns_mps_when_mps_is_available_and_no_force_is_specified():
     result = utils.select_device()
-    assert result == 'mps'
+    if torch.backends.mps.is_available():
+        assert result == 'mps'
+    else:
+        assert result == 'cpu'
 
 
 # Tests that the function returns 'cpu' when no other options are available and no force is specified
 def test_returns_cpu_when_no_other_options_are_available_and_no_force_is_specified():
     result = utils.select_device()
-    assert result == 'mps'
+    if torch.backends.mps.is_available():
+        assert result == 'mps'
+    else:
+        assert result == 'cpu'
 
 
 # Test with two identical graphs
@@ -199,9 +209,9 @@ def test_break_cycle_if_present_one_cycle():
 
     # Create a knowledge DataFrame with some permutation importances
     learnings = pd.DataFrame([
-        {'origin': '1', 'target': '2', 'mean_pi': 0.5},
-        {'origin': '2', 'target': '3', 'mean_pi': 0.4},
-        {'origin': '3', 'target': '1', 'mean_pi': 0.3}])
+        {'origin': '1', 'target': '2', 'shap_gof': 0.5},
+        {'origin': '2', 'target': '3', 'shap_gof': 0.4},
+        {'origin': '3', 'target': '1', 'shap_gof': 0.3}])
     rex = Rex(name="test")
     rex.hierarchies = Hierarchies()
     models = NNRegressor()
@@ -219,7 +229,7 @@ def test_break_cycle_if_present_one_cycle():
     knowledge.results = learnings
 
     # Call the break_cycle_if_present function
-    result = utils.break_cycles_if_present(dag, knowledge)
+    result = utils.break_cycles_if_present(dag, knowledge.results)
 
     # Check if the result is a DAG with no cycles
     assert nx.is_directed_acyclic_graph(result)
@@ -241,11 +251,11 @@ def test_break_cycle_if_present_multiple_cycles():
 
     # Create a knowledge DataFrame with some permutation importances
     learnings = pd.DataFrame([
-        {'origin': '1', 'target': '2', 'mean_pi': 0.5},
-        {'origin': '2', 'target': '3', 'mean_pi': 0.4},
-        {'origin': '3', 'target': '1', 'mean_pi': 0.3},
-        {'origin': '3', 'target': '4', 'mean_pi': 0.2},
-        {'origin': '4', 'target': '2', 'mean_pi': 0.1}
+        {'origin': '1', 'target': '2', 'shap_gof': 0.5},
+        {'origin': '2', 'target': '3', 'shap_gof': 0.4},
+        {'origin': '3', 'target': '1', 'shap_gof': 0.3},
+        {'origin': '3', 'target': '4', 'shap_gof': 0.2},
+        {'origin': '4', 'target': '2', 'shap_gof': 0.1}
     ])
     rex = Rex(name="test")
     rex.hierarchies = Hierarchies()
@@ -264,7 +274,7 @@ def test_break_cycle_if_present_multiple_cycles():
     knowledge.results = learnings
 
     # Call the break_cycle_if_present function
-    result = utils.break_cycles_if_present(dag, knowledge)
+    result = utils.break_cycles_if_present(dag, knowledge.results)
 
     # Check if the result is a DAG with no cycles
     assert nx.is_directed_acyclic_graph(result)

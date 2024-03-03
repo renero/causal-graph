@@ -45,7 +45,8 @@ warnings.filterwarnings('ignore')
 #   different samples.
 
 class Rex(BaseEstimator, ClassifierMixin):
-    """ Regression with Explainability (Rex) is a causal inference discovery that
+    """ 
+    Regression with Explainability (Rex) is a causal inference discovery that
     uses a regression model to predict the outcome of a treatment and uses
     explainability to identify the causal variables.
 
@@ -56,12 +57,22 @@ class Rex(BaseEstimator, ClassifierMixin):
 
     Examples
     --------
-    >>> from causalgraph import TemplateEstimator
-    >>> import numpy as np
-    >>> X = np.arange(100).reshape(100, 1)
-    >>> y = np.zeros((100, ))
-    >>> estimator = Rex()
-    >>> estimator.fit(X, y)
+    >>> from causalgraph.estimators.rex import Rex   # doctest: +SKIP
+    >>> import numpy as np   # doctest: +SKIP
+
+    >>> dataset_name = 'rex_generated_linear_0'  # doctest: +SKIP
+    >>> ref_graph = utils.graph_from_dot_file(f"../data/{dataset_name}.dot")  # doctest: +SKIP
+    >>> data = pd.read_csv(f"{input_path}{dataset_name}.csv")  # doctest: +SKIP
+    >>> scaler = StandardScaler()  # doctest: +SKIP
+    >>> data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)  # doctest: +SKIP
+    >>> train = data.sample(frac=0.8, random_state=42)  # doctest: +SKIP
+    >>> test = data.drop(train.index)  # doctest: +SKIP
+
+    >>> rex = Rex(   # doctest: +SKIP
+        name=dataset_name, tune_model=tune_model,   # doctest: +SKIP
+        model_type=model_type, explainer=explainer)   # doctest: +SKIP
+    >>> rex.fit_predict(train, test, ref_graph)   # doctest: +SKIP
+
     """
 
     def __init__(

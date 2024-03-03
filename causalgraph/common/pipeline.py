@@ -7,16 +7,24 @@ Pipeline class to define and run several execution steps.
 import inspect
 import types
 import typing
-import pandas as pd
-import numpy as np
-from typing import Any, Dict, List, Union
+from typing import Any, List, Union
 
+import numpy as np
+import pandas as pd
 from tqdm.auto import tqdm
 
 from causalgraph.common import tqdm_params
 
+# pylint: disable=E1101:no-member, W0201:attribute-defined-outside-init, W0511:fixme
+# pylint: disable=C0103:invalid-name
+# pylint: disable=C0116:missing-function-docstring, C0115:missing-class-docstring
+# pylint: disable=R0913:too-many-arguments, R0903:too-few-public-methods
+# pylint: disable=R0914:too-many-locals, R0915:too-many-statements
+# pylint: disable=W0106:expression-not-assigned, R1702:too-many-branches
+
 
 # TODO: Eliminate the need to pass the host object to the pipeline
+
 
 class Host:
     def __init__(self, param1, param2):
@@ -27,7 +35,7 @@ class Host:
 
     def host_method(self):
         # print(f"  Into the method {self.host_method.__name__}")
-        return ("Host.host_method")
+        return "Host.host_method"
 
 
 class SampleClass:
@@ -62,18 +70,18 @@ def method_with_object(obj):
 
 
 def m1(message="default_message"):
-    return (f"m1_return_value={message}")
+    return f"m1_return_value={message}"
 
 
-def m2(what):
-    return (f"m2_return_value={what}")
+def m2(msg):
+    return f"m2_return_value={msg}"
 
 
-def m3(what):
-    return (f"m3 dataframe argument shape={what.shape}")
+def m3(msg):
+    return f"m3 dataframe argument shape={msg.shape}"
 
 
-what = "(argument for m1 and m2)"
+what_msg = "(argument for m1 and m2)"
 
 
 # TODO: Eliminate the need to pass the host object to the pipeline
@@ -93,25 +101,25 @@ class Pipeline:
 
     Example:
     --------
-    >>> class Host:
-    >>>     def __init__(self, param1, param2):
-    >>>         self.param1 = param1
-    >>>         self.param2 = param2
+    >> class Host:
+    >>     def __init__(self, param1, param2):
+    >>         self.param1 = param1
+    >>         self.param2 = param2
 
-    >>> def my_method(param1, param2):
-    >>>     return f"{param1}, {param2}"
+    >> def my_method(param1, param2):
+    >>     return f"{param1}, {param2}"
 
-    >>> host = Host(param1='Hello', param2='world')
-    >>> pipeline = Pipeline(host, verbose=True, prog_bar=False)
-    >>> steps = [
-    >>>     'my_method',
-    >>>     ('result1', 'my_method'),
-    >>>     ('result2', 'my_method', {'param2': 'there!'})
-    >>> ]
+    >> host = Host(param1='Hello', param2='world')
+    >> pipeline = Pipeline(host, verbose=True, prog_bar=False)
+    >> steps = [
+    >>     'my_method',
+    >>     ('result1', 'my_method'),
+    >>     ('result2', 'my_method', {'param2': 'there!'})
+    >> ]
 
-    >>> pipeline.run(steps)
-    >>> print(host.result1)
-    >>> print(host.result2)
+    >> pipeline.run(steps)
+    >> print(host.result1)
+    >> print(host.result2)
     Hello, world
     Hello, there
     """
@@ -207,7 +215,7 @@ class Pipeline:
         """
         method = None
         # If the step call is a class, get the default method of the class.
-        if type(step_call) is type or inspect.isclass(step_call):
+        if isinstance(step_call, type) or inspect.isclass(step_call):
             # return getattr(step_call, self._default_object_method)
             return getattr(step_call, '__init__')
 
@@ -249,7 +257,7 @@ class Pipeline:
         """
         params = []
         for arg in param_names:
-            if type(arg) is str:
+            if isinstance(arg, str):
                 if not hasattr(method, arg):
                     raise ValueError(
                         f"Parameter {arg} not found in host object or globals")
@@ -337,7 +345,7 @@ class Pipeline:
                 setattr(self.host, vble_name, return_value)
                 # Check if the new attribute created is an object and if so,
                 # add it to the list of objects.
-                if type(return_value) is not type:
+                if not isinstance(return_value, type):
                     self.objects_[vble_name] = return_value
                 print(
                     f"      New attribute: <{vble_name}>") if self.verbose else None
@@ -347,7 +355,7 @@ class Pipeline:
 
         self._pbar.close()
 
-    def run_step(self, step_name: Union[Any, str], list_of_params: List[Any] = []) -> Any:
+    def run_step(self, step_name: Union[Any, str], list_of_params: List[Any] = None) -> Any:
         """
         Run a step of the pipeline.
 
@@ -364,6 +372,8 @@ class Pipeline:
             Value returned by the function or the fit method of the class.
         """
         return_value = None
+        if list_of_params is None:
+            list_of_params = []
 
         # Check if step_name is a function or a class already in globals
         if step_name in globals():

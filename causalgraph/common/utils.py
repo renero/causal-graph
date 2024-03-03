@@ -205,6 +205,8 @@ def select_device(force: str = None) -> str:
                 device = force
             elif force == 'mps' and torch.backends.mps.is_available():
                 device = force
+            elif force == 'mps' and not torch.backends.mps.is_available():
+                device = 'cpu'
             elif force == 'cpu':
                 device = force
             else:

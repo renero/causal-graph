@@ -1,0 +1,29 @@
+strict digraph my_dotgraph {
+concentrate=True;
+V0;
+V1;
+V2;
+V3;
+V4;
+V5;
+V6;
+V7;
+V8;
+V9;
+V0 -> V1;
+V0 -> V5;
+V0 -> V8;
+V1 -> V6;
+V1 -> V9;
+V2 -> V3;
+V2 -> V9;
+V3 -> V5;
+V3 -> V6;
+V4 -> V6;
+V4 -> V7;
+V4 -> V8;
+V5 -> V7;
+V5 -> V8;
+V7 -> V8;
+V7 
+}
