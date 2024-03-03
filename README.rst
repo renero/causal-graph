@@ -22,14 +22,16 @@ causal-graph - A library to infer causal-effect relationships from tabular data
 
 .. _scikit-learn: https://scikit-learn.org
 
-**causal-graph** is a library that implements methods to extract the causal graph, from continuous tabular data.
+**causal-graph** is a library that implements methods to extract the causal graph, 
+from continuous tabular data.
 
 It is build using SKLearn estimators, so that it can be used in scikit-learn pipelines
 and (hyper)parameter search, while facilitating testing (including some API
 compliance), documentation, open source development, packaging, and continuous
 integration.
 
-.. _documentation: https://sklearn-template.readthedocs.io/en/latest/quick_start.html
+**NOTICE**: This library is still in development and should be used with caution.
 
-Refer to the documentation_ to modify the template for your own scikit-learn
-contribution.
+The datasets used in the examples can be generated using the `generators` module, 
+which is also part of this library. But in case you want to reproduce results from the 
+articles that we used as reference, you can find the datasets in the `data` folder.
