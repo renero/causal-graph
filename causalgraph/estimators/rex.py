@@ -56,7 +56,7 @@ class Rex(BaseEstimator, ClassifierMixin):
 
     Examples
     --------
-    >>> from causalgraph import TemplateEstimator
+    >>> from causalgraph.estimators.rex import Rex
     >>> import numpy as np
     >>> X = np.arange(100).reshape(100, 1)
     >>> y = np.zeros((100, ))
