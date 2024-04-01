@@ -7,9 +7,9 @@ import os
 import warnings
 from copy import copy
 from typing import List, Tuple, Union
-import deprecated
 
-import matplotlib.pyplot as plt
+import deprecated
+from mlforge import Pipeline
 import networkx as nx
 import numpy as np
 import pandas as pd
@@ -18,12 +18,11 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.utils.validation import check_is_fitted, check_random_state
 
 from causalgraph.common import utils
-from causalgraph.common.pipeline import Pipeline
 from causalgraph.estimators.knowledge import Knowledge
 from causalgraph.explainability.hierarchies import Hierarchies
 from causalgraph.explainability.perm_importance import PermutationImportance
-from causalgraph.explainability.shapley import ShapEstimator
 from causalgraph.explainability.regression_quality import RegQuality
+from causalgraph.explainability.shapley import ShapEstimator
 from causalgraph.independence.graph_independence import GraphIndependence
 from causalgraph.metrics.compare_graphs import evaluate_graph
 from causalgraph.models import GBTRegressor, NNRegressor
@@ -45,7 +44,7 @@ warnings.filterwarnings('ignore')
 #   different samples.
 
 class Rex(BaseEstimator, ClassifierMixin):
-    """ 
+    """
     Regression with Explainability (Rex) is a causal inference discovery that
     uses a regression model to predict the outcome of a treatment and uses
     explainability to identify the causal variables.
@@ -102,7 +101,7 @@ class Rex(BaseEstimator, ClassifierMixin):
             model_type (str): The type of model to use. Either "nn" for MLP
                 or "gbt" for GradientBoostingRegressor.
             explainer (str): The explainer to use for the shap values. The default
-                values is "explainer", which uses the shap.Explainer class. Other 
+                values is "explainer", which uses the shap.Explainer class. Other
                 options are "gradient", which uses the shap.GradientExplainer class,
                 and "kernel", which uses the shap.KernelExplainer class.
             tune_model (bool): Whether to tune the model for HPO. Default is False.
@@ -212,7 +211,7 @@ class Rex(BaseEstimator, ClassifierMixin):
         fit_step = 'models.tune_fit' if self.tune_model else 'models.fit'
 
         # Create the pipeline for the training stages.
-        pipeline = Pipeline(host=self, prog_bar=self.prog_bar, verbose=self.verbose,
+        pipeline = Pipeline(self, prog_bar=self.prog_bar, verbose=self.verbose,
                             silent=self.silent)
         steps = [
             ('hierarchies', Hierarchies),
@@ -226,7 +225,8 @@ class Rex(BaseEstimator, ClassifierMixin):
             ('pi', PermutationImportance, {'models': 'models'}),
             ('pi.fit'),
         ]
-        pipeline.run(steps, self._fit_desc)
+        pipeline.from_list(steps)
+        pipeline.run()
         self.is_fitted_ = True
         return self
 
@@ -279,7 +279,8 @@ class Rex(BaseEstimator, ClassifierMixin):
             ('metrics_final', 'score', {
              'ref_graph': ref_graph, 'predicted_graph': 'G_final'})
         ]
-        prediction.run(steps, "Predicting graph")
+        prediction.from_list(steps)
+        prediction.run()
         if '\\n' in self.G_final.nodes:
             self.G_final.remove_node('\\n')
 
@@ -312,6 +313,7 @@ class Rex(BaseEstimator, ClassifierMixin):
         """
         self.fit(train)
         self.predict(test, ref_graph)
+        return self
 
     def score(
             self,
@@ -384,8 +386,8 @@ class Rex(BaseEstimator, ClassifierMixin):
 
     def adjust_discrepancy(self, dag: nx.DiGraph):
         """
-        Adjusts the discrepancy in the directed acyclic graph (DAG) by adding new 
-        edges based on the goodness-of-fit (GOF) R2 values calculated from the 
+        Adjusts the discrepancy in the directed acyclic graph (DAG) by adding new
+        edges based on the goodness-of-fit (GOF) R2 values calculated from the
         learning data.
 
         Args:
@@ -447,19 +449,14 @@ def custom_main(dataset_name,
     rex = Rex(
         name=dataset_name, tune_model=tune_model,
         model_type=model_type, explainer=explainer)
-    # rex.fit(train)
+
     rex.fit_predict(train, test, ref_graph)
+
     if save:
         where_to = utils.save_experiment(rex.name, output_path, rex)
         print(f"Saved '{rex.name}' to '{where_to}'")
 
-    # rex = load_experiment(dataset_name, output_path)
-
-    # print(rex.score(ref_graph, 'shap'))
-    # rex.plot_dags(rex.G_shap, ref_graph)
-    # rex.plot_dags(rex.G_pi, ref_graph)
-
 
 if __name__ == "__main__":
-    custom_main('sachs',  model_type="nn", explainer="gradient",
+    custom_main('rex_generated_linear_9',  model_type="nn", explainer="gradient",
                 tune_model=False, save=False)
