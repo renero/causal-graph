@@ -1,5 +1,5 @@
 """
-This module builds the causal graph based on the informacion that we derived 
+This module builds the causal graph based on the informacion that we derived
 from the SHAP values. The main idea is to use the SHAP values to compute the
 discrepancy between the SHAP values and the target values. This discrepancy
 is then used to build the graph.
@@ -34,7 +34,8 @@ from sklearn.discriminant_analysis import StandardScaler
 from sklearn.metrics import r2_score
 from sklearn.model_selection import train_test_split
 from sklearn.utils.validation import check_is_fitted
-from tqdm.auto import tqdm
+from mlforge import ProgBar
+# from tqdm.auto import tqdm
 
 from causalgraph.common import *
 from causalgraph.common import utils
@@ -50,25 +51,25 @@ K = 180.0 / math.pi
 @dataclass
 class ShapDiscrepancy:
     """
-    A class representing the discrepancy between the SHAP value and the parent 
+    A class representing the discrepancy between the SHAP value and the parent
     value for a given feature.
 
     Attributes:
         - target (str): The name of the target feature.
         - parent (str): The name of the parent feature.
-        - shap_heteroskedasticity (bool): Whether the SHAP value exhibits 
+        - shap_heteroskedasticity (bool): Whether the SHAP value exhibits
             heteroskedasticity.
-        - parent_heteroskedasticity (bool): Whether the parent value exhibits 
+        - parent_heteroskedasticity (bool): Whether the parent value exhibits
             heteroskedasticity.
         - shap_p_value (float): The p-value for the SHAP value.
         - parent_p_value (float): The p-value for the parent value.
-        - shap_model (sm.regression.linear_model.RegressionResultsWrapper): The 
+        - shap_model (sm.regression.linear_model.RegressionResultsWrapper): The
             regression model for the SHAP value.
-        - parent_model (sm.regression.linear_model.RegressionResultsWrapper): The 
+        - parent_model (sm.regression.linear_model.RegressionResultsWrapper): The
             regression model for the parent value.
-        - shap_discrepancy (float): The discrepancy between the SHAP value and the 
+        - shap_discrepancy (float): The discrepancy between the SHAP value and the
             parent value.
-        - shap_correlation (float): The correlation between the SHAP value and the 
+        - shap_correlation (float): The correlation between the SHAP value and the
             parent value.
         - ks_pvalue (float): The p-value for the Kolmogorov-Smirnov test.
         - ks_result (str): The result of the Kolmogorov-Smirnov test.
@@ -95,10 +96,10 @@ class ShapEstimator(BaseEstimator):
     Parameters
     ----------
     explainer : str, default="explainer"
-        The SHAP explainer to use. Possible values are "kernel", "gradient", and 
+        The SHAP explainer to use. Possible values are "kernel", "gradient", and
         "explainer".
     models : BaseEstimator, default=None
-        The models to use for computing SHAP values. If None, a linear regression 
+        The models to use for computing SHAP values. If None, a linear regression
         model is used for each feature.
     correlation_th : float, default=None
         The correlation threshold to use for removing highly correlated features.
@@ -149,15 +150,15 @@ class ShapEstimator(BaseEstimator):
         Parameters
         ----------
         explainer : str, default="explainer"
-            The SHAP explainer to use. Possible values are "kernel", "gradient", and 
+            The SHAP explainer to use. Possible values are "kernel", "gradient", and
             "explainer".
         models : BaseEstimator, default=None
-            The models to use for computing SHAP values. If None, a linear regression 
+            The models to use for computing SHAP values. If None, a linear regression
             model is used for each feature.
         correlation_th : float, default=None
             The correlation threshold to use for removing highly correlated features.
         mean_shap_percentile : float, default=0.8
-            The percentile threshold for selecting features based on their 
+            The percentile threshold for selecting features based on their
             mean SHAP value.
         iters : int, default=20
             The number of iterations to use for the feature selection method.
@@ -167,14 +168,14 @@ class ShapEstimator(BaseEstimator):
             The minimum impact threshold for selecting features.
         exhaustive : bool, default=False
             Whether to use the exhaustive (recursive) method for selecting features.
-            If this is True, the threshold parameter must be provided, and the 
+            If this is True, the threshold parameter must be provided, and the
             clustering is performed until remaining values to be clustered are below
             the given threshold.
         threshold : float, default=None
             The threshold to use when exhaustive is True. If None, exception is raised.
         on_gpu : bool, default=False
             Whether to use the GPU for computing SHAP values.
-        verbose : bool, default=False   
+        verbose : bool, default=False
             Whether to print verbose output.
         prog_bar : bool, default=True
             Whether to show a progress bar.
@@ -219,8 +220,9 @@ class ShapEstimator(BaseEstimator):
         self.feature_order = {}
         self.all_mean_shap_values = []
 
-        pbar = tqdm(total=len(self.feature_names),
-                    **tqdm_params(self._fit_desc, self.prog_bar, silent=self.silent))
+        # pbar = tqdm(total=len(self.feature_names),
+        #             **tqdm_params(self._fit_desc, self.prog_bar, silent=self.silent))
+        pbar = ProgBar().start_subtask(len(self.feature_names))
 
         self.X_train, self.X_test = train_test_split(
             X, test_size=min(0.2, 250 / len(X)), random_state=42)
@@ -236,7 +238,7 @@ class ShapEstimator(BaseEstimator):
             X_test_original = self.X_test.copy()
 
         for target_name in self.feature_names:
-            pbar.refresh()
+            # pbar.refresh()
 
             # if correlation_th is not None then, remove features that are highly
             # correlated with the target, at each step of the loop
@@ -284,9 +286,10 @@ class ShapEstimator(BaseEstimator):
                 self._add_zeroes(
                     target_name, self.correlated_features[target_name])
 
-            pbar.update(1)
+            # pbar.update(1)
+            pbar.update_subtask()
 
-        pbar.close()
+        # pbar.close()
 
         self.all_mean_shap_values = np.array(
             self.all_mean_shap_values).flatten()
@@ -362,20 +365,23 @@ class ShapEstimator(BaseEstimator):
         self.mean_shap_threshold = np.quantile(
             self.all_mean_shap_values, self.mean_shap_percentile)
 
-        pbar = tqdm(
-            total=3+len(self.feature_names), **tqdm_params(
-                "Building graph from SHAPs", self.prog_bar, silent=self.silent))
-        pbar.refresh()
+        # pbar = tqdm(
+        #     total=3+len(self.feature_names), **tqdm_params(
+        #         "Building graph from SHAPs", self.prog_bar, silent=self.silent))
+        # pbar.refresh()
+        pbar = ProgBar().start_subtask(3 + len(self.feature_names))
 
         # Compute error contribution at this stage, since it needs the individual
         # SHAP values
         self.compute_error_contribution()
-        pbar.update(1)
-        pbar.refresh()
+        # pbar.update(1)
+        # pbar.refresh()
+        pbar.update_subtask()
 
         self._compute_discrepancies(self.X_test)
-        pbar.update(1)
-        pbar.refresh()
+        # pbar.update(1)
+        # pbar.refresh()
+        pbar.update_subtask()
 
         self.connections = {}
         for target in self.feature_names:
@@ -394,16 +400,18 @@ class ShapEstimator(BaseEstimator):
                 exhaustive=self.exhaustive,
                 threshold=self.mean_shap_threshold,
                 verbose=self.verbose)
-            pbar.update(1)
-            pbar.refresh()
+            # pbar.update(1)
+            # pbar.refresh()
+            pbar.update_subtask()
 
         G_shap = utils.digraph_from_connected_features(
             X, self.feature_names, self.models, self.connections, root_causes,
             reciprocity=self.reciprocity, anm_iterations=self.iters,
             verbose=self.verbose)
 
-        pbar.update(1)
-        pbar.close()
+        # pbar.update(1)
+        # pbar.close()
+        pbar.update_subtask()
 
         return G_shap
 
@@ -687,11 +695,11 @@ class ShapEstimator(BaseEstimator):
     def compute_error_contribution(self):
         """
         Computes the error contribution of each feature for each target.
-        If this value is positive, then it means that, on average, the presence of 
-        the feature in the model leads to a higher error. Thus, without that feature, 
-        the prediction would have been generally better. In other words, the feature 
+        If this value is positive, then it means that, on average, the presence of
+        the feature in the model leads to a higher error. Thus, without that feature,
+        the prediction would have been generally better. In other words, the feature
         is making more harm than good!
-        On the contrary, the more negative this value, the more beneficial 
+        On the contrary, the more negative this value, the more beneficial
         the feature is for the predictions since its presence leads to smaller errors.
 
         Returns:
@@ -722,11 +730,11 @@ class ShapEstimator(BaseEstimator):
     def _individual_error_contribution(self, shap_values, y_true, y_pred):
         """
         Compute the error contribution of each feature.
-        If this value is positive, then it means that, on average, the presence of 
-        the feature in the model leads to a higher error. Thus, without that feature, 
-        the prediction would have been generally better. In other words, the feature 
+        If this value is positive, then it means that, on average, the presence of
+        the feature in the model leads to a higher error. Thus, without that feature,
+        the prediction would have been generally better. In other words, the feature
         is making more harm than good!
-        On the contrary, the more negative this value, the more beneficial the 
+        On the contrary, the more negative this value, the more beneficial the
         feature is for the predictions since its presence leads to smaller errors.
 
         Parameters:
@@ -735,7 +743,7 @@ class ShapEstimator(BaseEstimator):
             Shap values for a given target.
         y_true: pd.Series
             Ground truth values for a given target.
-        y_pred: pd.Series   
+        y_pred: pd.Series
             Predicted values for a given target.
 
         Returns:
@@ -980,6 +988,7 @@ def custom_main(exp_name):
     # Split the dataframe into train and test
     train = data.sample(frac=0.9, random_state=42)
     test = data.drop(train.index)
+
     rex = utils.load_experiment(f"{exp_name}_nn", output_path)
     rex.is_fitted_ = True
     print(f"Loaded experiment {exp_name}")
@@ -1000,8 +1009,7 @@ def custom_main(exp_name):
     rex.shaps.predict(test, rex.root_causes)
 
 
-if __name__ == "__main__":
-    # custom_main('sachs_long')
+def shachs_main():
     experiment_name = "sachs_long"
     path = "/Users/renero/phd/data/RC3/"
     output_path = "/Users/renero/phd/output/RC3/"
@@ -1025,3 +1033,7 @@ if __name__ == "__main__":
     rex.shaps.iters = 100
     rex.shaps.predict(test, rex.root_causes)
     print("fininshed")
+
+
+if __name__ == "__main__":
+    custom_main('rex_generated_linear_9')

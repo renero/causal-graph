@@ -22,9 +22,8 @@ from networkx import DiGraph, Graph
 from pandas import DataFrame
 from pygam import pygam
 
-from tqdm.auto import tqdm
+from mlforge import ProgBar
 
-from causalgraph.common import tqdm_params
 from causalgraph.common.utils import graph_from_adjacency_file
 from causalgraph.estimators.fci.initialization import (dsep_set_from_csv,
                                                        save_graph, save_sepset)
@@ -144,15 +143,16 @@ class GraphLearner():
         actions, condlen, condsize, graph, sepset = self.init_learning()
 
         # Iterate over each pair of adjacent nodes
-        pbar = tqdm(
-            self.labels,
-            **tqdm_params("Base Skeleton", self.prog_bar, silent=self.silent))
+        # pbar = tqdm(
+        #     self.labels,
+        #     **tqdm_params("Base Skeleton", self.prog_bar, silent=self.silent))
+        pbar = ProgBar().start_subtask(len(self.labels))
 
         while condlen != 0:
             # condlen controls the amount of potential dependencies to explore
             # at each iteration the nr of cond. sets are added to this variable
             # if it happens to be zero, then exploration stops.
-            pbar.reset()
+            # pbar.reset()
             condlen = 0
             self.oo(f"> Iterating over labels: {','.join(self.labels)}")
             for lx, x in enumerate(self.labels):
@@ -160,9 +160,9 @@ class GraphLearner():
                 self.oo(f" + x = {x}; {lx + 1}/{len(self.all_labels_but(x))}")
                 condlen, actions = self.check_independence(
                     x, graph, condlen, condsize, sepset, actions)
-                pbar.update(1)
+                pbar.update_subtask(1)
             condsize += 1
-        pbar.close()
+
         self.debug.stack(actions)
         return graph, sepset
 
@@ -212,30 +212,31 @@ class GraphLearner():
                 pbar.update(1)
 
         # Iterate over each pair of adjacent nodes
-        pbar = tqdm(
-            len(self.labels),
-            **tqdm_params("Base Skeleton", self.prog_bar, silent=self.silent))
+        # pbar = tqdm(
+        #     len(self.labels),
+        #     **tqdm_params("Base Skeleton", self.prog_bar, silent=self.silent))
+        pbar = ProgBar().start_subtask(len(self.labels))
 
         pbar.set_description("Base skeleton")
         while condlen != 0:
             # condlen controls the amount of potential dependencies to explore
             # at each iteration the nr of cond. sets are added to this variable
             # if it happens to be zero, then exploration stops.
-            pbar.reset()
+            # pbar.reset()
             condlen = 0
             results = []
             self.oo(f"> Iterating over labels: {','.join(self.labels)}")
             for x in self.labels:
-                pbar.update()
                 result = pool.apply_async(
                     self.check_independence,
                     args=(x, graph, condlen, condsize, sepset),
                     callback=collect_result)
                 results.append(result)
-                pbar.refresh()
+                pbar.update_subtask()
+                # pbar.refresh()
             [result.wait() for result in results]
             condsize += 1
-        pbar.close()
+
         pool.close()
         self.debug.stack(actions)
 

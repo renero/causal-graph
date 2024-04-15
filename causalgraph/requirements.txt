@@ -5,6 +5,7 @@ hyppo==0.4.0
 kneed==0.8.5
 matplotlib==3.7.2
 minepy==1.2.6
+mlforge==0.1.0
 networkx==3.1
 numpy==1.25.2
 numpy==1.24.2
@@ -26,4 +27,3 @@ seaborn==0.12.2
 shap==0.42.1
 statsmodels==0.14.0
 torch==2.0.1
-tqdm==4.65.2

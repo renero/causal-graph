@@ -1,3 +1,34 @@
+"""
+This module contains the implementation of the BaseModel and MLPModel classes.
+
+The BaseModel class serves as the base class for all models in the causalgraph package.
+It provides common functionality such as data initialization, logger initialization,
+and callback initialization.
+
+The MLPModel class is a specific implementation of the BaseModel class, representing
+a Multi-Layer Perceptron (MLP) model. It defines the architecture and training
+process for the MLP model.
+
+Example usage:
+    data = pd.read_csv("~/phd/data/generated_linear_10.csv")
+    mlp = MLPModel(
+        target='V0',
+        input_size=data.shape[1],
+        hidden_dim=[64, 128, 64],
+        activation=nn.ReLU(),
+        learning_rate=0.05,
+        batch_size=32,
+        loss_fn="mse",
+        dropout=0.05,
+        num_epochs=200,
+        dataframe=data,
+        test_size=0.1,
+        device="auto",
+        seed=1234,
+        early_stop=False)
+    mlp.train()
+"""
+
 import logging
 import random
 import warnings
@@ -5,7 +36,6 @@ from typing import List, Union
 
 import numpy as np
 import pandas as pd
-import pytorch_lightning as pl
 import torch
 import torch.nn as nn
 from pytorch_lightning import Trainer
@@ -26,6 +56,22 @@ torch_log.setLevel(logging.ERROR)
 
 
 class BaseModel(object):
+    """
+    Base class for all models in the causalgraph package.
+
+    Args:
+        target (str): The target variable name.
+        dataframe (pd.DataFrame): The input dataframe.
+        test_size (float): The proportion of the data to use for testing.
+        batch_size (int): The batch size for training.
+        tb_suffix (str): The suffix to append to the TensorBoard log directory.
+        seed (int): The random seed for reproducibility.
+        early_stop (bool, optional): Whether to use early stopping during training.
+            Defaults to True.
+        patience (int, optional): The patience value for early stopping. Defaults to 10.
+        min_delta (float, optional): The minimum change in the monitored metric to be
+            considered an improvement for early stopping. Defaults to 0.001.
+    """
 
     model = None
     all_columns = None
@@ -80,6 +126,12 @@ class BaseModel(object):
         self.init_data()
 
     def init_logger(self, suffix: str):
+        """
+        Initialize the logger for TensorBoard.
+
+        Args:
+            suffix (str): The suffix to append to the logger name.
+        """
         # Init logger. Without this, TensorBoard doesn't work.
         self.logger = TensorBoardLogger(
             "tb_logs", name=f"{self.target}_{suffix}")
@@ -98,6 +150,19 @@ class BaseModel(object):
         patience: int = 10,
         prog_bar: bool = False,
     ):
+        """
+        Initialize the callbacks for the training process.
+
+        Args:
+            early_stop (bool, optional): Whether to use early stopping.
+                Defaults to True.
+            min_delta (float, optional): The minimum change in the monitored metric
+                to be considered an improvement for early stopping. Defaults to 0.001.
+            patience (int, optional): The patience value for early stopping.
+                Defaults to 10.
+            prog_bar (bool, optional): Whether to use a progress bar during training.
+                Defaults to False.
+        """
         self.callbacks = []
         if early_stop:
             earlyStopping = EarlyStopping(
@@ -117,6 +182,9 @@ class BaseModel(object):
             self.callbacks.append(bar)
 
     def init_data(self):
+        """
+        Initialize the data loaders for training and validation.
+        """
         self.all_columns = list(self.dataframe)
         self.columns = list(self.dataframe)
         self.columns.remove(self.target)
@@ -148,6 +216,12 @@ class BaseModel(object):
         )
 
     def override_extras(self, **kwargs):
+        """
+        Override the extra trainer arguments.
+
+        Args:
+            **kwargs: Additional keyword arguments to override the default values.
+        """
         real_steps = np.floor(self.n_rows/self.batch_size)-1
         log_every_steps = int(min(real_steps, self.batch_size))
         # log_every_steps = np.min(int(np.floor(float(self.n_rows)/float(self.batch_size)))-1., self.batch_size)
@@ -165,6 +239,29 @@ class BaseModel(object):
 
 
 class MLPModel(BaseModel):
+    """
+    Implementation of the Multi-Layer Perceptron (MLP) model.
+
+    Args:
+        target (str): The target variable name.
+        input_size (int): The size of the input features.
+        hidden_dim (List[int]): The dimensions of the hidden layers.
+        activation (nn.Module): The activation function to use in the hidden layers.
+        learning_rate (float): The learning rate for training.
+        batch_size (int): The batch size for training.
+        loss_fn (str): The loss function to use.
+        dropout (float): The dropout rate.
+        num_epochs (int): The number of training epochs.
+        dataframe (pd.DataFrame): The input dataframe.
+        test_size (float): The proportion of the data to use for testing.
+        device (Union[int, str]): The device to use for training.
+        seed (int): The random seed for reproducibility.
+        early_stop (bool, optional): Whether to use early stopping during training. Defaults to True.
+        patience (int, optional): The patience value for early stopping. Defaults to 10.
+        min_delta (float, optional): The minimum change in the monitored metric to be considered an improvement for early stopping. Defaults to 0.001.
+        **kwargs: Additional keyword arguments to override the default values.
+    """
+
     def __init__(
         self,
         target: str,
@@ -223,6 +320,9 @@ class MLPModel(BaseModel):
             **self.extra_trainer_args)
 
     def train(self):
+        """
+        Train the MLP model.
+        """
         self.trainer.fit(
             self.model,
             train_dataloaders=self.train_loader,
@@ -236,6 +336,7 @@ if __name__ == "__main__":
         target='V0',
         input_size=data.shape[1],
         hidden_dim=[64, 128, 64],
+        activation=nn.ReLU(),
         learning_rate=0.05,
         batch_size=32,
         loss_fn="mse",
