@@ -1,5 +1,5 @@
 """
-Application of early stage FCI rules to setup the skeleton of a causal graph to 
+Application of early stage FCI rules to setup the skeleton of a causal graph to
 an existing graph in order to prune potentially spurious edges.
 
 (c) J. Renero, 2022
@@ -13,9 +13,7 @@ import numpy as np
 import pygam
 from hyppo.independence import Hsic
 from pandas import DataFrame
-from tqdm.auto import tqdm
-
-from causalgraph.common import tqdm_params
+from mlforge import ProgBar
 
 
 # pylint: disable=E1101:no-member, W0201:attribute-defined-outside-init, W0511:fixme
@@ -31,11 +29,11 @@ class GraphIndependence(object):
     Parameters:
     -----------
     - base_graph (nx.DiGraph): The graph to be cleaned
-    - condlen (int): The number of conditioning sets to use in the 
+    - condlen (int): The number of conditioning sets to use in the
         independence test. Defaults to 1, meaning that the cond. indep.
         test are of length=1.
-    - condsize (int): The size of the conditioning sets to use in the 
-        independence test. Default is 0, which means that conditioning 
+    - condsize (int): The size of the conditioning sets to use in the
+        independence test. Default is 0, which means that conditioning
         sets will be based on direct connections
     - prog_bar (bool): Whether to show a progress bar
     - verbose (bool): Whether to print debug messages
@@ -46,7 +44,7 @@ class GraphIndependence(object):
     - fit(X: DataFrame, y=None) -> Tuple[nx.DiGraph, Dict[str, List[Tuple[str, Tuple[str]]]]]:
         Remove edges from the graph that are conditionally independent.
     - predict() -> nx.DiGraph:
-        Predicts the causal graph using the current independence tests and returns 
+        Predicts the causal graph using the current independence tests and returns
         the resulting graph.
     - fit_predict(X: DataFrame, y=None) -> nx.DiGraph:
         Fits the model to the data and returns predictions.
@@ -78,11 +76,11 @@ class GraphIndependence(object):
         ----------
         - base_graph (nx.DiGraph): The graph to be cleaned
         - data (DataFrame): The data used to discover the causal graph
-        - condlen (int): The number of conditioning sets to use in the 
+        - condlen (int): The number of conditioning sets to use in the
             independence test. Defaults to 1, meaning that the cond. indep.
             test are of length=1.
-        - condsize (int): The size of the conditioning sets to use in the 
-            independence test. Default is 0, which means that conditioning 
+        - condsize (int): The size of the conditioning sets to use in the
+            independence test. Default is 0, which means that conditioning
             sets will be based on direct connections
         - prog_bar (bool): Whether to show a progress bar
         - verbose (bool): Whether to print debug messages
@@ -117,14 +115,13 @@ class GraphIndependence(object):
             if col not in self.G_skl.nodes():
                 self.G_skl.add_node(col)
 
-        pbar = tqdm(total=len(self.feature_names),
-                    **tqdm_params(self._fit_desc, self.prog_bar, silent=self.silent_))
+        # pbar = tqdm(total=len(self.feature_names),
+        #             **tqdm_params(self._fit_desc, self.prog_bar, silent=self.silent_))
+        pbar = ProgBar().start_subtask(len(self.feature_names))
         for feature_name in self.feature_names:
-            pbar.refresh()
             self._remove_independent_edges(
                 feature_name, self.condlen, self.condsize)
-            pbar.update(1)
-        pbar.close()
+            pbar.update_subtask(1)
 
         return self
 
@@ -301,7 +298,7 @@ class GraphIndependence(object):
     def compute_cond_indep_pvals(self):
         """
         Perform the `_test_cond_independence` on all pairs of nodes in the graph, and
-        store the p_value (3rd element in the return tuple) on the class 
+        store the p_value (3rd element in the return tuple) on the class
         `cond_indep_pvals`
         """
         self.cond_indep_pvals = {}

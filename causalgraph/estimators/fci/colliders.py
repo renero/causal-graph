@@ -14,13 +14,12 @@ import itertools
 
 import networkx as nx
 import timeout_decorator
-from tqdm.auto import tqdm
+from mlforge import ProgBar
 
 from causalgraph.estimators.fci import rules
 from causalgraph.estimators.fci.debug import Debug
 from causalgraph.estimators.fci.initialization import save_graph
 from causalgraph.estimators.fci.pag import PAG
-from causalgraph.common import tqdm_params
 
 
 def init_pag(skeleton, sepSet, verbose, debug):
@@ -83,9 +82,10 @@ def orientEdges(skeleton, sepSet, log, verbose, debug, data_file, output_path,
         if verbose:
             print("Applying rules...")
 
-        pbar = tqdm(
-            total=len(three_tuples),
-            **tqdm_params("App.Rules", prog_bar, silent=silent))
+        # pbar = tqdm(
+        #     total=len(three_tuples),
+        #     **tqdm_params("App.Rules", prog_bar, silent=silent))
+        pbar = ProgBar().start_subtask(len(three_tuples))
 
         pbar.reset()
         for i, j, k in three_tuples:
@@ -100,8 +100,8 @@ def orientEdges(skeleton, sepSet, log, verbose, debug, data_file, output_path,
                 changed_pag |= rules.rule8(pag, i, j, k)
                 changed_pag |= rules.rule9(pag, i, j, k, node)
                 changed_pag |= rules.rule10(pag, i, j, k, node)
-            pbar.update(1)
-        pbar.close()
+            pbar.update_subtask(1)
+
     if save_intermediate:
         save_graph(pag, "adjmat_FCI_ruled", data_file, output_path, log)
     return pag

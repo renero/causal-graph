@@ -24,9 +24,8 @@ import pandas as pd
 import networkx as nx
 from networkx import Graph
 from sklearn.discriminant_analysis import StandardScaler
-from tqdm.auto import tqdm
+from mlforge import ProgBar
 
-from causalgraph.common import tqdm_params
 from causalgraph.common.utils import (graph_from_adjacency_file,
                                       graph_from_dot_file)
 from causalgraph.estimators.fci.colliders import (get_dsep_combs,
@@ -72,12 +71,12 @@ class FCI(GraphLearner):
         output_path (Path): path to the directory where the output files will be saved
         Keyword Arguments:
             logger (logging.Logger): logger object
-            indep_test (Callable): independence test to be used for checking 
+            indep_test (Callable): independence test to be used for checking
                 independence
-            load_base_skeleton (bool): if True, load the base skeleton from the files 
+            load_base_skeleton (bool): if True, load the base skeleton from the files
                 specified
                 in the YAML file for "base_skeleton" and "base_sepset"
-            load_final_skeleton (bool): if True, load the final skeleton from the 
+            load_final_skeleton (bool): if True, load the final skeleton from the
                 files specified in the YAML file for "final_skeleton" and "final_sepset"
             save_intermediate (bool): if True, save the intermediate results
             base_skeleton (str): name of the file containing the base skeleton
@@ -151,7 +150,11 @@ class FCI(GraphLearner):
 
         return self
 
-    def fit_predict(self, train: pd.DataFrame, test: pd.DataFrame, ref_graph: nx.DiGraph = None):
+    def fit_predict(
+            self,
+            train: pd.DataFrame,
+            test: pd.DataFrame,
+            ref_graph: nx.DiGraph = None):
         """
         Method to fit the data and evaluate the learned graph against a reference graph.
 
@@ -228,16 +231,17 @@ class FCI(GraphLearner):
         if self.verbose:
             print("Finding colliders...", flush=True)
 
-        pbar = tqdm(
-            pag,
-            **tqdm_params("Learn Skeleton", self.prog_bar, silent=self.silent))
+        # pbar = tqdm(
+        #     pag,
+        #     **tqdm_params("Learn Skeleton", self.prog_bar, silent=self.silent))
+        pbar = ProgBar().start_subtask(len(pag))
 
         for lx, x in enumerate(pag):
-            pbar.refresh()
+            # pbar.refresh()
             neighbors = get_neighbors(x, pag)
             self.debug.neighbors(x, lx, neighbors, pag)
             if len(neighbors) == 0:
-                pbar.update(1)
+                pbar.update_subtask(1)
                 continue
             for ny, y in enumerate(neighbors):
                 tup = self.find_colliders(x, y, pag, ny, dseps, sepSet,
@@ -245,8 +249,8 @@ class FCI(GraphLearner):
                 if tup:
                     self.update_actions(pag_actions, tup)
             self.debug.stack(pag_actions)
-            pbar.update(1)
-        pbar.close()
+            pbar.update_subtask(1)
+
         return pag, sepSet
 
     def parallel_learn_skeleton(self):
@@ -285,23 +289,20 @@ class FCI(GraphLearner):
             print("Finding colliders...", flush=True)
         pool = mp.Pool(self.njobs)
 
-        pbar = tqdm(
-            len(pag), **tqdm_params("Learn Skeleton", self.prog_bar, silent=self.silent))
+        # pbar = tqdm(
+        #     len(pag), **tqdm_params("Learn Skeleton", self.prog_bar, silent=self.silent))
+        pbar = ProgBar().start_subtask(len(pag))
 
         results = []
         for lx, x in enumerate(pag):
-            # if x not in ["F", "J"]:
-            #     continue
-            pbar.update()
             pool.apply_async(
                 self.explore_neighbours,
                 args=(x, lx, pag, dseps, sepSet),
                 callback=update_PAG)
-            pbar.refresh()
-        pool.close()
+            pbar.update_subtask()
+
         # Wait until everyone is finished...
         pool.join()
-        pbar.close()
         self.debug.stack(pag_actions)
         self.debug.bm(f"2nd stage skeleton time: {time.time() - now:.1f} secs")
         return pag, sepSet
