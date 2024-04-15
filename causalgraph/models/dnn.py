@@ -1,3 +1,12 @@
+"""
+A class to train DFF networks for all variables in data. Each network will be trained to
+predict one of the variables in the data, using the rest as predictors plus one
+source of random noise.
+
+(C) 2022,2023,2024, J. Renero
+"""
+
+
 # pylint: disable=E1101:no-member, W0201:attribute-defined-outside-init, W0511:fixme
 # pylint: disable=C0103:invalid-name
 # pylint: disable=C0116:missing-function-docstring
@@ -18,9 +27,9 @@ from sklearn.base import BaseEstimator
 from sklearn.preprocessing import StandardScaler
 from sklearn.utils.validation import check_is_fitted
 from torch.utils.data import DataLoader
-from tqdm.auto import tqdm
+from mlforge import ProgBar
 
-from causalgraph.common import GRAY, GREEN, RESET, tqdm_params
+from causalgraph.common import GRAY, GREEN, RESET
 from causalgraph.explainability.hierarchies import Hierarchies
 from causalgraph.models._columnar import ColumnsDataset
 from causalgraph.models._models import MLPModel
@@ -30,9 +39,9 @@ warnings.filterwarnings("ignore")
 
 class NNRegressor(BaseEstimator):
     """
-    A class to train DFF networks for all variables in data. Each network will be trained to
-    predict one of the variables in the data, using the rest as predictors plus one
-    source of random noise.
+    A class to train DFF networks for all variables in data. Each network will be
+    trained to predict one of the variables in the data, using the rest as predictors
+    plus one source of random noise.
 
     Attributes:
     -----------
@@ -86,8 +95,8 @@ class NNRegressor(BaseEstimator):
         Args:
             data (pandas.DataFrame): The dataframe with the continuous variables.
             model_type (str): The type of model to use. Either 'dff' or 'mlp'.
-            hidden_dim (int): The dimension(s) of the hidden layer(s). This value 
-                can be a single integer for DFF or an array with the dimension of 
+            hidden_dim (int): The dimension(s) of the hidden layer(s). This value
+                can be a single integer for DFF or an array with the dimension of
                 each hidden layer for the MLP case.
             activation (str): The activation function to use, either 'relu' or 'selu'.
                 Default is 'relu'.
@@ -160,12 +169,13 @@ class NNRegressor(BaseEstimator):
                 verbose=self.verbose)
             X_original = X.copy()
 
-        pbar_in = tqdm(
-            total=len(self.feature_names),
-            **tqdm_params(self._fit_desc, self.prog_bar, silent=self.silent))
+        # pbar_in = tqdm(
+        #     total=len(self.feature_names),
+        #     **tqdm_params(self._fit_desc, self.prog_bar, silent=self.silent))
+        pbar = ProgBar().start_subtask(len(self.feature_names))
 
         for target_name in self.feature_names:
-            pbar_in.refresh()
+            # pbar_in.refresh()
 
             # if correlation_th is not None then, remove features that are highly
             # correlated with the target, at each step of the loop
@@ -196,8 +206,11 @@ class NNRegressor(BaseEstimator):
                 min_delta=self.min_delta,
                 prog_bar=self.prog_bar)
             self.regressor[target_name].train()
-            pbar_in.update(1)
-        pbar_in.close()
+
+            # pbar_in.update(1)
+            pbar.update_subtask()
+
+        # pbar_in.close()
 
         self.is_fitted_ = True
         return self
@@ -367,7 +380,7 @@ class NNRegressor(BaseEstimator):
             >>> study.optimize(Objective(train_data, test_data), n_trials=100)
 
             The only dependency is you need to pass the train and test data to the class
-            constructor. Tha class will build the data loaders for them from the 
+            constructor. Tha class will build the data loaders for them from the
             dataframes.
             """
 

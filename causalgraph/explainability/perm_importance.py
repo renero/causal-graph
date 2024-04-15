@@ -23,7 +23,7 @@ verbose: bool
     Whether to display explanations on the process or not.
 silent: bool
     Whether to display anything or not.
-    
+
 """
 
 # pylint: disable=E1101:no-member, W0201:attribute-defined-outside-init, W0511:fixme
@@ -35,27 +35,27 @@ silent: bool
 
 from typing import Tuple
 
+import networkx as nx
 import numpy as np
 import pandas as pd
-import networkx as nx
-from sklearn.preprocessing import StandardScaler
 import torch
 from matplotlib import pyplot as plt
+from mlforge import ProgBar
 from sklearn.base import BaseEstimator
 from sklearn.inspection import permutation_importance
-from tqdm.auto import tqdm
+from sklearn.preprocessing import StandardScaler
 
-from causalgraph.common import tqdm_params, utils
+from causalgraph.common import utils
 from causalgraph.common.plot import subplots
-from causalgraph.models._models import MLPModel
 from causalgraph.explainability.hierarchies import Hierarchies
 from causalgraph.independence.feature_selection import select_features
+from causalgraph.models._models import MLPModel
 
 
 class PermutationImportance(BaseEstimator):
     """
     Permutation Importance for feature selection.
-    Wrapper over SKLearn's PermutationImportance and own implementation of 
+    Wrapper over SKLearn's PermutationImportance and own implementation of
     the vanilla version of the algorithm to run over models trained with PyTorch.
     """
 
@@ -148,13 +148,15 @@ class PermutationImportance(BaseEstimator):
         """
         Fit the model to compute the base loss for each feature for pyTorch models.
         """
-        pbar = tqdm(
-            total=len(self.feature_names),
-            **tqdm_params(self._fit_desc, self.prog_bar, silent=self.silent))
+        # pbar = tqdm(
+        #     total=len(self.feature_names),
+        #     **tqdm_params(self._fit_desc, self.prog_bar, silent=self.silent))
+        pbar = ProgBar().start_subtask(len(self.feature_names))
         print("Computing base loss (PyTorch)") if self.verbose else None
 
         for feature in self.feature_names:
-            pbar.refresh()
+            # pbar.refresh()
+            pbar.update_subtask(1)
             print(f"Feature: {feature} ", end="") if self.verbose else None
 
             regressor = self.regressors[feature]
@@ -169,8 +171,9 @@ class PermutationImportance(BaseEstimator):
                 print(f"Base loss: {self.base_loss[feature]:.6f} ", end="")
                 print(f"+/- {self.base_std[feature]:.6f}")
 
-            pbar.update(1)
-        pbar.close()
+            pbar.update_subtask()
+        #     pbar.update(1)
+        # pbar.close()
 
         self.is_fitted_ = True
 
@@ -180,9 +183,10 @@ class PermutationImportance(BaseEstimator):
         """
         Fit the model to compute the base loss for each feature, for SKLearn models.
         """
-        pbar = tqdm(
-            total=len(self.feature_names),
-            **tqdm_params(self._fit_desc, self.prog_bar, silent=self.silent))
+        # pbar = tqdm(
+        #     total=len(self.feature_names),
+        #     **tqdm_params(self._fit_desc, self.prog_bar, silent=self.silent))
+        pbar = ProgBar().start_subtask(len(self.feature_names))
 
         # If me must exclude features due to correlation, we must do it before
         # computing the base loss
@@ -196,7 +200,8 @@ class PermutationImportance(BaseEstimator):
         self.all_pi = []
         X_original = X.copy()
         for target_name in self.feature_names:
-            pbar.refresh()
+            # pbar.refresh()
+            pbar.update_subtask(1)
             X = X_original.copy()
 
             # if correlation_th is not None then, remove features that are highly
@@ -223,9 +228,10 @@ class PermutationImportance(BaseEstimator):
 
             self.all_pi.append(self.pi[target_name]['importances_mean'])
 
-            pbar.update(1)
+            # pbar.update(1)
+            pbar.update_subtask()
 
-        pbar.close()
+        # pbar.close()
 
         self.all_pi = np.array(self.all_pi).flatten()
         self.mean_pi_threshold = np.quantile(
@@ -244,18 +250,19 @@ class PermutationImportance(BaseEstimator):
 
     def _predict_pytorch(self, X, root_causes) -> nx.DiGraph:
         """
-        Predict the permutation importance for each feature, for each target, 
+        Predict the permutation importance for each feature, for each target,
         under the PyTorch implementation of the algorithm.
         """
-        pbar = tqdm(
-            total=len(self.feature_names),
-            **tqdm_params(self._fit_desc, self.prog_bar, silent=self.silent))
+        # pbar = tqdm(
+        #     total=len(self.feature_names),
+        #     **tqdm_params(self._fit_desc, self.prog_bar, silent=self.silent))
+        pbar = ProgBar().start_subtask(len(self.feature_names))
         print("Computing permutation loss (PyTorch)") if self.verbose else None
 
         self.all_pi = []
         num_vars = len(self.feature_names)
         for target in self.feature_names:
-            pbar.refresh()
+            # pbar.refresh()
             regressor = self.regressors[target]
             model = regressor.model
             candidate_causes = [f for f in self.feature_names if f != target]
@@ -277,7 +284,7 @@ class PermutationImportance(BaseEstimator):
             self.pi[target]['importances_mean'], self.pi[target]['importances_std'] = \
                 self._compute_perm_imp(target, regressor, model, num_vars)
 
-            pbar.update(1)
+            pbar.update_subtask()
 
             if self.correlation_th is not None:
                 self._add_zeroes(target, self.correlated_features[target])
@@ -291,14 +298,12 @@ class PermutationImportance(BaseEstimator):
                 threshold=self.mean_pi_threshold,
                 verbose=self.verbose)
 
-        pbar.close()
-
         self.G_pi = self._build_pi_dag(X, root_causes)
         return self.G_pi
 
     def _predict_sklearn(self, X, root_causes) -> nx.DiGraph:
         """
-        Predict the permutation importance for each feature, for each target, 
+        Predict the permutation importance for each feature, for each target,
         under the PyTorch implementation of the algorithm.
         """
         print("Computing permutation loss (SKLearn)") if self.verbose else None

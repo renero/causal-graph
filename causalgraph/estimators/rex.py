@@ -212,7 +212,7 @@ class Rex(BaseEstimator, ClassifierMixin):
 
         # Create the pipeline for the training stages.
         pipeline = Pipeline(self, prog_bar=self.prog_bar, verbose=self.verbose,
-                            silent=self.silent)
+                            silent=self.silent, subtask=True)
         steps = [
             ('hierarchies', Hierarchies),
             ('hierarchies.fit'),

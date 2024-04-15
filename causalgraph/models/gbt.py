@@ -1,16 +1,60 @@
+"""
+This module contains the GBTRegressor class, which is a wrapper around the
+GradientBoostingRegressor class from the scikit-learn library. The class
+implements the fit, predict, and score methods to fit a separate model for
+each feature in the dataframe, and predict and score the model for each feature
+in the dataframe.
+
+The class also implements a tune method to tune the hyperparameters of the model
+using Optuna. The tune method uses the Objective class to define the objective
+function for the hyperparameter optimization. The Objective class is a nested
+class within the GBTRegressor class, and it defines the objective function for
+the hyperparameter optimization. The class is designed to be used with the
+Optuna library.
+
+The module also contains a main function that can be used to run the GBTRegressor
+class with the tune method. The main function takes the name of the experiment
+as an argument, and loads the data and the reference graph for the experiment.
+The main function then splits the data into train and test, and runs the tune
+method to tune the hyperparameters of the model. The main function can be used
+to run the GBTRegressor class with the tune method for any experiment.
+
+The module can be run as a script to run the main function with the tune method
+for a specific experiment. The experiment name is passed as an argument to the
+script, and the main function is called with the experiment name as an argument.
+The script can be used to run the GBTRegressor class with the tune method for
+any experiment.
+
+Example:
+
+    $ python gbt.py rex_generated_linear_6
+
+This will run the GBTRegressor class with the tune method for the experiment
+'rex_generated_linear_6'.
+
+The module can also be imported and used in other modules or scripts to run the
+GBTRegressor class with the tune method for any experiment.
+
+Example:
+
+    from causalgraph.models.gbt import custom_main
+
+    custom_main("rex_generated_linear_6")
+
+"""
+
 import numpy as np
 import optuna
 import pandas as pd
 from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.preprocessing import StandardScaler
-from tqdm.auto import tqdm
+from mlforge import ProgBar
 
-from causalgraph.common import tqdm_params
 from causalgraph.explainability.hierarchies import Hierarchies
 
 
 class GBTRegressor(GradientBoostingRegressor):
-    
+
     random_state = 42
 
     def __init__(
@@ -72,7 +116,7 @@ class GBTRegressor(GradientBoostingRegressor):
 
     def fit(self, X):
         """
-        Call the fit method of the parent class with every feature from the "X" 
+        Call the fit method of the parent class with every feature from the "X"
         dataframe as a target variable. This will fit a separate model for each
         feature in the dataframe.
         """
@@ -87,13 +131,12 @@ class GBTRegressor(GradientBoostingRegressor):
                 verbose=self.verbose)
             X_original = X.copy()
 
-        pbar_in = tqdm(total=len(self.feature_names),
-                       **tqdm_params(self._fit_desc, self.prog_bar,
-                                     silent=self.silent))
+        # pbar_in = tqdm(total=len(self.feature_names),
+        #                **tqdm_params(self._fit_desc, self.prog_bar,
+        #                              silent=self.silent))
+        pbar = ProgBar().start_subtask(len(self.feature_names))
 
         for target_name in self.feature_names:
-            pbar_in.refresh()
-
             # if correlation_th is not None then, remove features that are highly
             # correlated with the target, at each step of the loop
             if self.correlation_th is not None:
@@ -129,15 +172,14 @@ class GBTRegressor(GradientBoostingRegressor):
             )
             self.regressor[target_name].fit(
                 X.drop(target_name, axis=1), X[target_name])
-            pbar_in.update(1)
-        pbar_in.close()
+            pbar.update_subtask(1)
 
         self.is_fitted_ = True
         return self
 
     def predict(self, X):
         """
-        Call the predict method of the parent class with every feature from the "X" 
+        Call the predict method of the parent class with every feature from the "X"
         dataframe as a target variable. This will predict a separate value for each
         feature in the dataframe.
         """
@@ -162,7 +204,7 @@ class GBTRegressor(GradientBoostingRegressor):
 
     def score(self, X):
         """
-        Call the score method of the parent class with every feature from the "X" 
+        Call the score method of the parent class with every feature from the "X"
         dataframe as a target variable. This will score a separate model for each
         feature in the dataframe.
         """
@@ -179,14 +221,14 @@ class GBTRegressor(GradientBoostingRegressor):
             if self.correlation_th is not None:
                 X = X_original.drop(
                     self.correlated_features[target_name], axis=1)
-                
+
             R2 = self.regressor[target_name].score(
                     X.drop(target_name, axis=1), X[target_name])
-            
-            # Append 1.0 if R2 is negative, or 1.0 - R2 otherwise since we're 
+
+            # Append 1.0 if R2 is negative, or 1.0 - R2 otherwise since we're
             # in the minimization mode of the error function.
             scores.append(1.0) if R2 < 0.0 else scores.append(1.0 - R2)
-        
+
         self.scoring = np.array(scores)
         return self.scoring
 
@@ -217,7 +259,7 @@ class GBTRegressor(GradientBoostingRegressor):
             >>> study.optimize(Objective(train_data, test_data), n_trials=100)
 
             The only dependency is you need to pass the train and test data to the class
-            constructor. Tha class will build the data loaders for them from the 
+            constructor. Tha class will build the data loaders for them from the
             dataframes.
             """
 
@@ -231,7 +273,7 @@ class GBTRegressor(GradientBoostingRegressor):
                 self.silent = silent
                 self.prog_bar = prog_bar
 
-                
+
             def __call__(self, trial):
                 """
                 This method is called by Optuna to evaluate the objective function.
@@ -239,7 +281,7 @@ class GBTRegressor(GradientBoostingRegressor):
                 # Define the model hyperparameters
                 self.n_iter_no_change = 5
                 self.tol = 0.0001
-                
+
                 # Define the hyperparameters to optimize
                 self.learning_rate = trial.suggest_float("learning_rate", 0.001, 0.2)
                 self.n_estimators = trial.suggest_int("n_estimators", 10, 1000)
@@ -251,9 +293,9 @@ class GBTRegressor(GradientBoostingRegressor):
                 self.max_leaf_nodes = trial.suggest_int("max_leaf_nodes", 10, 1000)
                 # self.max_features = trial.suggest_categorical("max_features", ["auto", "sqrt", "log2"])
                 self.min_impurity_decrease = trial.suggest_float("min_impurity_decrease", 0.0, 0.5)
-                
+
                 # Extract feature_names from the train_data dataframe
-                
+
                 self.models = GBTRegressor(
                     learning_rate=self.learning_rate,
                     n_estimators=self.n_estimators,
@@ -273,14 +315,14 @@ class GBTRegressor(GradientBoostingRegressor):
                     silent=self.silent
                 )
                 self.models.fit(self.train_data)
-                
+
                 # Now, measure the performance of the model with the test data.
                 loss = []
                 for target_name in list(self.train_data.columns):
                     R2 = self.models.regressor[target_name].score(
-                        self.test_data.drop(target_name, axis=1), 
+                        self.test_data.drop(target_name, axis=1),
                         self.test_data[target_name])
-                    # Append 1.0 if R2 is negative, or 1.0 - R2 otherwise since we're 
+                    # Append 1.0 if R2 is negative, or 1.0 - R2 otherwise since we're
                     # in the minimization mode of the error function.
                     loss.append(1.0) if R2 < 0.0 else loss.append(1.0 - R2)
 
@@ -290,25 +332,25 @@ class GBTRegressor(GradientBoostingRegressor):
         def callback(study: optuna.study.Study, trial: optuna.trial.FrozenTrial):
             if trial.value < min_loss or study.best_value < min_loss:
                 study.stop()
-        
+
         if self.verbose is False:
             optuna.logging.set_verbosity(optuna.logging.WARNING)
-            
+
         # Create and run the HPO study
         study = optuna.create_study(
             direction='minimize', study_name=study_name, storage=storage,
             load_if_exists=load_if_exists)
         study.optimize(Objective(training_data, test_data, verbose=self.verbose,
-                                 silent=self.silent, prog_bar=self.prog_bar), 
+                                 silent=self.silent, prog_bar=self.prog_bar),
                        n_trials=n_trials,
                        show_progress_bar=(self.prog_bar & (not self.silent)),
                        callbacks=[callback])
-        
+
         # Capture the best hyperparameters and the minimum loss
         best_trials = sorted(study.best_trials, key=lambda x: x.values[0])
         self.best_params = best_trials[0].params
         self.min_tunned_loss = best_trials[0].values[0]
-        
+
         regressor_args = {
             'learning_rate': self.best_params['learning_rate'],
             'n_estimators': self.best_params['n_estimators'],
@@ -321,9 +363,9 @@ class GBTRegressor(GradientBoostingRegressor):
             # 'max_features': self.best_params['max_features'],
             'min_impurity_decrease': self.best_params['min_impurity_decrease']
         }
-        
+
         return regressor_args
-    
+
     def tune_fit(
             self,
             X: pd.DataFrame,
@@ -343,7 +385,7 @@ class GBTRegressor(GradientBoostingRegressor):
         # tune the model
         regressor_args = self.tune(
             train_data, test_data, n_trials=hpo_n_trials, study_name=hpo_study_name,
-            min_loss=hpo_min_loss, storage=hpo_storage, 
+            min_loss=hpo_min_loss, storage=hpo_storage,
             load_if_exists=hpo_load_if_exists)
 
         if self.verbose and not self.silent:
@@ -357,7 +399,7 @@ class GBTRegressor(GradientBoostingRegressor):
 
         # Fit the model with the best parameters.
         self.fit(train_data)
-        
+
 
 #
 # Main function
@@ -367,9 +409,9 @@ def custom_main(experiment_name = 'custom_rex', score:bool=False, tune: bool = F
     from causalgraph.common import utils
     path = "/Users/renero/phd/data/RC3/"
     output_path = "/Users/renero/phd/output/RC3/"
-    
+
     ref_graph = utils.graph_from_dot_file(f"{path}{experiment_name}.dot")
-    
+
     data = pd.read_csv(f"{path}{experiment_name}.csv")
     scaler = StandardScaler()
     data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)

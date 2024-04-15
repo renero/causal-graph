@@ -1,23 +1,48 @@
+"""
+This module contains functions to extract and visualize the weights of a neural
+network model. The weights are extracted from the model and then visualized in
+different ways to help understand the relationships between the input features
+and the target variable. The functions in this module are used to visualize the
+weights of a neural network model and to identify relationships between the input
+features and the target variable.
+
+"""
+
 from collections import Counter
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Tuple
 
 import kneed
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 import pandas as pd
 import seaborn as sns
 import shap
+import torch
+from mlforge import ProgBar
 from sklearn.cluster import DBSCAN
 from sklearn.preprocessing import StandardScaler
-from tqdm.auto import tqdm
 
 from causalgraph.common.utils import graph_from_dictionary
-from causalgraph.common import tqdm_params
 from causalgraph.models._models import MLPModel
 
 
-def extract_weights(model, verbose=False):
+# pylint: disable=too-many-locals, consider-using-enumerate
+
+
+def extract_weights(model: torch.nn.Module, verbose: bool = False) -> List[np.ndarray]:
+    """
+    Extracts the weights from a given model.
+
+    Parameters:
+    - model: The model from which to extract the weights.
+    - verbose: If True, prints the names of the weights being extracted.
+
+    Returns:
+    - weights: A list of the extracted weights.
+
+    """
     weights = []
     for name, prm in model.named_parameters():
         if verbose:
@@ -29,18 +54,35 @@ def extract_weights(model, verbose=False):
     return weights
 
 
-def see_weights_to_hidden(W, input_names, target):
+def see_weights_to_hidden(
+        weights_matrix: np.ndarray,
+        input_names: List[str],
+        target: str) -> None:
+    """
+    Visualizes the weights connecting the input layer to the hidden layer.
+
+    Args:
+        W (np.ndarray): The weight matrix of shape (num_hidden, num_inputs) representing
+        the connections between the input layer and the hidden layer.
+        input_names (List[str]): A list of input names corresponding to each input
+            feature.
+        target (str): The target variable.
+
+    Returns:
+        None
+
+    """
     num_rows = 4
     num_cols = 3
-    num_plots = W.shape[0]
+    num_plots = weights_matrix.shape[0]
     fig, ax = plt.subplots(nrows=num_rows, ncols=num_cols, figsize=(10, 8))
-    x_range = range(W.shape[1])
-    hidden_names = [f"h{i:02d}" for i in range(W.shape[0])]
+    x_range = range(weights_matrix.shape[1])
+    hidden_names = [f"h{i:02d}" for i in range(weights_matrix.shape[0])]
     for idx, i in enumerate(range(num_plots)):
         row = int((i) / num_cols)
         col = np.round(((i / num_cols) - row) * num_cols).astype(int)
         ax[row, col].axhline(0, color="black", linewidth=0.5)
-        ax[row, col].bar(x_range, W[i], alpha=0.6)
+        ax[row, col].bar(x_range, weights_matrix[i], alpha=0.6)
         ax[row, col].set_xticks(x_range)
         ax[row, col].set_xticklabels(input_names, fontsize=7)
         ax[row, col].set_title(hidden_names[i])
@@ -98,7 +140,7 @@ def plot_features(
     num_rows = n_rows
     num_cols = n_cols
     row, col = 0, 0
-    fig, ax = plt.subplots(num_rows, num_cols, figsize=(12, 14))
+    _, ax = plt.subplots(num_rows, num_cols, figsize=(12, 14))
     for target in all_columns:
         plot_feature(results[target], axis=ax[row, col])
         col += 1
@@ -126,7 +168,7 @@ def layer_weights(dff_net, target, layer=0):
 
 
 def _plot_clusters(X: pd.DataFrame, K: DBSCAN, target: str, counts: Dict, min_counts=2):
-    colors = [plt.cm.tab20(i) for i in range(20)]
+    colors = [mpl.cm.tab20(i) for i in range(20)]
     fig, ax = plt.subplots(1, 3, figsize=(8, 2), sharey=True)
     minX, maxX = X.min().min(), X.max().max()
     minX -= (maxX - minX) * 0.1
@@ -170,6 +212,20 @@ def _plot_clusters(X: pd.DataFrame, K: DBSCAN, target: str, counts: Dict, min_co
 
 
 def summarize_weights(weights, feature_names, layer=0, scale=True):
+    """
+    Summarize the weights of a neural network model by calculating the mean,
+    median, and positive semidefinite values of the weights for each feature.
+
+    Parameters:
+    - weights: The weights of the neural network model.
+    - feature_names: A list of feature names.
+    - layer: The layer of the neural network model from which to extract the weights.
+    - scale: If True, scale the summary values.
+
+    Returns:
+    - psd: A DataFrame containing the summary values of the weights for each feature.
+
+    """
     l1 = dict()
     psd = pd.DataFrame()
     for feature in feature_names:
@@ -196,6 +252,18 @@ def identify_relationships(weights, feature_names, eps=0.5, min_counts=2, plot=T
     identify what clusters have less or equal than min_count elements, to consider
     that cluster as relevant to produce the regression for that given feature the
     NN has been trained for.
+
+    Parameters:
+    - weights: The weights of the neural network model.
+    - feature_names: A list of feature names.
+    - eps: The maximum distance between two samples for one to be considered as in
+        the neighborhood of the other.
+    - min_counts: The minimum number of elements in a cluster to consider it relevant.
+    - plot: If True, plot the clusters.
+
+    Returns:
+    - rels: A dictionary containing the relevant features for each target feature.
+
     """
     rels = {}
     for target in feature_names:
@@ -217,6 +285,16 @@ def identify_relationships(weights, feature_names, eps=0.5, min_counts=2, plot=T
 
 
 def _get_shap_values(model: MLPModel) -> np.ndarray:
+    """
+    Get the SHAP values for the given model.
+
+    Parameters:
+    - model: The model for which to compute the SHAP values.
+
+    Returns:
+    - shap_values: The SHAP values for the given model.
+
+    """
     explainer = shap.DeepExplainer(
         model.model, model.train_loader.dataset.features)
     shap_values = explainer.shap_values(
@@ -226,8 +304,21 @@ def _get_shap_values(model: MLPModel) -> np.ndarray:
 
 
 def _average_shap_values(
-    shap_values: Dict[str, np.ndarray], column_names: List[str], abs: bool = False
-) -> np.array:
+        shap_values: Dict[str, np.ndarray],
+        column_names: List[str],
+        abs: bool = False) -> np.array:
+    """
+    Compute the average SHAP values for the given model.
+
+    Parameters:
+    - shap_values: The SHAP values for the given model.
+    - column_names: The names of the columns in the dataset.
+    - abs: If True, compute the absolute values of the SHAP values.
+
+    Returns:
+    - avg_shaps: The average SHAP values for the given model.
+
+    """
     avg_shaps = []
     for i in range(len(column_names)):
         target_name = column_names[i]
@@ -348,22 +439,42 @@ def infer_causal_relationships(
         verbose=False,
         plot=False,
         prog_bar=True,
-        silent=False
-):
-    shap_values = dict()
-    pbar = tqdm(total=len(feature_names),
-                **tqdm_params("Computing SHAPLEY values", prog_bar, silent=silent))
+        silent=False):
+    """
+    Infer causal relationships between the input features and the target variable
+    based on the SHAP values of the trained models.
+
+    Parameters:
+    - trained_models: A dictionary of trained models, where the keys are the target
+        variable names and the values are the trained models.
+    - feature_names: A list of input feature names.
+    - prune: If True, remove asymmetric edges from the graph.
+    - verbose: If True, print additional information.
+    - plot: If True, plot the results.
+    - prog_bar: If True, show a progress bar.
+    - silent: If True, do not show any output.
+
+    Returns:
+    - A dictionary containing the SHAP values, the average SHAP values, the thresholds,
+        the raw graph, and the oriented graph.
+
+    """
+    # pbar = tqdm(total=len(feature_names),
+    #             **tqdm_params("Computing SHAPLEY values", prog_bar, silent=silent))
+    if prog_bar and not silent:
+        pbar = ProgBar().start_subtask(len(feature_names))
+
+    shap_values = {}
+
     # desc="Computing SHAPLEY values",
     # disable=not prog_bar, position=1, leave=False)
     for target_name in feature_names:
-        pbar.update(1)
         model = trained_models[target_name]
         shap_values[target_name] = _get_shap_values(model)
-        pbar.refresh()
-    pbar.close()
+        pbar.update_subtask(1)
 
     avg_shaps = _average_shap_values(shap_values, feature_names)
-    feature_threshold = dict()
+    feature_threshold = {}
     for i, target in enumerate(feature_names):
         feature_threshold[target] = _find_shap_elbow(
             avg_shaps[i], plot, verbose)

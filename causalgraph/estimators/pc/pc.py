@@ -12,9 +12,9 @@ import networkx as nx
 import pandas as pd
 from joblib import Parallel, delayed
 from sklearn.preprocessing import StandardScaler
-from tqdm.auto import tqdm
+from mlforge import ProgBar
 
-from causalgraph.common import tqdm_params, utils
+from causalgraph.common import utils
 from causalgraph.estimators.pc.ci_tests import chi_square, pearsonr
 from causalgraph.estimators.pc.estimators import StructureEstimator
 from causalgraph.estimators.pc.pdag import PDAG
@@ -33,10 +33,10 @@ class PC(StructureEstimator):
 
     References
     ----------
-    [1] Koller & Friedman, Probabilistic Graphical Models - Principles and 
+    [1] Koller & Friedman, Probabilistic Graphical Models - Principles and
         Techniques, 2009, Section 18.2
-    [2] Neapolitan, Learning Bayesian Networks, Section 10.1.2 for the PC algorithm 
-        (page 550), 
+    [2] Neapolitan, Learning Bayesian Networks, Section 10.1.2 for the PC algorithm
+        (page 550),
         http://www.cs.technion.ac.il/~dang/books/Learning%20Bayesian%20Networks(Neapolitan,%20Richard).pdf # noqa
     """
 
@@ -139,10 +139,10 @@ class PC(StructureEstimator):
         ----------
         [1] Original PC: P. Spirtes, C. Glymour, and R. Scheines, Causation,
             Prediction, and Search, 2nd ed. Cambridge, MA: MIT Press, 2000.
-        [2] Stable PC:  D. Colombo and M. H. Maathuis, “A modification of the PC 
+        [2] Stable PC:  D. Colombo and M. H. Maathuis, “A modification of the PC
             algorithm yielding order-independent skeletons,” ArXiv e-prints, Nov. 2012.
-        [3] Parallel PC: Le, Thuc, et al. "A fast PC algorithm for high dimensional 
-            causal discovery with multi-core PCs." IEEE/ACM transactions on 
+        [3] Parallel PC: Le, Thuc, et al. "A fast PC algorithm for high dimensional
+            causal discovery with multi-core PCs." IEEE/ACM transactions on
             computational biology and bioinformatics (2016).
 
         Examples
@@ -268,8 +268,9 @@ class PC(StructureEstimator):
                 f"or a function. Got: {ci_test_fn}"
             )
 
-        pbar = tqdm(
-            total=self.max_cond_vars, **tqdm_params("PC algorithm", self.prog_bar))
+        # pbar = tqdm(
+        #     total=self.max_cond_vars, **tqdm_params("PC algorithm", self.prog_bar))
+        pbar = ProgBar().start_subtask(self.max_cond_vars)
 
         # Step 1: Initialize a fully connected undirected graph
         graph = nx.complete_graph(n=self.variables, create_using=nx.Graph)
@@ -381,13 +382,13 @@ class PC(StructureEstimator):
             lim_neighbors += 1
 
             if self.prog_bar and SHOW_PROGRESS:
-                pbar.update(1)
-                pbar.set_description(
-                    f"PC: Working for n conditional variables: {lim_neighbors}"
-                )
+                pbar.update_subtask(1)
+                # pbar.set_description(
+                #     f"PC: Working for n conditional variables: {lim_neighbors}"
+                # )
 
-        if self.prog_bar and SHOW_PROGRESS:
-            pbar.close()
+        # if self.prog_bar and SHOW_PROGRESS:
+        #     pbar.close()
         return graph, separating_sets
 
     @staticmethod

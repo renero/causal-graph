@@ -34,7 +34,8 @@ from sklearn.discriminant_analysis import StandardScaler
 from sklearn.metrics import r2_score
 from sklearn.model_selection import train_test_split
 from sklearn.utils.validation import check_is_fitted
-from tqdm.auto import tqdm
+from mlforge import ProgBar
+# from tqdm.auto import tqdm
 
 from causalgraph.common import *
 from causalgraph.common import utils
@@ -219,8 +220,9 @@ class ShapEstimator(BaseEstimator):
         self.feature_order = {}
         self.all_mean_shap_values = []
 
-        pbar = tqdm(total=len(self.feature_names),
-                    **tqdm_params(self._fit_desc, self.prog_bar, silent=self.silent))
+        # pbar = tqdm(total=len(self.feature_names),
+        #             **tqdm_params(self._fit_desc, self.prog_bar, silent=self.silent))
+        pbar = ProgBar().start_subtask(len(self.feature_names))
 
         self.X_train, self.X_test = train_test_split(
             X, test_size=min(0.2, 250 / len(X)), random_state=42)
@@ -236,7 +238,7 @@ class ShapEstimator(BaseEstimator):
             X_test_original = self.X_test.copy()
 
         for target_name in self.feature_names:
-            pbar.refresh()
+            # pbar.refresh()
 
             # if correlation_th is not None then, remove features that are highly
             # correlated with the target, at each step of the loop
@@ -284,9 +286,10 @@ class ShapEstimator(BaseEstimator):
                 self._add_zeroes(
                     target_name, self.correlated_features[target_name])
 
-            pbar.update(1)
+            # pbar.update(1)
+            pbar.update_subtask()
 
-        pbar.close()
+        # pbar.close()
 
         self.all_mean_shap_values = np.array(
             self.all_mean_shap_values).flatten()
@@ -362,20 +365,23 @@ class ShapEstimator(BaseEstimator):
         self.mean_shap_threshold = np.quantile(
             self.all_mean_shap_values, self.mean_shap_percentile)
 
-        pbar = tqdm(
-            total=3+len(self.feature_names), **tqdm_params(
-                "Building graph from SHAPs", self.prog_bar, silent=self.silent))
-        pbar.refresh()
+        # pbar = tqdm(
+        #     total=3+len(self.feature_names), **tqdm_params(
+        #         "Building graph from SHAPs", self.prog_bar, silent=self.silent))
+        # pbar.refresh()
+        pbar = ProgBar().start_subtask(3 + len(self.feature_names))
 
         # Compute error contribution at this stage, since it needs the individual
         # SHAP values
         self.compute_error_contribution()
-        pbar.update(1)
-        pbar.refresh()
+        # pbar.update(1)
+        # pbar.refresh()
+        pbar.update_subtask()
 
         self._compute_discrepancies(self.X_test)
-        pbar.update(1)
-        pbar.refresh()
+        # pbar.update(1)
+        # pbar.refresh()
+        pbar.update_subtask()
 
         self.connections = {}
         for target in self.feature_names:
@@ -394,16 +400,18 @@ class ShapEstimator(BaseEstimator):
                 exhaustive=self.exhaustive,
                 threshold=self.mean_shap_threshold,
                 verbose=self.verbose)
-            pbar.update(1)
-            pbar.refresh()
+            # pbar.update(1)
+            # pbar.refresh()
+            pbar.update_subtask()
 
         G_shap = utils.digraph_from_connected_features(
             X, self.feature_names, self.models, self.connections, root_causes,
             reciprocity=self.reciprocity, anm_iterations=self.iters,
             verbose=self.verbose)
 
-        pbar.update(1)
-        pbar.close()
+        # pbar.update(1)
+        # pbar.close()
+        pbar.update_subtask()
 
         return G_shap
 
