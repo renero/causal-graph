@@ -15,7 +15,7 @@ and (hyper)parameter search, while facilitating testing (including some API
 compliance), documentation, open source development, packaging, and continuous
 integration.
 
-**NOTICE**: This library is still in development and should be used with caution.
+**NOTICE**: This library is still in development and should be used with caution. Feel free to contact me to provide more details on how to use it.
 
 The datasets used in the examples can be generated using the `generators` module,
 which is also part of this library. But in case you want to reproduce results from the
