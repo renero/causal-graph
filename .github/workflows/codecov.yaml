@@ -1,12 +1,10 @@
-name: Causal graph repo
+name: Causal graph tests and coverage
 
 on: [push, pull_request]
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -24,7 +22,7 @@ jobs:
 
       - name: Run tests and collect coverage
         run: |
-          pip install rich 
+          pip install rich
           pip install pytest
           pip install pytest-cov
           pytest --cov .

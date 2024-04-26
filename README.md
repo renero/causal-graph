@@ -5,8 +5,6 @@
 
 # causal-graph - A library to infer causal-effect relationships from continuous tabular data
 
-[scikit-learn](https://scikit-learn.org)
-
 **causal-graph** is a library that implements methods to extract the causal graph,
 from continuous tabular data.
 

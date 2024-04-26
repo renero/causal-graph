@@ -13,7 +13,7 @@ with open(ver_file) as f:
 
 DISTNAME = 'causalgraph'
 DESCRIPTION = 'A package to extract the causal graph from continuous tabular data.'
-with codecs.open('README.rst', encoding='utf-8-sig') as f:
+with codecs.open('README.md', encoding='utf-8-sig') as f:
     LONG_DESCRIPTION = f.read()
 MAINTAINER = 'J. Renero'
 MAINTAINER_EMAIL = 'jesus.renero@gmail.com'
