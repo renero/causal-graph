@@ -8,7 +8,6 @@ import warnings
 from copy import copy
 from typing import List, Tuple, Union
 
-import deprecated
 from mlforge import Pipeline
 import networkx as nx
 import numpy as np
