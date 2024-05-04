@@ -20,7 +20,7 @@ import pandas as pd
 import seaborn as sns
 import shap
 import torch
-from mlforge import ProgBar
+from mlforge.progbar import ProgBar
 from sklearn.cluster import DBSCAN
 from sklearn.preprocessing import StandardScaler
 

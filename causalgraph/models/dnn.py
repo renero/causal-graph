@@ -27,7 +27,7 @@ from sklearn.base import BaseEstimator
 from sklearn.preprocessing import StandardScaler
 from sklearn.utils.validation import check_is_fitted
 from torch.utils.data import DataLoader
-from mlforge import ProgBar
+from mlforge.progbar import ProgBar
 
 from causalgraph.common import GRAY, GREEN, RESET
 from causalgraph.explainability.hierarchies import Hierarchies

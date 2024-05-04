@@ -8,7 +8,7 @@ import warnings
 from copy import copy
 from typing import List, Tuple, Union
 
-from mlforge import Pipeline
+from mlforge.mlforge import Pipeline
 import networkx as nx
 import numpy as np
 import pandas as pd

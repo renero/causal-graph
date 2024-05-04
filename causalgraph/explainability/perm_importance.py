@@ -40,7 +40,7 @@ import numpy as np
 import pandas as pd
 import torch
 from matplotlib import pyplot as plt
-from mlforge import ProgBar
+from mlforge.progbar import ProgBar
 from sklearn.base import BaseEstimator
 from sklearn.inspection import permutation_importance
 from sklearn.preprocessing import StandardScaler

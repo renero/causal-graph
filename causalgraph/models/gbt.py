@@ -48,7 +48,7 @@ import optuna
 import pandas as pd
 from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.preprocessing import StandardScaler
-from mlforge import ProgBar
+from mlforge.progbar import ProgBar
 
 from causalgraph.explainability.hierarchies import Hierarchies
 

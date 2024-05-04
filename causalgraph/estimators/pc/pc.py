@@ -12,7 +12,7 @@ import networkx as nx
 import pandas as pd
 from joblib import Parallel, delayed
 from sklearn.preprocessing import StandardScaler
-from mlforge import ProgBar
+from mlforge.progbar import ProgBar
 
 from causalgraph.common import utils
 from causalgraph.estimators.pc.ci_tests import chi_square, pearsonr

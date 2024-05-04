@@ -24,7 +24,7 @@ import pandas as pd
 import networkx as nx
 from networkx import Graph
 from sklearn.discriminant_analysis import StandardScaler
-from mlforge import ProgBar
+from mlforge.progbar import ProgBar
 
 from causalgraph.common.utils import (graph_from_adjacency_file,
                                       graph_from_dot_file)

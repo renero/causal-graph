@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 from deprecated import deprecated
 from minepy import MINE, pstats
-from mlforge import ProgBar
+from mlforge.progbar import ProgBar
 
 
 def pairwise_mic(

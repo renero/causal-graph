@@ -13,7 +13,7 @@ import numpy as np
 import pygam
 from hyppo.independence import Hsic
 from pandas import DataFrame
-from mlforge import ProgBar
+from mlforge.progbar import ProgBar
 
 
 # pylint: disable=E1101:no-member, W0201:attribute-defined-outside-init, W0511:fixme

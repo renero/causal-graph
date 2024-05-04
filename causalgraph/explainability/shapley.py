@@ -34,7 +34,7 @@ from sklearn.discriminant_analysis import StandardScaler
 from sklearn.metrics import r2_score
 from sklearn.model_selection import train_test_split
 from sklearn.utils.validation import check_is_fitted
-from mlforge import ProgBar
+from mlforge.progbar import ProgBar
 # from tqdm.auto import tqdm
 
 from causalgraph.common import *

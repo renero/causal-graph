@@ -14,7 +14,7 @@ import itertools
 
 import networkx as nx
 import timeout_decorator
-from mlforge import ProgBar
+from mlforge.progbar import ProgBar
 
 from causalgraph.estimators.fci import rules
 from causalgraph.estimators.fci.debug import Debug

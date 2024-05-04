@@ -22,7 +22,7 @@ from networkx import DiGraph, Graph
 from pandas import DataFrame
 from pygam import pygam
 
-from mlforge import ProgBar
+from mlforge.progbar import ProgBar
 
 from causalgraph.common.utils import graph_from_adjacency_file
 from causalgraph.estimators.fci.initialization import (dsep_set_from_csv,
