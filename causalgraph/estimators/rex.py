@@ -6,7 +6,7 @@ Main class for the REX estimator.
 import os
 import warnings
 from copy import copy
-from typing import List, Tuple, Union
+from typing import Tuple, Union
 
 from mlforge.mlforge import Pipeline
 import networkx as nx
@@ -249,7 +249,7 @@ class Rex(BaseEstimator, ClassifierMixin):
         # Create a new pipeline for the prediction stages.
         prediction = Pipeline(
             self, description="Predicting causal graph", prog_bar=self.prog_bar,
-            verbose=self.verbose, silent=self.silent)
+            verbose=self.verbose, silent=self.silent, subtask=True)
 
         # Overwrite values for prog_bar and verbosity with current pipeline
         #  values, in case predict is called from a loaded experiment
@@ -315,6 +315,29 @@ class Rex(BaseEstimator, ClassifierMixin):
         """
         self.fit(train)
         self.predict(test, ref_graph)
+        return self
+
+    def custom_pipeline(self, steps):
+        """
+        Execute a pipeline formed by a list of custom steps previously defined.
+
+        Parameters
+        ----------
+        steps : list
+            A list of tuples with the steps to add to the pipeline.
+
+        Returns
+        -------
+        self : object
+            Returns self.
+        """
+        # Create the pipeline for the training stages.
+        pipeline = Pipeline(self, description="Custom pipeline", prog_bar=self.prog_bar,
+                            verbose=self.verbose, silent=self.silent, subtask=True)
+        pipeline.from_list(steps)
+        pipeline.run()
+        pipeline.close()
+
         return self
 
     def score(

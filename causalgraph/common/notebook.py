@@ -6,7 +6,7 @@ Example:
     >> from causalgraph.common.notebook import Experiment
     >> experiment = Experiment("linear", csv_filename="linear.csv")
     >> rex = experiment.load()
-    
+
 (C) 2023 J. Renero
 """
 
@@ -189,8 +189,8 @@ class BaseExperiment:
             csv_filename=None,
             dot_filename=None):
         """
-        - Loads the data and 
-        - splits it into train and test, 
+        - Loads the data and
+        - splits it into train and test,
         - scales it
         - loads the reference graph from the dot file, which has to be named
           as the experiment file, with the .dot extension
@@ -234,10 +234,10 @@ class BaseExperiment:
         experiment or not. The decision is based on the following rules:
 
         - If the experiment exists, it will be loaded unless train_anyway is True
-        - If the experiment does not exist, it will be trained unless train_anyway 
+        - If the experiment does not exist, it will be trained unless train_anyway
             is False
         - If the experiment exists, it will be saved unless save_anyway is False
-        - If the experiment does not exist, it will be saved unless save_anyway 
+        - If the experiment does not exist, it will be saved unless save_anyway
             is False
         """
         experiment_exists = self.experiment_exists(self.experiment_name)
@@ -285,7 +285,7 @@ class BaseExperiment:
         Dynamically creates an instance of a class based on the estimator name.
 
         Args:
-        estimator_name (str): The name of the estimator (key in the 'estimators' 
+        estimator_name (str): The name of the estimator (key in the 'estimators'
             dictionary).
         name (str): The name of the estimator instance.
         *args: Variable length argument list to be passed to the class constructor.
@@ -319,6 +319,7 @@ class Experiment(BaseExperiment):
         experiment_name,
         csv_filename: str = None,
         dot_filename: str = None,
+        model_type: str = 'nn',
         input_path="/Users/renero/phd/data/RC3/",
         output_path="/Users/renero/phd/output/RC3/",
         train_size: float = 0.9,
@@ -330,25 +331,28 @@ class Experiment(BaseExperiment):
 
         Args:
             experiment_name (str): The name of the experiment.
-            csv_filename (str, optional): The filename of the CSV file containing 
+            csv_filename (str, optional): The filename of the CSV file containing
                 the data. Defaults to None.
-            dot_filename (str, optional): The filename of the DOT file containing 
+            dot_filename (str, optional): The filename of the DOT file containing
                 the causal graph. Defaults to None.
-            input_path (str, optional): The path to the input data. 
+            model_type (str, optional): The type of model to use. Defaults to 'nn'.
+                Other options are: 'gbt', 'pc', 'fci', 'ges' and 'lingam'.
+            input_path (str, optional): The path to the input data.
                 Defaults to "/Users/renero/phd/data/RC3/".
-            output_path (str, optional): The path to save the output. 
+            output_path (str, optional): The path to save the output.
                 Defaults to "/Users/renero/phd/output/RC3/".
-            train_size (float, optional): The proportion of data to use for training. 
+            train_size (float, optional): The proportion of data to use for training.
                 Defaults to 0.9.
-            random_state (int, optional): The random seed for reproducibility. 
+            random_state (int, optional): The random seed for reproducibility.
                 Defaults to 42.
-            verbose (bool, optional): Whether to print verbose output.  
+            verbose (bool, optional): Whether to print verbose output.
                 Defaults to False.
         """
 
         super().__init__(
             input_path, output_path, train_size=train_size,
             random_state=random_state, verbose=verbose)
+        self.model_type = model_type
 
         # Prepare the input
         self.prepare_experiment_input(
@@ -381,7 +385,7 @@ class Experiment(BaseExperiment):
         Loads the experiment data.
 
         Args:
-            exp_name (str, optional): The name of the experiment to load. 
+            exp_name (str, optional): The name of the experiment to load.
             If None, loads the current experiment. Defaults to None.
 
         Returns:
@@ -391,7 +395,11 @@ class Experiment(BaseExperiment):
         if exp_name is None:
             exp_name = self.experiment_name
 
-        exp_object = load_experiment(exp_name, self.output_path)
+        if self.model_type:
+            exp_object = load_experiment(
+                f"{exp_name}_{self.model_type}", self.output_path)
+        else:
+            exp_object = load_experiment(exp_name, self.output_path)
 
         # A priori, I don't know which estimator was used to train the experiment
         # so I have to check the type of the object
@@ -423,9 +431,9 @@ class Experiment(BaseExperiment):
 
         Args:
         -----
-        - exp_name (str, optional): The name to save the experiment as. 
+        - exp_name (str, optional): The name to save the experiment as.
             If None, uses the experiment name. Defaults to None.
-        - overwrite (bool, optional): Whether to overwrite an existing 
+        - overwrite (bool, optional): Whether to overwrite an existing
             experiment with the same name. Defaults to False.
         """
         # estimator_object = getattr(self, self.estimator)
@@ -540,7 +548,7 @@ class Experiments(BaseExperiment):
             The estimator to use. Default is "rex". Other options are "pc", "lingam",
             "ges" and "fci".
         - save_as_pattern: str, optional
-            The pattern used to save the experiments. "*" will be replaced with the 
+            The pattern used to save the experiments. "*" will be replaced with the
             experiment name. If not provided, the experiment name will be used.
 
         Returns:
@@ -785,8 +793,8 @@ def plot_score_by_subtype(
         and the reference graph.
         - name (str): The name of the experiment.
     and stores one experiment per row.
-    - score_name (str): The name of the score to plot. Valid names are 'f1', 
-    'precision', 'recall', 'aupr', 'shd', 'sid', 'n_edges', 'ref_n_edges' and 
+    - score_name (str): The name of the score to plot. Valid names are 'f1',
+    'precision', 'recall', 'aupr', 'shd', 'sid', 'n_edges', 'ref_n_edges' and
     'diff_edges'.
     - methods (list, optional): The list of methods to plot. If None, all the methods
     will be plotted. The methods included are: 'rex_intersection', 'rex_union',
@@ -888,7 +896,7 @@ def plot_scores_by_method(
 
     Optional parameters:
     - figsize (tuple, optional): The size of the figure. Default is (7, 5).
-    - dpi (int, optional): The resolution of the figure in dots per inch. 
+    - dpi (int, optional): The resolution of the figure in dots per inch.
         Default is 300.
     - ylim (tuple, optional): The y-axis limits of the plot. Default is None.
 

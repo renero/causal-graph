@@ -220,8 +220,6 @@ class ShapEstimator(BaseEstimator):
         self.feature_order = {}
         self.all_mean_shap_values = []
 
-        # pbar = tqdm(total=len(self.feature_names),
-        #             **tqdm_params(self._fit_desc, self.prog_bar, silent=self.silent))
         pbar = ProgBar().start_subtask(len(self.feature_names))
 
         self.X_train, self.X_test = train_test_split(
@@ -365,22 +363,14 @@ class ShapEstimator(BaseEstimator):
         self.mean_shap_threshold = np.quantile(
             self.all_mean_shap_values, self.mean_shap_percentile)
 
-        # pbar = tqdm(
-        #     total=3+len(self.feature_names), **tqdm_params(
-        #         "Building graph from SHAPs", self.prog_bar, silent=self.silent))
-        # pbar.refresh()
         pbar = ProgBar().start_subtask(3 + len(self.feature_names))
 
         # Compute error contribution at this stage, since it needs the individual
         # SHAP values
         self.compute_error_contribution()
-        # pbar.update(1)
-        # pbar.refresh()
         pbar.update_subtask()
 
         self._compute_discrepancies(self.X_test)
-        # pbar.update(1)
-        # pbar.refresh()
         pbar.update_subtask()
 
         self.connections = {}
@@ -400,17 +390,12 @@ class ShapEstimator(BaseEstimator):
                 exhaustive=self.exhaustive,
                 threshold=self.mean_shap_threshold,
                 verbose=self.verbose)
-            # pbar.update(1)
-            # pbar.refresh()
             pbar.update_subtask()
 
         G_shap = utils.digraph_from_connected_features(
             X, self.feature_names, self.models, self.connections, root_causes,
             reciprocity=self.reciprocity, anm_iterations=self.iters,
             verbose=self.verbose)
-
-        # pbar.update(1)
-        # pbar.close()
         pbar.update_subtask()
 
         return G_shap
