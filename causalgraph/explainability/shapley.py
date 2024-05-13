@@ -18,7 +18,6 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Union
 
-import matplotlib as mpl
 import networkx as nx
 import numpy as np
 import pandas as pd
@@ -599,7 +598,8 @@ class ShapEstimator(BaseEstimator):
                         # If reversing the edge creates a cycle that includes both
                         # the target and feature nodes, reverse the edge back to
                         # its original direction and log the decision as discarded.
-                        if len(cycles) > 0 and self._nodes_in_cycles(cycles, feature, target):
+                        if len(cycles) > 0 and \
+                            self._nodes_in_cycles(cycles, feature, target):
                             new_graph.remove_edge(target, feature)
                             edges_reversed.remove((feature, target))
                             new_graph.add_edge(feature, target)
