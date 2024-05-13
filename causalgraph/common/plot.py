@@ -14,6 +14,7 @@ This file includes all the plot methods for the causal graph
 from copy import copy
 from typing import Any, Callable, List, Tuple
 
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
@@ -27,6 +28,7 @@ from matplotlib.ticker import MultipleLocator
 from pydot import Dot
 from scipy.cluster.hierarchy import dendrogram
 from sklearn.base import BaseEstimator
+from sklearn.preprocessing import StandardScaler
 
 from causalgraph.metrics.compare_graphs import evaluate_graph
 
@@ -749,7 +751,7 @@ def shap_values(shaps: BaseEstimator, **kwargs):
 def shap_discrepancies(
         shaps: BaseEstimator,
         target_name: str,
-        threshold: float=+100.0,
+        threshold: float = +100.0,
         **kwargs):
     """
     Plot the discrepancies of the SHAP values.
@@ -774,4 +776,133 @@ def shap_discrepancies(
 
     """
     assert shaps.is_fitted_, "Model not fitted yet"
-    shaps._plot_discrepancies(target_name, threshold, **kwargs)
+    # shaps._plot_discrepancies(target_name, threshold, **kwargs)
+    mpl.rcParams['figure.dpi'] = kwargs.get('dpi', 75)
+    pdf_filename = kwargs.get('pdf_filename', None)
+    feature_names = [
+        f for f in shaps.feature_names if (
+            (f != target_name) and
+            ((1. - shaps.shap_discrepancies[target_name][f].shap_gof) < threshold)
+        )
+    ]
+    # If no features are found, gracefully return
+    if not feature_names:
+        print(f"No features with discrepancy index below {threshold} found "
+              f"for target {target_name}.")
+        return
+
+    # Set the height of the figure to 18 unless there're less than 9 features,
+    # in which case, the height is 18/(9 - len(feature_names)).
+    if len(feature_names) < 9:
+        height = 2*len(feature_names)
+    else:
+        height = 16
+    figsize_ = kwargs.get('figsize', (10, height))
+    fig, ax = plt.subplots(len(feature_names), 4, figsize=figsize_)
+
+    # If the number of features is 1, I must keep ax indexable, so I put it
+    # in a list.
+    if len(feature_names) == 1:
+        ax = [ax]
+
+    for i, parent_name in enumerate(feature_names):
+        r = shaps.shap_discrepancies[target_name][parent_name]
+        x = shaps.X_test[parent_name].values.reshape(-1, 1)
+        y = shaps.X_test[target_name].values.reshape(-1, 1)
+        parent_pos = feature_names.index(parent_name)
+        s = shaps.shap_scaled_values[target_name][:,
+                                                  parent_pos].reshape(-1, 1)
+        _plot_discrepancy(x, y, s, target_name, parent_name, r, ax[i])
+
+    plt.suptitle(f"Discrepancies for {target_name}")
+
+    if pdf_filename is not None:
+        plt.tight_layout(rect=[0, 0.0, 1, 0.97])
+        plt.savefig(pdf_filename, bbox_inches='tight')
+        plt.close()
+    else:
+        plt.tight_layout(rect=[0, 0.0, 1, 0.97])
+        fig.show()
+
+
+def _plot_discrepancy(x, y, s, target_name, parent_name, r, ax):
+    """
+    Plot the discrepancy between target and SHAP values.
+
+    Args:
+        x (array-like): The x-axis values.
+        y (array-like): The target values.
+        s (array-like): The SHAP values.
+        target_name (str): The name of the target variable.
+        parent_name (str): The name of the parent variable.
+        r (object): The result object containing model parameters and statistics.
+        ax (array-like): The array of subplots.
+
+    Returns:
+        None
+    """
+    def _remove_ticks_and_box(ax):
+        ax.set_xticks([])
+        ax.set_xticklabels([])
+        ax.set_yticks([])
+        ax.set_yticklabels([])
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['left'].set_visible(False)
+
+    b0_s, b1_s = r.shap_model.params[0], r.shap_model.params[1]
+    b0_y, b1_y = r.parent_model.params[0], r.parent_model.params[1]
+
+    mpl.rc('text', usetex=True)
+    mpl.rc('text.latex', preamble=r'\usepackage{amsmath}')
+    # mpl.rcParams["mathtext.fontset"] = "cm"
+
+    # Represent scatter plots
+    ax[0].scatter(x, s, alpha=0.5, marker='+')
+    ax[0].scatter(x, y, alpha=0.5, marker='.')
+    ax[0].plot(x, b1_s * x + b0_s, color='blue', linewidth=.5)
+    ax[0].plot(x, b1_y * x + b0_y, color='red', linewidth=.5)
+    ax[0].set_title(
+        r'$ [X_i | \phi_j]\ \textrm{vs}\ X_j $',
+        fontsize=10)
+    # ax[0].set_title(
+    #     f'$m_s$:{math.atan(b1_s)*K:.1f}°; $m_y$:{math.atan(b1_y)*K:.1f}°',
+    #     fontsize=10)
+    ax[0].set_xlabel(f'${parent_name}$')
+    ax[0].set_ylabel(
+        fr'$ \mathrm{{{target_name}}} / \phi_{{{parent_name}}} $')
+
+    # Represent distributions
+    pd.DataFrame(s).plot(kind='density', ax=ax[1], label="shap")
+    pd.DataFrame(y).plot(kind='density', ax=ax[1], label="parent")
+    ax[1].legend().set_visible(False)
+    ax[1].set_ylabel('')
+    ax[1].set_xlabel(
+        fr'$ \mathrm{{{target_name}}} /  \phi_{{{parent_name}}} $')
+    ax[1].set_title(rf'$\mathrm{{KS}}({r.ks_pvalue:.2g})$', fontsize=10)
+
+    # Represent fitted vs. residuals
+    s_resid = r.shap_model.get_influence().resid_studentized_internal
+    y_resid = r.parent_model.get_influence().resid_studentized_internal
+    scaler = StandardScaler()
+    s_fitted_scaled = scaler.fit_transform(
+        r.shap_model.fittedvalues.reshape(-1, 1))
+    y_fitted_scaled = scaler.fit_transform(
+        r.parent_model.fittedvalues.reshape(-1, 1))
+    ax[2].scatter(s_fitted_scaled, s_resid, alpha=0.5, marker='+')
+    ax[2].scatter(y_fitted_scaled, y_resid, alpha=0.5,
+                    marker='.', color='tab:orange')
+    ax[2].set_title(r'$\mathrm{Residuals}$', fontsize=10)
+    ax[2].set_xlabel(
+        rf'$ \mathrm{{{target_name}}} /  \phi_{{{parent_name}}} $')
+    ax[2].set_ylabel(rf'$ \epsilon_{{{target_name}}} / \epsilon_\phi $')
+
+    # Represent target vs. SHAP values
+    ax[3].scatter(s, y, alpha=0.3, marker='.', color='tab:green')
+    ax[3].set_title(
+        rf'$\Delta \rho: {1 - r.shap_gof:.2f}$', fontsize=10)
+    ax[3].set_xlabel(fr'$ \phi_{{{parent_name}}} $')
+    ax[3].set_ylabel(fr'$ \mathrm{{{target_name}}} $')
+
+    for ax_idx in range(4):
+        _remove_ticks_and_box(ax[ax_idx])
