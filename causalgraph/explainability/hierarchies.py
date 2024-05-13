@@ -1,7 +1,7 @@
 """
 Hierarchy of links
 
-Can I use the information above to decide wether to connect groups 
+Can I use the information above to decide wether to connect groups
 of variables linked together?
 
 """
@@ -24,7 +24,6 @@ from scipy.cluster.hierarchy import dendrogram, fcluster, linkage
 from scipy.spatial.distance import squareform
 
 from causalgraph.independence.mic import pairwise_mic
-from causalgraph.common import plot
 
 
 class Hierarchies:
@@ -34,7 +33,7 @@ class Hierarchies:
     Parameters
     ----------
     method : str or Callable, optional
-        Method to use to compute the correlation. Default is 'spearman', but can 
+        Method to use to compute the correlation. Default is 'spearman', but can
         also be 'pearson', 'kendall' or 'mic'.
     alpha : float, optional
         Threshold for the correlation. Default is 0.6.
@@ -71,7 +70,7 @@ class Hierarchies:
         Parameters
         ----------
         method : str or Callable, optional
-            Method to use to compute the correlation. Default is 'spearman', 
+            Method to use to compute the correlation. Default is 'spearman',
             but can also be 'pearson', 'kendall' or 'mic'.
         mic_alpha : float, optional
             Threshold for the correlation. Default is 0.6.
@@ -100,7 +99,7 @@ class Hierarchies:
 
     def fit(self, X: pd.DataFrame):
         """
-        Compute the hierarchy of links between variables using the correlation 
+        Compute the hierarchy of links between variables using the correlation
         method specified in `corr_method`.
 
         Parameters
@@ -150,7 +149,7 @@ class Hierarchies:
         data : pd.DataFrame
             The input data.
         method : str or Callable, optional
-            Method to use to compute the correlation. Default is 'spearman', 
+            Method to use to compute the correlation. Default is 'spearman',
             but can also be 'pearson', 'kendall' or 'mic'.
         prog_bar : bool, optional
             Whether to show a progress bar during computation. Default is False.
@@ -209,9 +208,9 @@ class Hierarchies:
 
     def expand_clusters_perm_importance(self, pi, ground_truth=None):
         """
-        Expand the clusters of the linkage matrix to include the features that are 
+        Expand the clusters of the linkage matrix to include the features that are
         in the same cluster in the permutation importance matrix.
-        It expands, for each cluster, with the metrics related to correlation, 
+        It expands, for each cluster, with the metrics related to correlation,
         deltas, backward PI, etc. Used to determine if some criteria can be extracted.
 
         Parameters
@@ -268,7 +267,7 @@ class Hierarchies:
 
     def _cluster_features(self, method, threshold):
         """
-        Cluster the features of the data based on the linkage matrix obtained 
+        Cluster the features of the data based on the linkage matrix obtained
         from the hierarchical clustering.
 
         Parameters
@@ -493,9 +492,9 @@ class Hierarchies:
         ----------
             - clusters (List[str])
                 List of clusters.
-            - node1 (str)   
+            - node1 (str)
                 First node.
-            - node2 (str)   
+            - node2 (str)
                 Second node.
 
         Returns
@@ -524,26 +523,6 @@ class Hierarchies:
                 return disimilarity
         return None
 
-    def plot(self, threshold=0.5, **kwargs):
-        """
-        Plot the hierarchical clustering and correlation matrix of the data.
-
-        https://www.kaggle.com/code/sgalella/correlation-heatmaps-with-hierarchical-clustering/notebook
-        """
-        f_size = kwargs.get('figsize', (9, 4))
-        _, (ax1, ax2) = plt.subplots(nrows=1, ncols=2, figsize=f_size)
-        dendrogram(self.linkage_mat, labels=self.data.columns, orientation='top',
-                   leaf_rotation=90, ax=ax1)
-        ax1.set_title('Hierarchical Clustering Dendrogram')
-        ax1.set_ylabel("Dissimilarity")
-        ax1.set_ylim(0, 1)
-
-        correlations, sorted_colnames = self._cluster_features(
-            "spearman", threshold)
-        plot.correlations(
-            correlations, sorted_colnames, threshold, ax2, **kwargs)
-
-
 def _get_directed_pair(g, u, v):
     if g.has_edge(u, v) and not g.has_edge(v, u):
         return (u, v)
@@ -565,9 +544,9 @@ def _get_direction(g: nx.DiGraph, u: str, v: str) -> Tuple[str, Union[int, None]
 
     Returns:
     --------
-        - (str, int): A string respresenting the direction of the edge 
-            between u and v, and an integer representing it. The string 
-            can be either '-->', '<--', '<->' or ' · '. And the integer 
+        - (str, int): A string respresenting the direction of the edge
+            between u and v, and an integer representing it. The string
+            can be either '-->', '<--', '<->' or ' · '. And the integer
             can be either 1, -1, 0 or None for each possibility.
 
     """

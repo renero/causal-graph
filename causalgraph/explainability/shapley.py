@@ -18,7 +18,6 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Union
 
-import matplotlib as mpl
 import networkx as nx
 import numpy as np
 import pandas as pd
@@ -39,7 +38,6 @@ from mlforge.progbar import ProgBar
 
 from causalgraph.common import *
 from causalgraph.common import utils
-from causalgraph.common import plot
 from causalgraph.explainability.hierarchies import Hierarchies
 from causalgraph.independence.feature_selection import select_features
 
@@ -220,8 +218,6 @@ class ShapEstimator(BaseEstimator):
         self.feature_order = {}
         self.all_mean_shap_values = []
 
-        # pbar = tqdm(total=len(self.feature_names),
-        #             **tqdm_params(self._fit_desc, self.prog_bar, silent=self.silent))
         pbar = ProgBar().start_subtask(len(self.feature_names))
 
         self.X_train, self.X_test = train_test_split(
@@ -365,22 +361,14 @@ class ShapEstimator(BaseEstimator):
         self.mean_shap_threshold = np.quantile(
             self.all_mean_shap_values, self.mean_shap_percentile)
 
-        # pbar = tqdm(
-        #     total=3+len(self.feature_names), **tqdm_params(
-        #         "Building graph from SHAPs", self.prog_bar, silent=self.silent))
-        # pbar.refresh()
         pbar = ProgBar().start_subtask(3 + len(self.feature_names))
 
         # Compute error contribution at this stage, since it needs the individual
         # SHAP values
         self.compute_error_contribution()
-        # pbar.update(1)
-        # pbar.refresh()
         pbar.update_subtask()
 
         self._compute_discrepancies(self.X_test)
-        # pbar.update(1)
-        # pbar.refresh()
         pbar.update_subtask()
 
         self.connections = {}
@@ -400,17 +388,12 @@ class ShapEstimator(BaseEstimator):
                 exhaustive=self.exhaustive,
                 threshold=self.mean_shap_threshold,
                 verbose=self.verbose)
-            # pbar.update(1)
-            # pbar.refresh()
             pbar.update_subtask()
 
         G_shap = utils.digraph_from_connected_features(
             X, self.feature_names, self.models, self.connections, root_causes,
             reciprocity=self.reciprocity, anm_iterations=self.iters,
             verbose=self.verbose)
-
-        # pbar.update(1)
-        # pbar.close()
         pbar.update_subtask()
 
         return G_shap
@@ -615,7 +598,8 @@ class ShapEstimator(BaseEstimator):
                         # If reversing the edge creates a cycle that includes both
                         # the target and feature nodes, reverse the edge back to
                         # its original direction and log the decision as discarded.
-                        if len(cycles) > 0 and self._nodes_in_cycles(cycles, feature, target):
+                        if len(cycles) > 0 and \
+                            self._nodes_in_cycles(cycles, feature, target):
                             new_graph.remove_edge(target, feature)
                             edges_reversed.remove((feature, target))
                             new_graph.add_edge(feature, target)
@@ -848,124 +832,22 @@ class ShapEstimator(BaseEstimator):
         fig = ax.figure if fig is None else fig
         return fig
 
-    def _plot_discrepancies(self, target_name: str, **kwargs):
+    def _plot_discrepancies(self, target_name: str, threshold:float=10.0, **kwargs):
         """
         Plot the discrepancies between the target variable and each feature.
 
-        Args:
-            target_name (str): The name of the target variable.
-            **kwargs: Additional keyword arguments for configuring the plot.
+        Parameters
+        ----------
+        - target_name (str)
+            The name of the target variable.
+        - threshold (float)
+            The threshold to use for selecting what features to plot. Only
+            features with a discrepancy index below this threshold will be plotted.
 
         Returns:
             None
         """
-        mpl.rcParams['figure.dpi'] = kwargs.get('dpi', 75)
-        figsize_ = kwargs.get('figsize', (10, 16))
-        pdf_filename = kwargs.get('pdf_filename', None)
-        feature_names = [
-            f for f in self.feature_names if f != target_name]
-        fig, ax = plt.subplots(len(feature_names), 4, figsize=figsize_)
-
-        for i, parent_name in enumerate(feature_names):
-            r = self.shap_discrepancies[target_name][parent_name]
-            x = self.X_test[parent_name].values.reshape(-1, 1)
-            y = self.X_test[target_name].values.reshape(-1, 1)
-            parent_pos = feature_names.index(parent_name)
-            s = self.shap_scaled_values[target_name][:,
-                                                     parent_pos].reshape(-1, 1)
-            self._plot_discrepancy(x, y, s, target_name, parent_name, r, ax[i])
-
-        plt.suptitle(f"Discrepancies for {target_name}")
-
-        if pdf_filename is not None:
-            plt.tight_layout(rect=[0, 0.0, 1, 0.97])
-            plt.savefig(pdf_filename, bbox_inches='tight')
-            plt.close()
-        else:
-            plt.tight_layout(rect=[0, 0.0, 1, 0.97])
-            fig.show()
-
-    def _plot_discrepancy(self, x, y, s, target_name, parent_name, r, ax):
-        """
-        Plot the discrepancy between target and SHAP values.
-
-        Args:
-            x (array-like): The x-axis values.
-            y (array-like): The target values.
-            s (array-like): The SHAP values.
-            target_name (str): The name of the target variable.
-            parent_name (str): The name of the parent variable.
-            r (object): The result object containing model parameters and statistics.
-            ax (array-like): The array of subplots.
-
-        Returns:
-            None
-        """
-        def _remove_ticks_and_box(ax):
-            ax.set_xticks([])
-            ax.set_xticklabels([])
-            ax.set_yticks([])
-            ax.set_yticklabels([])
-            ax.spines['top'].set_visible(False)
-            ax.spines['right'].set_visible(False)
-            ax.spines['left'].set_visible(False)
-
-        b0_s, b1_s = r.shap_model.params[0], r.shap_model.params[1]
-        b0_y, b1_y = r.parent_model.params[0], r.parent_model.params[1]
-
-        mpl.rc('text', usetex=True)
-        mpl.rc('text.latex', preamble=r'\usepackage{amsmath}')
-        # mpl.rcParams["mathtext.fontset"] = "cm"
-
-        # Represent scatter plots
-        ax[0].scatter(x, s, alpha=0.5, marker='+')
-        ax[0].scatter(x, y, alpha=0.5, marker='.')
-        ax[0].plot(x, b1_s * x + b0_s, color='blue', linewidth=.5)
-        ax[0].plot(x, b1_y * x + b0_y, color='red', linewidth=.5)
-        ax[0].set_title(
-            r'$ [X_i | \phi_j]\ \textrm{vs}\ X_j $',
-            fontsize=10)
-        # ax[0].set_title(
-        #     f'$m_s$:{math.atan(b1_s)*K:.1f}°; $m_y$:{math.atan(b1_y)*K:.1f}°',
-        #     fontsize=10)
-        ax[0].set_xlabel(f'${parent_name}$')
-        ax[0].set_ylabel(
-            fr'$ \mathrm{{{target_name}}} / \phi_{{{parent_name}}} $')
-
-        # Represent distributions
-        pd.DataFrame(s).plot(kind='density', ax=ax[1], label="shap")
-        pd.DataFrame(y).plot(kind='density', ax=ax[1], label="parent")
-        ax[1].legend().set_visible(False)
-        ax[1].set_ylabel('')
-        ax[1].set_xlabel(
-            fr'$ \mathrm{{{target_name}}} /  \phi_{{{parent_name}}} $')
-        ax[1].set_title(rf'$\mathrm{{KS}}({r.ks_pvalue:.2g})$', fontsize=10)
-
-        # Represent fitted vs. residuals
-        s_resid = r.shap_model.get_influence().resid_studentized_internal
-        y_resid = r.parent_model.get_influence().resid_studentized_internal
-        scaler = StandardScaler()
-        s_fitted_scaled = scaler.fit_transform(
-            r.shap_model.fittedvalues.reshape(-1, 1))
-        y_fitted_scaled = scaler.fit_transform(
-            r.parent_model.fittedvalues.reshape(-1, 1))
-        ax[2].scatter(s_fitted_scaled, s_resid, alpha=0.5, marker='+')
-        ax[2].scatter(y_fitted_scaled, y_resid, alpha=0.5,
-                      marker='.', color='tab:orange')
-        ax[2].set_title(r'$\mathrm{Residuals}$', fontsize=10)
-        ax[2].set_xlabel(
-            rf'$ \mathrm{{{target_name}}} /  \phi_{{{parent_name}}} $')
-        ax[2].set_ylabel(rf'$ \epsilon_{{{target_name}}} / \epsilon_\phi $')
-
-        # Represent target vs. SHAP values
-        ax[3].scatter(s, y, alpha=0.3, marker='.', color='tab:green')
-        ax[3].set_title(
-            rf'$\Delta \rho: {1 - r.shap_gof:.2f}$', fontsize=10)
-        ax[3].set_xlabel(fr'$ \phi_{{{parent_name}}} $')
-        ax[3].set_ylabel(fr'$ \mathrm{{{target_name}}} $')
-
-        for ax_idx in range(4):
-            _remove_ticks_and_box(ax[ax_idx])
+        pass
 
 
 def custom_main(exp_name):
