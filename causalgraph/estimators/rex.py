@@ -6,7 +6,7 @@ Main class for the REX estimator.
 import os
 import warnings
 from copy import copy
-from typing import Tuple, Union
+from typing import List, Tuple, Union
 
 from mlforge.mlforge import Pipeline
 import networkx as nx
@@ -129,6 +129,7 @@ class Rex(BaseEstimator, ClassifierMixin):
                     be saved. Default is None, producing no pdf file.
         """
         self.name = name
+        self.prior = None
         self.hpo_study_name = kwargs.get(
             'hpo_study_name', f"{self.name}_{model_type}")
         self.model_type = NNRegressor if model_type == "nn" else GBTRegressor
@@ -197,7 +198,7 @@ class Rex(BaseEstimator, ClassifierMixin):
         Returns
         -------
         self : object
-            Returns self.
+            Returns self
         """
         self.random_state_state = check_random_state(self.random_state)
         self.n_features_in_ = X.shape[1]
@@ -230,21 +231,60 @@ class Rex(BaseEstimator, ClassifierMixin):
         pipeline.close()
         return self
 
-    def predict(self, X: pd.DataFrame, ref_graph: nx.DiGraph = None):
+    def predict(self,
+                X: pd.DataFrame,
+                ref_graph: nx.DiGraph = None,
+                prior: List[List[str]] = None):
         """
         Predicts the causal graph from the given data.
 
         Parameters
         ----------
-        X : {array-like, sparse matrix}, shape (n_samples, n_features)
+        - X : {array-like, sparse matrix}, shape (n_samples, n_features)
             The input samples.
+        - ref_graph: nx.DiGraph
+            The reference graph, or ground truth.
+        - prior: str
+            The prior to use for building the DAG. This prior is a list of lists
+            of node/feature names, ordered according to a temporal structure so that
+            the first list contains the first set of nodes to be considered as
+            root causes, the second list contains the set of nodes to be
+            considered as potential effects of the first set, and the nodes in this
+            second list, and so on. The number of lists in the prior is the depth of
+            the conditioning sequence. This prior imposes the rule that the nodes in
+            the first list are the only ones that can be root causes, and the nodes
+            in the following lists cannot be the cause of the nodes in the previous
+            lists. If the prior is not provided, the DAG is built without any prior
+            information.
 
         Returns
         -------
-        y : ndarray, shape (n_samples,)
-            Returns an array of ones.
+        - G_final : nx.DiGraph
+            The final graph, after the correction stage.
+
+        Examples
+        --------
+        In the following example, where four features are used, the prior is
+        defined as [['A', 'B'], ['C', 'D']], which means that the first set of
+        features to be considered as root causes are 'A' and 'B', and the second
+        set of features to be considered as potential effects of the first set are
+        'C' and 'D'.
+
+        The resulting DAG cannot contain any edge from 'C' or 'D' to 'A' or 'B'.
+
+            ```python
+            rex.predict(X_test, ref_graph, prior=[['A', 'B'], ['C', 'D']])
+            ```
         """
         check_is_fitted(self, "is_fitted_")
+
+        # Check that prior is a list of lists and does not contain repeated elements.
+        if prior is not None:
+            if not isinstance(prior, list):
+                raise ValueError("The prior must be a list of lists.")
+            if any([len(p) != len(set(p)) for p in prior]):
+                raise ValueError("The prior cannot contain repeated elements.")
+            self.prior = prior
 
         # Create a new pipeline for the prediction stages.
         prediction = Pipeline(
@@ -257,7 +297,7 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.shaps.verbose = self.verbose
 
         steps = [
-            ('G_shap', 'shaps.predict', {'root_causes': 'root_causes'}),
+            ('G_shap', 'shaps.predict', {'root_causes': 'root_causes', 'prior': prior}),
             ('G_pi', 'pi.predict', {'root_causes': 'root_causes'}),
             ('indep', GraphIndependence, {'base_graph': 'G_shap'}),
             ('G_indep', 'indep.fit_predict'),
@@ -292,7 +332,8 @@ class Rex(BaseEstimator, ClassifierMixin):
             self,
             train: pd.DataFrame,
             test: pd.DataFrame,
-            ref_graph: nx.DiGraph):
+            ref_graph: nx.DiGraph,
+            prior: List[List[str]] = None):
         """
         Fit the model according to the given training data and predict
         the outcome of the treatment.
@@ -314,7 +355,7 @@ class Rex(BaseEstimator, ClassifierMixin):
             The final graph, after the correction stage.
         """
         self.fit(train)
-        self.predict(test, ref_graph)
+        self.predict(test, ref_graph, prior)
         return self
 
     def custom_pipeline(self, steps):
@@ -475,7 +516,9 @@ def custom_main(dataset_name,
         name=dataset_name, tune_model=tune_model,
         model_type=model_type, explainer=explainer)
 
-    rex.fit_predict(train, test, ref_graph)
+    rex.fit_predict(train, test, ref_graph,
+                    prior=[['V0', 'V1', 'V3', 'V4', 'V5'],
+                           ['V2', 'V6', 'V7', 'V8', 'V9']])
 
     if save:
         where_to = utils.save_experiment(rex.name, output_path, rex)
