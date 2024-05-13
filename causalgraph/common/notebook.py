@@ -443,6 +443,8 @@ class Experiment(BaseExperiment):
         if self.verbose:
             print(f"Saved '{self.experiment_name}' to '{where_to}'")
 
+        return where_to
+
 
 class Experiments(BaseExperiment):
     """

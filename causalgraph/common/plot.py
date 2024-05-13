@@ -25,10 +25,10 @@ from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.colors import ListedColormap
 from matplotlib.ticker import MultipleLocator
 from pydot import Dot
+from scipy.cluster.hierarchy import dendrogram
 from sklearn.base import BaseEstimator
 
 from causalgraph.metrics.compare_graphs import evaluate_graph
-
 
 # Defaults for the graphs plotted
 formatting_kwargs = {
@@ -324,7 +324,7 @@ def set_colormap(
 
     Returns
     -------
-    LinearColormap 
+    LinearColormap
         The colormap to be used in the plot.
     """
     cw = plt.get_cmap(cmap_name)
@@ -418,11 +418,11 @@ def values_distribution(values, threshold=None, **kwargs):
     plt.show()
 
 
-def correlations(
+def correlation_matrix(
         corr_matrix: pd.DataFrame,
-        sorted_colnames: List[str],
-        threshold: float,
-        ax: axes.Axes,
+        sorted_colnames: List[str] = None,
+        threshold: float = 0.5,
+        ax: axes.Axes = None,
         **kwargs) -> None:
     """
     Plot the correlation matrix of the data.
@@ -432,16 +432,20 @@ def correlations(
         - corrs (pd.DataFrame)
             Correlation matrix.
         - sorted_colnames (List[str])
-            List of sorted column names.
+            List of sorted column names. If the dataframe contains the names of
+                columns already sorted, then no need to pass this argument.
         - threshold (float)
-            Threshold for the correlation.
+            Threshold for the correlation. Values below this threshold will
+                not be displayed
         - ax (matplotlib.axes.Axes)
-            Axes to plot the correlation matrix.
+            Axes to plot the correlation matrix, in case this is a plot to be
+                embedded in a subplot. Otherwise, a new figure will be created and
+                this argument is not necessary.
         - **kwargs
             Keyword arguments to be passed to the plot_dendogram function.
             - title (str)
                 Title of the plot.
-            - fontsize (int)    
+            - fontsize (int)
                 Font size for the labels.
             - fontname (str)
                 Font name for the labels.
@@ -452,6 +456,12 @@ def correlations(
     -------
         None
     """
+    if sorted_colnames is None:
+        sorted_colnames = corr_matrix.columns
+
+    if ax is None:
+        _, ax = plt.subplots()
+
     title = kwargs.get('title', 'Correlation matrix')
     fontsize = kwargs.get('fontsize', 9)
     fontname = kwargs.get('fontname', "Arial")
@@ -500,6 +510,54 @@ def correlations(
     ax.spines['left'].set_edgecolor('grey')
     ax.spines['bottom'].set_linewidth(.3)
     ax.set_title(title)
+
+
+def hierarchies(hierarchies, threshold=0.5, **kwargs):
+    """
+    Plot the hierarchical clustering and correlation matrix of the data.
+
+    https://www.kaggle.com/code/sgalella/correlation-heatmaps-with-hierarchical-clustering/notebook
+
+    Parameters
+    ----------
+        - hierarchies (HierarchicalClustering)
+            Hierarchical clustering object.
+        - threshold (float)
+            Threshold for the correlation.
+        - **kwargs
+            Additional keyword arguments to be passed to the correlation_matrix function.
+
+    Returns
+    -------
+        None
+
+    Example
+    -------
+    ```python
+    from causalgraph.common.notebook import Experiment
+    from causalgraph.common import plot
+
+
+    dataset_name = "my_dataset"
+    output_path = "output"
+
+    experiment = Experiment(dataset_name, output_path=output_path).load()
+    rex = experiment.rex
+    plot.correlations(rex.hierarchies)
+    ```
+    """
+    f_size = kwargs.get('figsize', (9, 4))
+    _, (ax1, ax2) = plt.subplots(nrows=1, ncols=2, figsize=f_size)
+    dendrogram(hierarchies.linkage_mat, labels=hierarchies.data.columns,
+               orientation='top', leaf_rotation=90, ax=ax1)
+    ax1.set_title('Hierarchical Clustering Dendrogram')
+    ax1.set_ylabel("Dissimilarity")
+    ax1.set_ylim(0, 1)
+
+    correlations, sorted_colnames = hierarchies._cluster_features(
+        "spearman", threshold)
+    correlation_matrix(
+        correlations, sorted_colnames, threshold, ax2, **kwargs)
 
 
 def dag(
