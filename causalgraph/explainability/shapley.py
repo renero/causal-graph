@@ -833,23 +833,46 @@ class ShapEstimator(BaseEstimator):
         fig = ax.figure if fig is None else fig
         return fig
 
-    def _plot_discrepancies(self, target_name: str, **kwargs):
+    def _plot_discrepancies(self, target_name: str, threshold:float=10.0, **kwargs):
         """
         Plot the discrepancies between the target variable and each feature.
 
-        Args:
-            target_name (str): The name of the target variable.
-            **kwargs: Additional keyword arguments for configuring the plot.
+        Parameters
+        ----------
+        - target_name (str)
+            The name of the target variable.
+        - threshold (float)
+            The threshold to use for selecting what features to plot. Only
+            features with a discrepancy index below this threshold will be plotted.
 
         Returns:
             None
         """
         mpl.rcParams['figure.dpi'] = kwargs.get('dpi', 75)
-        figsize_ = kwargs.get('figsize', (10, 16))
         pdf_filename = kwargs.get('pdf_filename', None)
         feature_names = [
-            f for f in self.feature_names if f != target_name]
+            f for f in self.feature_names if ((f != target_name) and\
+                ((1. - self.shap_discrepancies[target_name][f].shap_gof) < threshold))
+        ]
+        # If no features are found, gracefully return
+        if not feature_names:
+            print(f"No features with discrepancy index below {threshold} found "
+                  f"for target {target_name}.")
+            return
+
+        # Set the height of the figure to 18 unless there're less than 9 features,
+        # in which case, the height is 18/(9 - len(feature_names)).
+        if len(feature_names) < 9:
+            height = 2*len(feature_names)
+        else:
+            height = 16
+        figsize_ = kwargs.get('figsize', (10, height))
         fig, ax = plt.subplots(len(feature_names), 4, figsize=figsize_)
+
+        # If the number of features is 1, I must keep ax indexable, so I put it
+        # in a list.
+        if len(feature_names) == 1:
+            ax = [ax]
 
         for i, parent_name in enumerate(feature_names):
             r = self.shap_discrepancies[target_name][parent_name]

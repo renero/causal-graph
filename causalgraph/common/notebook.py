@@ -503,7 +503,8 @@ class Experiments(BaseExperiment):
 
         Returns:
         - dict
-            A dictionary containing the loaded experiments, where the keys are the experiment names.
+            A dictionary containing the loaded experiments, where the keys are the
+                experiment names.
         """
         if pattern is not None:
             pickle_files = self.list_files(pattern, where='output')

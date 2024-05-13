@@ -746,6 +746,32 @@ def shap_values(shaps: BaseEstimator, **kwargs):
     return subplots(shaps._plot_shap_summary, *plot_args, **kwargs)
 
 
-def shap_discrepancies(shaps: BaseEstimator, target_name: str, **kwargs):
+def shap_discrepancies(
+        shaps: BaseEstimator,
+        target_name: str,
+        threshold: float=+100.0,
+        **kwargs):
+    """
+    Plot the discrepancies of the SHAP values.
+
+    Parameters:
+    -----------
+        shaps: BaseEstimator
+            The SHAP values to plot.
+        target_name: str
+            The name of the target variable.
+        threshold: float, default=+100.0
+            The threshold for the discrepancies. Only discrepancies below this
+            threshold will be displayed. Typical values are in (0.0, 5.0), but those
+            significant are in the values close to 0.0.
+        Optional arguments:
+        - figsize: Tuple[int, int], default=(10, 16)
+            The size of the figure.
+        - pdf_filename: str, default=None
+            The name of the PDF file to save the plot to.
+        - dpi: int, default=75
+            The DPI of the plot.
+
+    """
     assert shaps.is_fitted_, "Model not fitted yet"
-    shaps._plot_discrepancies(target_name, **kwargs)
+    shaps._plot_discrepancies(target_name, threshold, **kwargs)
