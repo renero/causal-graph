@@ -296,6 +296,7 @@ def digraph_from_connected_features(
         models,
         connections,
         root_causes,
+        prior: Optional[List[List[str]]] = None,
         reciprocity=True,
         anm_iterations=10,
         max_anm_samples=400,
@@ -357,14 +358,43 @@ def digraph_from_connected_features(
         if verbose:
             print(f"Reducing number of samples to {max_anm_samples}")
     for u, v in unoriented_graph.edges():
-        orientation = get_edge_orientation(
-            X, u, v, iters=anm_iterations, method="gpr", verbose=verbose)
-        if orientation == +1:
-            dag.add_edge(u, v)
-        elif orientation == -1:
-            dag.add_edge(v, u)
-        else:
-            pass
+        # Set orientation to 0 ~ unknown
+        orientation = 0
+
+        # Check if we can set it from prior knowledge
+        if prior:
+            print(f"Checking edge {u} -> {v}...") if verbose else None
+            idx_u = [i for i, l in enumerate(prior) if u in l][0]
+            idx_v = [i for i, l in enumerate(prior) if v in l][0]
+            both_in_top_list = idx_u == 0 and idx_v == 0
+            u_is_before_v = idx_u - idx_v < 0
+            v_is_before_u = idx_v - idx_u < 0
+            if both_in_top_list:
+                print(f"Edge {u} -x- {v} removed: both top list") if verbose else None
+                orientation = +1
+                continue
+            elif u_is_before_v:
+                print(f"Edge {u} -> {v} added: {u} before {v}") if verbose else None
+                dag.add_edge(u, v)
+                continue
+            elif v_is_before_u:
+                print(f"Edge {v} -> {u} added: {v} before {u}") if verbose else None
+                dag.add_edge(v, u)
+                continue
+            else:
+                pass
+
+        if orientation == 0:
+            orientation = get_edge_orientation(
+                X, u, v, iters=anm_iterations, method="gpr", verbose=verbose)
+            if orientation == +1:
+                print(f"Edge {u} -> {v} added from ANM") if verbose else None
+                dag.add_edge(u, v)
+            elif orientation == -1:
+                print(f"Edge {v} -> {u} added from ANM") if verbose else None
+                dag.add_edge(v, u)
+            else:
+                pass
 
     # Apply a simple fix: if quality of regression for a feature is poor, then
     # that feature can be considered a root or parent node. Therefore, we cannot
@@ -382,6 +412,41 @@ def digraph_from_connected_features(
         dag.add_edge(effect, cause)
 
     return dag
+
+def valid_candidates_from_prior(feature_names, effect, prior):
+    """
+    This method returns the valid candidates for a given effect, based on the
+    prior information. The prior information is a list of lists, where each list
+    contains the features that are known to be in the same level of the hierarchy.
+
+    Parameters:
+    -----------
+    feature_names: List[str]
+        The list of feature names.
+    effect: str
+        The effect for which to find the valid candidates.
+    prior: List[List[str]]
+        The prior information about the hierarchy of the features.
+
+    Returns:
+    --------
+    List[str]
+        The valid candidates for the given effect.
+    """
+    if prior is None:
+        return [c for c in feature_names if c != effect]
+
+    # identify in what list is the effect, from the list of lists defined in prior
+    idx = [i for i, sublist in enumerate(prior) if effect in sublist]
+    if not idx:
+        raise ValueError(f"Effect '{effect}' not found in prior")
+
+    # candidates are elements in the list ' idx' and all the lists before it
+    candidates = [item for sublist in prior[:idx[0] + 1]
+                    for item in sublist]
+
+    # return the candidates, excluding the effect itself
+    return [c for c in candidates if c != effect]
 
 
 def break_cycles_using_prior(

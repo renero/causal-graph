@@ -25,6 +25,7 @@ RESET = colorama.Style.RESET_ALL
 def select_features(
         values,
         feature_names,
+        valid_candidates,
         return_shaps=False,
         min_impact: float = 1e-06,
         exhaustive=False,
@@ -32,17 +33,17 @@ def select_features(
         verbose=False) -> List[str]:
     """
     Sort the values and select those before (strict) the point of max. curvature,
-    according to the selected algorithm. If strict is False, the point of max curv. 
-    is also selected. When the method is 'abrupt' the selection method is based on 
-    taking only those feature up-to (down-to) a certain percentage of change in their 
+    according to the selected algorithm. If strict is False, the point of max curv.
+    is also selected. When the method is 'abrupt' the selection method is based on
+    taking only those feature up-to (down-to) a certain percentage of change in their
     values.
 
     Arguments:
-        - values (np.ndarray): The values for each of the features. This can 
-            be anything that should be used to determine what features are more 
+        - values (np.ndarray): The values for each of the features. This can
+            be anything that should be used to determine what features are more
             important than others.
-        - feature_names (list): Names of the variables corresponding to the shap values 
-        - return_shaps (bool): Whether returning the mean shap values together with 
+        - feature_names (list): Names of the variables corresponding to the shap values
+        - return_shaps (bool): Whether returning the mean shap values together with
             order of the features.
         - min_impact (float): Default 1e-06. The minimum impact of a feature to be
             selected. If all features are below this value, none are selected.
@@ -103,6 +104,10 @@ def select_features(
 
         sorted_impact_values = sorted_impact_values[:limit_idx]
         iteration += 1
+
+    # Final check: from the selected features, remove those that are not in the
+    # valid_candidates list.
+    selected_features = [f for f in selected_features if f in valid_candidates]
 
     if verbose:
         print(f"  Limit_idx(cut-off).: {limit_idx}")

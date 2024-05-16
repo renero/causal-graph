@@ -349,7 +349,7 @@ class ShapEstimator(BaseEstimator):
             self.all_mean_shap_values[-1] = np.insert(
                 self.all_mean_shap_values[-1], correlated_feature_position, 0.)
 
-    def predict(self, X, root_causes, prior: List[List[str]] = None):
+    def predict(self, X, root_causes=None, prior: List[List[str]] = None):
         """
         Builds a causal graph from the shap values using a selection mechanism based
         on clustering, knee or abrupt methods.
@@ -376,7 +376,8 @@ class ShapEstimator(BaseEstimator):
             # The valid parents are the features that are in the same level of the
             # hierarchy as the target, or in previous levels. In case prior is not
             # provided, all features are valid candidates.
-            candidate_causes = self._valid_candidates_from_prior(target, self.prior)
+            candidate_causes = utils.valid_candidates_from_prior(
+                self.feature_names, target, self.prior)
 
             # Filter out features that are highly correlated with the target
             if self.correlation_th is not None:
@@ -386,17 +387,13 @@ class ShapEstimator(BaseEstimator):
             print(
                 f"Selecting features for target {target}...") if self.verbose else None
 
-            # Select from `self.shap_values[target]` the features that are in
-            # `candidate_causes`.
             feature_names_wo_target = [f for f in self.feature_names if f != target]
-            candidate_shap_values = self.shap_values[target][:, [
-                feature_names_wo_target.index(f) for f in candidate_causes]]
 
             # Select the features that are connected to the target
             self.connections[target] = select_features(
-                # values=self.shap_values[target],
-                values=candidate_shap_values,
-                feature_names=candidate_causes,
+                values=self.shap_values[target],
+                feature_names=feature_names_wo_target,
+                valid_candidates=candidate_causes,
                 min_impact=self.min_impact,
                 exhaustive=self.exhaustive,
                 threshold=self.mean_shap_threshold,
@@ -404,7 +401,7 @@ class ShapEstimator(BaseEstimator):
             pbar.update_subtask()
 
         G_shap = utils.digraph_from_connected_features(
-            X, self.feature_names, self.models, self.connections, root_causes,
+            X, self.feature_names, self.models, self.connections, root_causes, prior,
             reciprocity=self.reciprocity, anm_iterations=self.iters,
             verbose=self.verbose)
         pbar.update_subtask()
@@ -688,39 +685,6 @@ class ShapEstimator(BaseEstimator):
              target_mean, source_mean])
 
         return input_vector
-
-    def _valid_candidates_from_prior(self, effect, prior):
-        """
-        This method returns the valid candidates for a given effect, based on the
-        prior information. The prior information is a list of lists, where each list
-        contains the features that are known to be in the same level of the hierarchy.
-
-        Parameters:
-        -----------
-        effect: str
-            The effect for which to find the valid candidates.
-        prior: List[List[str]]
-            The prior information about the hierarchy of the features.
-
-        Returns:
-        --------
-        List[str]
-            The valid candidates for the given effect.
-        """
-        if prior is None:
-            return [c for c in self.feature_names if c != effect]
-
-        # identify in what list is the effect, from the list of lists defined in prior
-        idx = [i for i, sublist in enumerate(prior) if effect in sublist]
-        if not idx:
-            raise ValueError(f"Effect '{effect}' not found in prior")
-
-        # candidates are elements in the list ' idx' and all the lists before it
-        candidates = [item for sublist in prior[:idx[0] + 1] for item in sublist]
-
-        # return the candidates, excluding the effect itself
-        return [c for c in candidates if c != effect]
-
 
     def compute_error_contribution(self):
         """

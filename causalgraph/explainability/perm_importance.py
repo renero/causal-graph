@@ -33,7 +33,7 @@ silent: bool
 # pylint: disable=R0914:too-many-locals, R0915:too-many-statements
 # pylint: disable=W0106:expression-not-assigned, R1702:too-many-branches
 
-from typing import Tuple
+from typing import List, Tuple
 
 import networkx as nx
 import numpy as np
@@ -240,7 +240,21 @@ class PermutationImportance(BaseEstimator):
 
         return self
 
-    def predict(self, X=None, root_causes=None):
+    def predict(self, X=None, root_causes=None, prior: List[List[str]] = None):
+        """
+        Implementation of the predict method for the PermutationImportance class.
+
+        Parameters:
+        -----------
+        X: pd.DataFrame
+            The data to predict the permutation importance for.
+
+        Returns:
+        --------
+        G_pi: nx.DiGraph
+            The DAG representing the permutation importance for the features.
+        """
+        self.prior = prior
         first_key = self.feature_names[0]
         if isinstance(self.regressors[first_key], MLPModel):
             return self._predict_pytorch(X, root_causes)
@@ -253,19 +267,18 @@ class PermutationImportance(BaseEstimator):
         Predict the permutation importance for each feature, for each target,
         under the PyTorch implementation of the algorithm.
         """
-        # pbar = tqdm(
-        #     total=len(self.feature_names),
-        #     **tqdm_params(self._fit_desc, self.prog_bar, silent=self.silent))
         pbar = ProgBar().start_subtask(len(self.feature_names))
         print("Computing permutation loss (PyTorch)") if self.verbose else None
 
         self.all_pi = []
         num_vars = len(self.feature_names)
         for target in self.feature_names:
-            # pbar.refresh()
             regressor = self.regressors[target]
             model = regressor.model
-            candidate_causes = [f for f in self.feature_names if f != target]
+            feature_names_wo_target = [
+                f for f in self.feature_names if f != target]
+            candidate_causes = utils.valid_candidates_from_prior(
+                self.feature_names, target, self.prior)
             if self.verbose:
                 print(
                     f"Target: {target} (base loss: {self.base_loss[target]:.6f})")
@@ -293,7 +306,8 @@ class PermutationImportance(BaseEstimator):
 
             self.connections[target] = select_features(
                 values=self.pi[target]['importances_mean'],
-                feature_names=candidate_causes,
+                feature_names=feature_names_wo_target,
+                valid_candidates=candidate_causes,
                 exhaustive=self.exhaustive,
                 threshold=self.mean_pi_threshold,
                 verbose=self.verbose)

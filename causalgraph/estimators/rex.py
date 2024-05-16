@@ -298,7 +298,7 @@ class Rex(BaseEstimator, ClassifierMixin):
 
         steps = [
             ('G_shap', 'shaps.predict', {'root_causes': 'root_causes', 'prior': prior}),
-            ('G_pi', 'pi.predict', {'root_causes': 'root_causes'}),
+            ('G_pi', 'pi.predict', {'root_causes': 'root_causes', 'prior': prior}),
             ('indep', GraphIndependence, {'base_graph': 'G_shap'}),
             ('G_indep', 'indep.fit_predict'),
             ('G_final', 'shaps.adjust', {'graph': 'G_indep'}),
@@ -501,7 +501,7 @@ class Rex(BaseEstimator, ClassifierMixin):
 
 def custom_main(dataset_name,
                 input_path="/Users/renero/phd/data/RC3/",
-                output_path="/Users/renero/phd/output/RC3/",
+                output_path="/Users/renero/phd/output/RC4/",
                 tune_model: bool = False,
                 model_type="nn", explainer="gradient",
                 save=False):
@@ -526,6 +526,30 @@ def custom_main(dataset_name,
         print(f"Saved '{rex.name}' to '{where_to}'")
 
 
+def prior_main(dataset_name,
+               input_path="/Users/renero/phd/data/RC3/",
+               output_path="/Users/renero/phd/output/RC4/",
+               model_type="nn"):
+    from causalgraph.common.notebook import Experiment
+    experiment_name = f"{dataset_name}_{model_type}"
+    data = pd.read_csv(f"{input_path}{dataset_name}.csv")
+    scaler = StandardScaler()
+    data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)
+    experiment = Experiment(dataset_name, output_path=output_path).load()
+    rex = experiment.rex
+    print(f"Loaded {experiment_name} from {experiment.output_path}")
+
+    def get_prior(ref_graph):
+        root_nodes = [n for n, d in ref_graph.in_degree() if d == 0]
+        return [root_nodes, [n for n in ref_graph.nodes if n not in root_nodes]]
+
+    # train = exp_prior.rex.X
+    experiment.rex.verbose = True
+    experiment.rex.G_shap = experiment.rex.shaps.predict(
+        experiment.rex.X, prior=get_prior(experiment.ref_graph))
+
+
 if __name__ == "__main__":
-    custom_main('rex_generated_linear_9',  model_type="nn", explainer="gradient",
-                tune_model=False, save=False)
+    # custom_main('rex_generated_linear_9',  model_type="nn", explainer="gradient",
+    #             tune_model=False, save=False)
+    prior_main('rex_generated_gp_add_5')
