@@ -393,7 +393,6 @@ class ShapEstimator(BaseEstimator):
             self.connections[target] = select_features(
                 values=self.shap_values[target],
                 feature_names=feature_names_wo_target,
-                valid_candidates=candidate_causes,
                 min_impact=self.min_impact,
                 exhaustive=self.exhaustive,
                 threshold=self.mean_shap_threshold,

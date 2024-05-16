@@ -7,7 +7,7 @@
 
 import numpy as np
 
-from causalgraph.independence.feature_selection import (cluster_change,
+from causalgraph.independence.feature_selection import (find_cluster_change_point,
                                                         select_features)
 
 
@@ -18,29 +18,29 @@ class TestClusterChange:
 
     def test_increasing_values(self):
         """
-        Given a list of increasing values, the function returns the index of 
+        Given a list of increasing values, the function returns the index of
         the last element.
         """
         values = [1, 2, 3, 4, 5]
-        result = cluster_change(values)
+        result = find_cluster_change_point(values)
         assert result is None
 
     def test_decreasing_values(self):
         """
-        Given a list of decreasing values, the function returns the index of 
+        Given a list of decreasing values, the function returns the index of
         the last element.
         """
         values = [5, 4, 3, 2, 1]
-        result = cluster_change(values)
+        result = find_cluster_change_point(values)
         assert result is None
 
     def test_single_cluster(self):
         """
-        Given a list of values with a single cluster, the function returns the 
+        Given a list of values with a single cluster, the function returns the
         index of the last element.
         """
         values = [1, 1, 1, 1, 1]
-        result = cluster_change(values)
+        result = find_cluster_change_point(values)
         assert result is None
 
     def test_empty_list(self):
@@ -48,7 +48,7 @@ class TestClusterChange:
         Given an empty list, the function returns None.
         """
         values = []
-        result = cluster_change(values)
+        result = find_cluster_change_point(values)
         assert result is None
 
     def test_single_element(self):
@@ -56,7 +56,7 @@ class TestClusterChange:
         Given a list with a single element, the function returns None.
         """
         values = [1]
-        result = cluster_change(values)
+        result = find_cluster_change_point(values)
         assert result is None
 
     def test_zeros_list(self):
@@ -64,34 +64,34 @@ class TestClusterChange:
         Given a list with only zeros, the function returns None.
         """
         values = [0, 0, 0, 0, 0]
-        result = cluster_change(values)
+        result = find_cluster_change_point(values)
         assert result is None
 
     def test_multiple_clusters(self):
         """
-        Given a list of values with multiple clusters, the function returns the 
+        Given a list of values with multiple clusters, the function returns the
         index of the last element of the first cluster.
         """
         values = [1, 2, 3, 4, 5, 10, 11, 12, 13]
-        result = cluster_change(values)
+        result = find_cluster_change_point(values)
         assert result == 5
 
     def test_values_with_noise(self):
         """
-        Given a list of values with noise, the function returns the index of the 
+        Given a list of values with noise, the function returns the index of the
         last element of the largest cluster.
         """
         values = [1, 2, 3, 4, 5, 10, 11, 12, 13, 20, 21, 22]
-        result = cluster_change(values)
+        result = find_cluster_change_point(values)
         assert result == 9
 
     def test_single_cluster_from_three(self):
         """
-        Given a list of values with noise and a single cluster, the function 
+        Given a list of values with noise and a single cluster, the function
         returns the index of the last element.
         """
         values = [1, 2, 3, 4, 5, 10, 11, 12, 13, 20]
-        result = cluster_change(values)
+        result = find_cluster_change_point(values)
         assert result == 9
 
 
@@ -111,7 +111,7 @@ class TestSelectFeatures:
 
     def test_returns_empty_list_below_minimum_impact(self):
         """
-        Returns an empty list if all mean SHAP values are below the minimum 
+        Returns an empty list if all mean SHAP values are below the minimum
         impact value.
         """
         values = np.array([0.000001, 0.000001, 0.000001, 0.000001, 0.000001])
@@ -130,7 +130,7 @@ class TestSelectFeatures:
 
     def test_returns_empty_list_all_mean_shap_below_minimum_impact(self):
         """
-        Returns an empty list when all mean SHAP values are below the minimum 
+        Returns an empty list when all mean SHAP values are below the minimum
         impact value.
         """
         values = np.array([0.000001, 0.000001, 0.000001])

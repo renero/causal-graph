@@ -25,7 +25,6 @@ RESET = colorama.Style.RESET_ALL
 def select_features(
         values,
         feature_names,
-        valid_candidates,
         return_shaps=False,
         min_impact: float = 1e-06,
         exhaustive=False,
@@ -95,7 +94,7 @@ def select_features(
         if iteration >= max_iterations:
             break
 
-        limit_idx = cluster_change(sorted_impact_values, verbose=verbose)
+        limit_idx = find_cluster_change_point(sorted_impact_values, verbose=verbose)
         selected_features = list(reversed(
             [feature_names[i] for i in feature_order[limit_idx:]]))
 
@@ -104,10 +103,6 @@ def select_features(
 
         sorted_impact_values = sorted_impact_values[:limit_idx]
         iteration += 1
-
-    # Final check: from the selected features, remove those that are not in the
-    # valid_candidates list.
-    selected_features = [f for f in selected_features if f in valid_candidates]
 
     if verbose:
         print(f"  Limit_idx(cut-off).: {limit_idx}")
@@ -118,7 +113,7 @@ def select_features(
     return selected_features
 
 
-def cluster_change(X: List, verbose: bool = False) -> int:
+def find_cluster_change_point(X: List, verbose: bool = False) -> int:
     """
     Given an array of values in increasing or decreasing order, detect what are the
     elements that belong to the same cluster. The clustering is done using DBSCAN

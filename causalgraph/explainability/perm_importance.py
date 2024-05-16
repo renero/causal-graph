@@ -307,7 +307,6 @@ class PermutationImportance(BaseEstimator):
             self.connections[target] = select_features(
                 values=self.pi[target]['importances_mean'],
                 feature_names=feature_names_wo_target,
-                valid_candidates=candidate_causes,
                 exhaustive=self.exhaustive,
                 threshold=self.mean_pi_threshold,
                 verbose=self.verbose)
