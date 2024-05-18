@@ -3,6 +3,7 @@ Main class for the REX estimator.
 (C) J. Renero, 2022, 2023
 """
 
+from collections import defaultdict
 import os
 import warnings
 from copy import copy
@@ -86,6 +87,7 @@ class Rex(BaseEstimator, ClassifierMixin):
             condlen: int = 1,
             condsize: int = 0,
             mean_pi_percentile: float = 0.8,
+            discrepancy_threshold: float = 0.99,
             verbose: bool = False,
             prog_bar=True,
             silent: bool = False,
@@ -112,6 +114,10 @@ class Rex(BaseEstimator, ClassifierMixin):
                 Default is 15.
             condlen (int): The depth of the conditioning sequence. Default is 1.
             condsize (int): The size of the conditioning sequence. Default is 0.
+            mean_pi_percentile (float): The percentile for the mean permutation
+                importance. Default is 0.8.
+            discrepancy_threshold (float): The threshold for the discrepancy.
+                Default is 0.99.
             prog_bar (bool): Whether to display a progress bar.
                 Default is False.
             verbose (bool): Whether to print the progress of the training. Default
@@ -145,6 +151,7 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.condsize = condsize
         self.mean_pi_percentile = mean_pi_percentile
         self.mean_pi_threshold = 0.0
+        self.discrepancy_threshold = discrepancy_threshold
         self.prog_bar = prog_bar
         self.verbose = verbose
         self.silent = silent
@@ -495,6 +502,49 @@ class Rex(BaseEstimator, ClassifierMixin):
 
         return G_adj
 
+    def dag_from_discrepancy(
+            self,
+            discrepancy_upper_threshold:float = 0.99) -> nx.DiGraph:
+        """
+        Build a directed acyclic graph (DAG) from the discrepancies in the SHAP values.
+        The discrepancies are calculated as 1.0 - GoodnessOfFit, so that a low
+        discrepancy means that the GoodnessOfFit is close to 1.0, which means that
+        the SHAP values are similar.
+
+        Parameters:
+        -----------
+            discrepancy_upper_threshold (float): The threshold for the discrepancy.
+                Default is 0.99, which means that the GoodnessOfFit must be
+                at least 0.01.
+
+        Returns:
+        --------
+            nx.DiGraph: The directed acyclic graph (DAG) built from the discrepancies.
+        """
+        # Find out what pairs of features have low discrepancy, and add them as edges.
+        # A low discrepancy means that 1.0 - GoodnesOfFit is lower than the threshold.
+        low_discrepancy_edges = defaultdict(list)
+        for child in self.feature_names:
+            for parent in self.feature_names:
+                if child == parent:
+                    continue
+                discrepancy = 1. - self.shaps.shap_discrepancies[child][parent].shap_gof
+                if discrepancy < discrepancy_upper_threshold:
+                    if low_discrepancy_edges[child]:
+                        low_discrepancy_edges[child].append(parent)
+                    else:
+                        low_discrepancy_edges[child] = [parent]
+
+        # Build a DAG from the connected features.
+        self.G_rho = utils.digraph_from_connected_features(
+            self.X, self.feature_names, self.models, low_discrepancy_edges,
+            root_causes=self.root_causes,
+            prior=self.prior, verbose=self.verbose)
+
+        self.G_rho = self.break_cycles(self.G_rho)
+
+        return self.G_rho
+
     def __str__(self):
         return utils.stringfy_object(self)
 
@@ -536,7 +586,6 @@ def prior_main(dataset_name,
     scaler = StandardScaler()
     data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)
     experiment = Experiment(dataset_name, output_path=output_path).load()
-    rex = experiment.rex
     print(f"Loaded {experiment_name} from {experiment.output_path}")
 
     def get_prior(ref_graph):

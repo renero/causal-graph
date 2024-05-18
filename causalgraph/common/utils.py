@@ -413,6 +413,7 @@ def digraph_from_connected_features(
 
     return dag
 
+
 def valid_candidates_from_prior(feature_names, effect, prior):
     """
     This method returns the valid candidates for a given effect, based on the
