@@ -16,7 +16,7 @@ is then used to build the graph.
 import math
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Union
+from typing import List, Union
 
 import networkx as nx
 import numpy as np
@@ -349,13 +349,13 @@ class ShapEstimator(BaseEstimator):
             self.all_mean_shap_values[-1] = np.insert(
                 self.all_mean_shap_values[-1], correlated_feature_position, 0.)
 
-    def predict(self, X, root_causes):
+    def predict(self, X, root_causes=None, prior: List[List[str]] = None):
         """
         Builds a causal graph from the shap values using a selection mechanism based
         on clustering, knee or abrupt methods.
         """
-        # X_array = check_array(X)
         check_is_fitted(self, 'is_fitted_')
+        self.prior = prior
 
         # Recompute mean_shap_percentile here, in case it was changed
         self.mean_shap_threshold = np.quantile(
@@ -373,17 +373,26 @@ class ShapEstimator(BaseEstimator):
 
         self.connections = {}
         for target in self.feature_names:
-            candidate_causes = [
-                f for f in self.feature_names if f != target]
+            # The valid parents are the features that are in the same level of the
+            # hierarchy as the target, or in previous levels. In case prior is not
+            # provided, all features are valid candidates.
+            candidate_causes = utils.valid_candidates_from_prior(
+                self.feature_names, target, self.prior)
+
             # Filter out features that are highly correlated with the target
             if self.correlation_th is not None:
                 candidate_causes = [f for f in candidate_causes
                                     if f not in self.correlated_features[target]]
+
             print(
                 f"Selecting features for target {target}...") if self.verbose else None
+
+            feature_names_wo_target = [f for f in self.feature_names if f != target]
+
+            # Select the features that are connected to the target
             self.connections[target] = select_features(
                 values=self.shap_values[target],
-                feature_names=candidate_causes,
+                feature_names=feature_names_wo_target,
                 min_impact=self.min_impact,
                 exhaustive=self.exhaustive,
                 threshold=self.mean_shap_threshold,
@@ -391,7 +400,7 @@ class ShapEstimator(BaseEstimator):
             pbar.update_subtask()
 
         G_shap = utils.digraph_from_connected_features(
-            X, self.feature_names, self.models, self.connections, root_causes,
+            X, self.feature_names, self.models, self.connections, root_causes, prior,
             reciprocity=self.reciprocity, anm_iterations=self.iters,
             verbose=self.verbose)
         pbar.update_subtask()

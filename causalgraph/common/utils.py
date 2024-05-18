@@ -26,6 +26,8 @@ import pydotplus
 import torch
 
 from causalgraph.independence.edge_orientation import get_edge_orientation
+from typing import List, Optional
+import networkx as nx
 
 AnyGraph = Union[nx.Graph, nx.DiGraph]
 
@@ -266,8 +268,8 @@ def graph_intersection(g1: AnyGraph, g2: AnyGraph) -> AnyGraph:
 
 
 def graph_union(g1: AnyGraph, g2: AnyGraph) -> AnyGraph:
-    """ 
-    Returns the union of two graphs. The union is defined as the set of nodes and 
+    """
+    Returns the union of two graphs. The union is defined as the set of nodes and
     edges that are in both graphs. The union is performed on the nodes and edges,
     not on the attributes of the nodes and edges.
     """
@@ -294,6 +296,7 @@ def digraph_from_connected_features(
         models,
         connections,
         root_causes,
+        prior: Optional[List[List[str]]] = None,
         reciprocity=True,
         anm_iterations=10,
         max_anm_samples=400,
@@ -355,14 +358,43 @@ def digraph_from_connected_features(
         if verbose:
             print(f"Reducing number of samples to {max_anm_samples}")
     for u, v in unoriented_graph.edges():
-        orientation = get_edge_orientation(
-            X, u, v, iters=anm_iterations, method="gpr", verbose=verbose)
-        if orientation == +1:
-            dag.add_edge(u, v)
-        elif orientation == -1:
-            dag.add_edge(v, u)
-        else:
-            pass
+        # Set orientation to 0 ~ unknown
+        orientation = 0
+
+        # Check if we can set it from prior knowledge
+        if prior:
+            print(f"Checking edge {u} -> {v}...") if verbose else None
+            idx_u = [i for i, l in enumerate(prior) if u in l][0]
+            idx_v = [i for i, l in enumerate(prior) if v in l][0]
+            both_in_top_list = idx_u == 0 and idx_v == 0
+            u_is_before_v = idx_u - idx_v < 0
+            v_is_before_u = idx_v - idx_u < 0
+            if both_in_top_list:
+                print(f"Edge {u} -x- {v} removed: both top list") if verbose else None
+                orientation = +1
+                continue
+            elif u_is_before_v:
+                print(f"Edge {u} -> {v} added: {u} before {v}") if verbose else None
+                dag.add_edge(u, v)
+                continue
+            elif v_is_before_u:
+                print(f"Edge {v} -> {u} added: {v} before {u}") if verbose else None
+                dag.add_edge(v, u)
+                continue
+            else:
+                pass
+
+        if orientation == 0:
+            orientation = get_edge_orientation(
+                X, u, v, iters=anm_iterations, method="gpr", verbose=verbose)
+            if orientation == +1:
+                print(f"Edge {u} -> {v} added from ANM") if verbose else None
+                dag.add_edge(u, v)
+            elif orientation == -1:
+                print(f"Edge {v} -> {u} added from ANM") if verbose else None
+                dag.add_edge(v, u)
+            else:
+                pass
 
     # Apply a simple fix: if quality of regression for a feature is poor, then
     # that feature can be considered a root or parent node. Therefore, we cannot
@@ -382,29 +414,136 @@ def digraph_from_connected_features(
     return dag
 
 
+def valid_candidates_from_prior(feature_names, effect, prior):
+    """
+    This method returns the valid candidates for a given effect, based on the
+    prior information. The prior information is a list of lists, where each list
+    contains the features that are known to be in the same level of the hierarchy.
+
+    Parameters:
+    -----------
+    feature_names: List[str]
+        The list of feature names.
+    effect: str
+        The effect for which to find the valid candidates.
+    prior: List[List[str]]
+        The prior information about the hierarchy of the features.
+
+    Returns:
+    --------
+    List[str]
+        The valid candidates for the given effect.
+    """
+    if prior is None:
+        return [c for c in feature_names if c != effect]
+
+    # identify in what list is the effect, from the list of lists defined in prior
+    idx = [i for i, sublist in enumerate(prior) if effect in sublist]
+    if not idx:
+        raise ValueError(f"Effect '{effect}' not found in prior")
+
+    # candidates are elements in the list ' idx' and all the lists before it
+    candidates = [item for sublist in prior[:idx[0] + 1]
+                    for item in sublist]
+
+    # return the candidates, excluding the effect itself
+    return [c for c in candidates if c != effect]
+
+
+def break_cycles_using_prior(
+        original_dag: nx.DiGraph,
+        prior: List[List[str]],
+        verbose: bool=False) -> nx.DiGraph:
+    """
+    This method remove potential edges in the DAG by removing edges that are
+    incompatible with the temporal relationship defined in the prior knowledge.
+    Any edge pointing backwards, according to the order established in the prior
+    knowledge, is removed.
+
+    Parameters:
+    -----------
+    original_dag (nx.DiGraph): The original directed acyclic graph.
+    prior (List[List[str]]): A list of lists containing the prior knowledge
+        about the edges in the DAG. The lists define a hierarchy of edges that
+        represent a temporal relation in cause and effect. If a node is in the first
+        list, then it is a root cause. If a node is in the second list, then it is
+        caused by the nodes in the first list or the second list, and so on.
+    verbose (bool): If True, then the method prints information about the
+        edges that are removed.
+
+    Returns:
+    --------
+    nx.DiGraph: The directed acyclic graph with the edges removed according to
+        the prior knowledge.
+    """
+    dag = nx.DiGraph()
+    dag.add_edges_from(original_dag.edges)
+
+    if verbose:
+        print("Prior knowledge:", prior)
+    cycles = list(nx.simple_cycles(dag))
+    while len(cycles) > 0:
+        cycle = cycles.pop(0)
+        if verbose:
+            print("Checking cycle", cycle)
+        for i, node in enumerate(cycle):
+            if node == cycle[-1]:
+                neighbour = cycle[0]
+            else:
+                neighbour = cycle[i+1]
+            # Check if the edge between the two nodes is in the prior knowledge
+            if [node, neighbour] not in prior:
+                if verbose:
+                    print(
+                        f"↳ Checking '{node} -> {neighbour}' in the prior knowledge")
+                idx_node = [i for i, l in enumerate(prior) if node in l][0]
+                idx_neighbour = [i for i, l in enumerate(
+                    prior) if neighbour in l][0]
+                if idx_neighbour - idx_node < 0:
+                    if verbose:
+                        print(
+                            f"  ↳ Breaking cycle, removing edge {node} -> {neighbour}")
+                        print("** Recomputing cycles **")
+                    dag.remove_edge(node, neighbour)
+                    cycles = list(nx.simple_cycles(dag))
+                    break
+    return dag
+
+
 def break_cycles_if_present(
         dag: nx.DiGraph,
         knowledge: pd.DataFrame,
+        prior: Optional[List[List[str]]] = None,
         verbose: bool = False):
     """
-    Breaks cycles in a directed acyclic graph (DAG) by removing the edge with 
-    the lowest goodness of fit (R2). If there are multiple cycles, they are 
+    Breaks cycles in a directed acyclic graph (DAG) by removing the edge with
+    the lowest goodness of fit (R2). If there are multiple cycles, they are
     all traversed and fixed.
 
     Parameters:
     - dag (nx.DiGraph): the DAG to break cycles in.
-    - knowledge (pd.DataFrame): a DataFrame containing the permutation importances 
+    - knowledge (pd.DataFrame): a DataFrame containing the permutation importances
         for each edge in the DAG.
+    - prior (List[List[str]]): a list of lists containing the prior knowledge
+        about the edges in the DAG. The lists define a hierarchy of edges that
+        represent a temporal relation in cause and effect. If a node is in the first
+        list, then it is a root cause. If a node is in the second list, then it is
+        caused by the nodes in the first list or the second list, and so on.
 
     Returns:
     - dag (nx.DiGraph): the DAG with cycles broken.
     """
-    new_dag = dag.copy()
+    # If prior is set, then break cycles using the prior knowledge
+    if prior:
+        new_dag = break_cycles_using_prior(dag, prior, verbose)
+    else:
+        new_dag = dag.copy()
+
+    # Find all cycles in the DAG
     cycles = list(nx.simple_cycles(new_dag))
 
     # This might be important, to remove first double edges
     cycles.sort(key=len)
-
     if len(cycles) == 0:
         if verbose:
             print("No cycles found")
@@ -427,6 +566,10 @@ def break_cycles_if_present(
                     knowledge['target'] == neighbour),
                 'shap_gof'].values[0]
         cycles_info.append((cycle, cycle_edges))
+
+        # If there's prior, find if any of the edges in the cycle connect two nodes
+        # that are in two non-consecutive lists in the prior knowledge
+        # if prior:
 
         # Find the edge with the lowest SHAP discrepancy
         min_gof = min(cycle_edges.values())

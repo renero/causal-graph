@@ -1,0 +1,7 @@
+version 0.4.2
+-------------
+- Now it is possible to add a prior to ReX. The prior is in the form of a
+temporal hierarchy of node names (`List[List[str]]`), so there can be no 
+links from a node in a list which is after/deeper to another node in a
+previous/higher list.
+- Build a DAG (`DAG_rho`) from SHAP discrepancies.
