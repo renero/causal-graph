@@ -512,7 +512,7 @@ def break_cycles_using_prior(
 
 def break_cycles_if_present(
         dag: nx.DiGraph,
-        knowledge: pd.DataFrame,
+        discrepancies: Dict[str, Dict[str, float]],
         prior: Optional[List[List[str]]] = None,
         verbose: bool = False):
     """
@@ -561,10 +561,11 @@ def break_cycles_if_present(
                 neighbour = cycle[0]
             else:
                 neighbour = cycle[cycle.index(node)+1]
-            cycle_edges[(node, neighbour)] = knowledge.loc[
-                (knowledge['origin'] == node) & (
-                    knowledge['target'] == neighbour),
-                'shap_gof'].values[0]
+            cycle_edges[(node, neighbour)] = discrepancies[neighbour][node].shap_gof
+            # cycle_edges[(node, neighbour)] = knowledge.loc[
+            #     (knowledge['origin'] == node) & (
+            #         knowledge['target'] == neighbour),
+            #     'shap_gof'].values[0]
         cycles_info.append((cycle, cycle_edges))
 
         # If there's prior, find if any of the edges in the cycle connect two nodes

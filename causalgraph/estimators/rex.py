@@ -229,7 +229,8 @@ class Rex(BaseEstimator, ClassifierMixin):
             ('root_causes', 'compute_regression_quality'),
             ('shaps', ShapEstimator, {'models': 'models'}),
             ('shaps.fit'),
-            ('pi', PermutationImportance, {'models': 'models'}),
+            ('pi', PermutationImportance, {
+                'models': 'models', 'discrepancies': 'shaps.shap_discrepancies'}),
             ('pi.fit'),
         ]
         pipeline.from_list(steps)
@@ -304,28 +305,38 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.shaps.verbose = self.verbose
 
         steps = [
+            # DAGs construction
             ('G_shap', 'shaps.predict', {'root_causes': 'root_causes', 'prior': prior}),
+            ('G_rho', 'dag_from_discrepancy', {
+                'discrepancy_upper_threshold': self.discrepancy_threshold}),
+            ('G_adj', 'adjust_discrepancy', {'dag': 'G_shap'}),
             ('G_pi', 'pi.predict', {'root_causes': 'root_causes', 'prior': prior}),
             ('indep', GraphIndependence, {'base_graph': 'G_shap'}),
             ('G_indep', 'indep.fit_predict'),
             ('G_final', 'shaps.adjust', {'graph': 'G_indep'}),
+
+            # Knowledge Summarization
             ('summarize_knowledge', {'ref_graph': ref_graph}),
-            ('G_adj', 'adjust_discrepancy', {'dag': 'G_shap'}),
-            ('G_shag', 'break_cycles', {'dag': 'G_shap'}),
-            ('G_adjnc', 'break_cycles', {'dag': 'G_adj'}),
+
+            # Old: break_cycles is now part of DAG construction
+            # ('G_shag', 'break_cycles', {'dag': 'G_shap'}),
+            # ('G_adjnc', 'break_cycles', {'dag': 'G_adj'}),
+
             # Metrics Generation, here
             ('metrics_shap', 'score', {
              'ref_graph': ref_graph, 'predicted_graph': 'G_shap'}),
-            ('metrics_shag', 'score', {
-             'ref_graph': ref_graph, 'predicted_graph': 'G_shag'}),
+            ('metrics_rho', 'score', {
+             'ref_graph': ref_graph, 'predicted_graph': 'G_rho'}),
             ('metrics_adj', 'score', {
              'ref_graph': ref_graph, 'predicted_graph': 'G_adj'}),
-            ('metrics_adjnc', 'score', {
-             'ref_graph': ref_graph, 'predicted_graph': 'G_adjnc'}),
             ('metrics_indep', 'score', {
              'ref_graph': ref_graph, 'predicted_graph': 'G_indep'}),
             ('metrics_final', 'score', {
              'ref_graph': ref_graph, 'predicted_graph': 'G_final'})
+            # ('metrics_shag', 'score', {
+            #  'ref_graph': ref_graph, 'predicted_graph': 'G_shag'}),
+            # ('metrics_adjnc', 'score', {
+            #  'ref_graph': ref_graph, 'predicted_graph': 'G_adjnc'}),
         ]
         prediction.from_list(steps)
         prediction.run()
@@ -456,7 +467,7 @@ class Rex(BaseEstimator, ClassifierMixin):
             dag (nx.DiGraph): The DAG to break the cycle from.
         """
         return utils.break_cycles_if_present(
-            dag, self.learnings, self.prior, verbose=self.verbose)
+            dag, self.shaps.shap_discrepancies, self.prior, verbose=self.verbose)
 
     def adjust_discrepancy(self, dag: nx.DiGraph):
         """
@@ -473,16 +484,15 @@ class Rex(BaseEstimator, ClassifierMixin):
         G_adj = dag.copy()
         gof = np.zeros((len(self.feature_names), len(self.feature_names)))
 
-        # Filter rows based on the condition that origin and target are linked in DAG
-        filtered_rows = self.learnings[
-            ~self.learnings.apply(
-                lambda row: G_adj.has_edge(row['origin'], row['target']) or
-                G_adj.has_edge(row['target'], row['origin']), axis=1)]
-
-        for _, row in filtered_rows.iterrows():
-            i = self.feature_names.index(row['origin'])
-            j = self.feature_names.index(row['target'])
-            gof[i, j] = row['shap_gof']
+        # Loop through all pairs of nodes where the edge is not present in the graph.
+        for origin in self.feature_names:
+            for target in self.feature_names:
+                if origin == target:
+                    continue
+                if not G_adj.has_edge(origin, target) and not G_adj.has_edge(target, origin):
+                    i = self.feature_names.index(origin)
+                    j = self.feature_names.index(target)
+                    gof[i, j] = self.shaps.shap_discrepancies[target][origin].shap_gof
 
         new_edges = set()
         # Loop through the i, j positions in the matrix `gof` that are
@@ -499,6 +509,8 @@ class Rex(BaseEstimator, ClassifierMixin):
         # Add the new edges to the graph `G_adj`, if any.
         if new_edges:
             G_adj.add_edges_from(new_edges)
+
+        G_adj = self.break_cycles(G_adj)
 
         return G_adj
 
@@ -556,6 +568,11 @@ def custom_main(dataset_name,
                 model_type="nn", explainer="gradient",
                 save=False):
 
+
+    def get_prior(ref_graph):
+        root_nodes = [n for n, d in ref_graph.in_degree() if d == 0]
+        return [root_nodes, [n for n in ref_graph.nodes if n not in root_nodes]]
+
     ref_graph = utils.graph_from_dot_file(f"{input_path}{dataset_name}.dot")
     data = pd.read_csv(f"{input_path}{dataset_name}.csv")
     scaler = StandardScaler()
@@ -568,8 +585,7 @@ def custom_main(dataset_name,
         model_type=model_type, explainer=explainer)
 
     rex.fit_predict(train, test, ref_graph,
-                    prior=[['V0', 'V1', 'V3', 'V4', 'V5'],
-                           ['V2', 'V6', 'V7', 'V8', 'V9']])
+                    prior=get_prior(ref_graph))
 
     if save:
         where_to = utils.save_experiment(rex.name, output_path, rex)
@@ -599,6 +615,6 @@ def prior_main(dataset_name,
 
 
 if __name__ == "__main__":
-    # custom_main('rex_generated_linear_9',  model_type="nn", explainer="gradient",
-    #             tune_model=False, save=False)
-    prior_main('rex_generated_gp_add_5')
+    custom_main('rex_generated_gp_add_5',  model_type="nn", explainer="gradient",
+                tune_model=False, save=False)
+    # prior_main('rex_generated_gp_add_5')

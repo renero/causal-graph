@@ -405,6 +405,9 @@ class ShapEstimator(BaseEstimator):
             verbose=self.verbose)
         pbar.update_subtask()
 
+        G_shap = utils.break_cycles_if_present(
+            G_shap, self.shap_discrepancies, self.prior, verbose=self.verbose)
+
         return G_shap
 
     def adjust(
