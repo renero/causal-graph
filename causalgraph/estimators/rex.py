@@ -308,7 +308,7 @@ class Rex(BaseEstimator, ClassifierMixin):
             # DAGs construction
             ('G_shap', 'shaps.predict', {'root_causes': 'root_causes', 'prior': prior}),
             ('G_rho', 'dag_from_discrepancy', {
-                'discrepancy_upper_threshold': self.discrepancy_threshold}),
+                'discrepancy_upper_threshold': self.discrepancy_threshold, "verbose": True}),
             ('G_adj', 'adjust_discrepancy', {'dag': 'G_shap'}),
             ('G_pi', 'pi.predict', {'root_causes': 'root_causes', 'prior': prior}),
             ('indep', GraphIndependence, {'base_graph': 'G_shap'}),
@@ -516,7 +516,7 @@ class Rex(BaseEstimator, ClassifierMixin):
 
     def dag_from_discrepancy(
             self,
-            discrepancy_upper_threshold:float = 0.99) -> nx.DiGraph:
+            discrepancy_upper_threshold:float = 0.99, verbose:bool=False) -> nx.DiGraph:
         """
         Build a directed acyclic graph (DAG) from the discrepancies in the SHAP values.
         The discrepancies are calculated as 1.0 - GoodnessOfFit, so that a low
@@ -533,25 +533,37 @@ class Rex(BaseEstimator, ClassifierMixin):
         --------
             nx.DiGraph: The directed acyclic graph (DAG) built from the discrepancies.
         """
+        if verbose:
+            print("-----\ndag_from_discrepancies()")
+
         # Find out what pairs of features have low discrepancy, and add them as edges.
         # A low discrepancy means that 1.0 - GoodnesOfFit is lower than the threshold.
         low_discrepancy_edges = defaultdict(list)
+        if verbose:
+            print('    ' + ' '.join([f"{f:^5s}" for f in self.feature_names]))
         for child in self.feature_names:
+            if verbose:
+                print(f"{child}: ", end="")
             for parent in self.feature_names:
                 if child == parent:
+                    if verbose:
+                        print("  X  ", end=" ")
                     continue
                 discrepancy = 1. - self.shaps.shap_discrepancies[child][parent].shap_gof
+                if verbose:
+                    print(f"{discrepancy:+.2f}", end=" ")
                 if discrepancy < discrepancy_upper_threshold:
                     if low_discrepancy_edges[child]:
                         low_discrepancy_edges[child].append(parent)
                     else:
                         low_discrepancy_edges[child] = [parent]
+            if verbose:
+                print()
 
         # Build a DAG from the connected features.
         self.G_rho = utils.digraph_from_connected_features(
             self.X, self.feature_names, self.models, low_discrepancy_edges,
-            root_causes=self.root_causes,
-            prior=self.prior, verbose=self.verbose)
+            root_causes=self.root_causes, prior=self.prior, verbose=verbose)
 
         self.G_rho = self.break_cycles(self.G_rho)
 

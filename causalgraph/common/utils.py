@@ -336,6 +336,8 @@ def digraph_from_connected_features(
         module.
 
     """
+    if verbose:
+        print("-----\ndigraph_from_connected_features()")
     unoriented_graph = nx.Graph()
     for target in feature_names:
         for peer in connections[target]:
@@ -356,7 +358,7 @@ def digraph_from_connected_features(
     if X.shape[0] > max_anm_samples:
         X = X.sample(max_anm_samples)
         if verbose:
-            print(f"Reducing number of samples to {max_anm_samples}")
+            print(f"Reduced number of samples to {max_anm_samples}")
     for u, v in unoriented_graph.edges():
         # Set orientation to 0 ~ unknown
         orientation = 0
@@ -370,28 +372,32 @@ def digraph_from_connected_features(
             u_is_before_v = idx_u - idx_v < 0
             v_is_before_u = idx_v - idx_u < 0
             if both_in_top_list:
-                print(f"Edge {u} -x- {v} removed: both top list") if verbose else None
+                print(
+                    f"Edge {u} -x- {v} removed: both top list") if verbose else None
                 orientation = +1
                 continue
             elif u_is_before_v:
-                print(f"Edge {u} -> {v} added: {u} before {v}") if verbose else None
+                print(
+                    f"Edge {u} -> {v} added: {u} before {v}") if verbose else None
                 dag.add_edge(u, v)
                 continue
             elif v_is_before_u:
-                print(f"Edge {v} -> {u} added: {v} before {u}") if verbose else None
+                print(
+                    f"Edge {v} -> {u} added: {v} before {u}") if verbose else None
                 dag.add_edge(v, u)
                 continue
             else:
                 pass
 
         if orientation == 0:
+            print(f"Checking edge {u} -> {v}...") if verbose else None
             orientation = get_edge_orientation(
                 X, u, v, iters=anm_iterations, method="gpr", verbose=verbose)
             if orientation == +1:
-                print(f"Edge {u} -> {v} added from ANM") if verbose else None
+                print(f"  Edge {u} -> {v} added from ANM") if verbose else None
                 dag.add_edge(u, v)
             elif orientation == -1:
-                print(f"Edge {v} -> {u} added from ANM") if verbose else None
+                print(f"  Edge {v} -> {u} added from ANM") if verbose else None
                 dag.add_edge(v, u)
             else:
                 pass
@@ -444,7 +450,7 @@ def valid_candidates_from_prior(feature_names, effect, prior):
 
     # candidates are elements in the list ' idx' and all the lists before it
     candidates = [item for sublist in prior[:idx[0] + 1]
-                    for item in sublist]
+                  for item in sublist]
 
     # return the candidates, excluding the effect itself
     return [c for c in candidates if c != effect]
@@ -453,7 +459,7 @@ def valid_candidates_from_prior(feature_names, effect, prior):
 def break_cycles_using_prior(
         original_dag: nx.DiGraph,
         prior: List[List[str]],
-        verbose: bool=False) -> nx.DiGraph:
+        verbose: bool = False) -> nx.DiGraph:
     """
     This method remove potential edges in the DAG by removing edges that are
     incompatible with the temporal relationship defined in the prior knowledge.
@@ -510,9 +516,46 @@ def break_cycles_using_prior(
     return dag
 
 
+def potential_misoriented_edges(
+        loop: List[str],
+        discrepancies: Dict,
+        verbose: bool = False):
+    """
+    Find potential misoriented edges in a loop based on discrepancies.
+
+    Args:
+        loop (List[str]): The list of nodes in the loop.
+        discrepancies (Dict): A dictionary containing discrepancies between nodes.
+        verbose (bool, optional): Whether to print verbose output. Defaults to False.
+
+    Returns:
+        List[Tuple[str, str, float]]: A list of potential misoriented edges,
+            sorted by the difference in goodness-of-fit scores.
+
+    """
+    potential_misoriented_edges = []
+    for i, node in enumerate(loop):
+        if i == len(loop) - 1:
+            neighbor = loop[0]
+        else:
+            neighbor = loop[i + 1]
+        fwd_gof = 1. - discrepancies[neighbor][node].shap_gof
+        bwd_gof = 1. - discrepancies[node][neighbor].shap_gof
+        orientation = +1 if fwd_gof < bwd_gof else -1
+        if orientation == -1:
+            potential_misoriented_edges.append((node, neighbor, fwd_gof - bwd_gof))
+        if verbose:
+            direction = "-->" if fwd_gof < bwd_gof else "<--"
+            print(
+                f"Edge: {node}{direction}{neighbor} FWD:{fwd_gof:.3f} "
+                f"BWD:{bwd_gof:.3f}")
+
+    return sorted(potential_misoriented_edges, key=lambda x: x[2], reverse=True)
+
+
 def break_cycles_if_present(
         dag: nx.DiGraph,
-        discrepancies: Dict[str, Dict[str, float]],
+        discrepancies: Dict,
         prior: Optional[List[List[str]]] = None,
         verbose: bool = False):
     """
@@ -533,6 +576,9 @@ def break_cycles_if_present(
     Returns:
     - dag (nx.DiGraph): the DAG with cycles broken.
     """
+    if verbose:
+        print("-----\nbreak_cycles_if_present()")
+
     # If prior is set, then break cycles using the prior knowledge
     if prior:
         new_dag = break_cycles_using_prior(dag, prior, verbose)
@@ -553,35 +599,49 @@ def break_cycles_if_present(
     cycles_info = []
     while len(cycles) > 0:
         cycle = cycles.pop(0)
-        # For every pair of consecutive nodes in the cycle, store their
-        # SHAP discrepancy
+        # For every pair of consecutive nodes in the cycle, store its SHAP discrepancy
         cycle_edges = {}
         for node in cycle:
             if node == cycle[-1]:
                 neighbour = cycle[0]
             else:
                 neighbour = cycle[cycle.index(node)+1]
-            cycle_edges[(node, neighbour)] = discrepancies[neighbour][node].shap_gof
-            # cycle_edges[(node, neighbour)] = knowledge.loc[
-            #     (knowledge['origin'] == node) & (
-            #         knowledge['target'] == neighbour),
-            #     'shap_gof'].values[0]
+            cycle_edges[(node, neighbour)
+                        ] = discrepancies[neighbour][node].shap_gof
         cycles_info.append((cycle, cycle_edges))
-
-        # If there's prior, find if any of the edges in the cycle connect two nodes
-        # that are in two non-consecutive lists in the prior knowledge
-        # if prior:
 
         # Find the edge with the lowest SHAP discrepancy
         min_gof = min(cycle_edges.values())
         min_edge = [edge for edge, gof in cycle_edges.items() if gof ==
                     min_gof][0]
-        if verbose:
-            print(f"Breaking cycle {cycle} by removing edge {min_edge}")
+
+        # Check if any of the edges in the loop is potentially misoriented.
+        # If so, change the orientation of the edge with the lowest SHAP discrepancy
+        potential_misoriented = potential_misoriented_edges(
+            cycle, discrepancies, verbose)
+        if len(potential_misoriented) > 0:
+            if verbose:
+                print("Potential misoriented edges in the cycle:")
+                for edge in potential_misoriented:
+                    print(f"  {edge[0]} --> {edge[1]} ({edge[2]:.3f})")
+            # Check if changing the orientation of the edge would break the cycle
+            test_dag = new_dag.copy()
+            test_dag.remove_edge(*min_edge)
+            test_dag.add_edge(*potential_misoriented[0][1::-1])
+            test_cycles = list(nx.simple_cycles(test_dag))
+            if len(test_cycles) == len(cycles):
+                if verbose:
+                    print(
+                        f"Breaking cycle {cycle} by changing orientation of edge {min_edge}")
+                new_dag.remove_edge(*min_edge)
+                new_dag.add_edge(*potential_misoriented[0][1::-1])
+                continue
 
         # Remove the edge with the lowest SHAP discrepancy, checking that
         # the edge still exists
         if min_edge in new_dag.edges:
+            if verbose:
+                print(f"Breaking cycle {cycle} by removing edge {min_edge}")
             new_dag.remove_edge(*min_edge)
 
         # Recompute whether there're cycles in the DAG after this change

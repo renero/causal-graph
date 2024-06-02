@@ -8,10 +8,10 @@ from causalgraph.independence.regressors import fit_and_get_residuals
 
 def get_edge_orientation(data, x, y, iters=20, method='gpr', verbose=False):
     """
-    This is an ANM test of independence for the pairs between which 
-    a lot of correlation has been seen. If the test is repeated a sufficient 
-    number of times (100) the correct causal direction almost always comes 
-    out -- and in cases where it is not, it is enough to repeat the test 
+    This is an ANM test of independence for the pairs between which
+    a lot of correlation has been seen. If the test is repeated a sufficient
+    number of times (100) the correct causal direction almost always comes
+    out -- and in cases where it is not, it is enough to repeat the test
     an odd number of times (5) to see that the result Yeah that's right.
 
     Args:
@@ -33,17 +33,18 @@ def get_edge_orientation(data, x, y, iters=20, method='gpr', verbose=False):
 
     r1 = Hsic().test(res_y, data[x].values, reps=iters).pvalue
     r2 = Hsic().test(res_x, data[y].values, reps=iters).pvalue
+    mark = "**" if r1 < 0.05 and r2 < 0.05 else ""
     if r1 > r2:
         if verbose:
-            print(f" {x:>3s}-->{y:<3s}", end="")
-            print(
-                f"  [p({x:>3s}->{y:<3s}): {r1:8.6f}; p({y:>3s}->{x:<3s}): {r2:8.6f}]")
+            print(f" {x:>3s}-->{y:<3s}  "
+                  f"[p({x:>3s}->{y:<3s}): {r1:8.6f};"
+                  f" p({y:>3s}->{x:<3s}): {r2:8.6f}] {mark}")
         return +1
     elif r1 < r2:
         if verbose:
-            print(f" {x:>3s}<--{y:<3s}", end="")
-            print(
-                f"  [p({x:>3s}->{y:<3s}): {r1:8.6f}; p({y:>3s}->{x:<3s}): {r2:8.6f}]")
+            print(f" {x:>3s}<--{y:<3s}  "
+                  f"[p({x:>3s}->{y:<3s}): {r1:8.6f};"
+                  f" p({y:>3s}->{x:<3s}): {r2:8.6f}] {mark}")
         return -1
     else:
         if verbose:
