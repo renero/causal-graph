@@ -559,14 +559,15 @@ class NNRegressor(BaseEstimator):
 #
 
 def custom_main(score: bool = False, tune: bool = False):
+    import os
     from causalgraph.common import utils
-    path = "/Users/renero/phd/data/RC3/"
-    output_path = "/Users/renero/phd/output/RC3/"
-    experiment_name = 'custom_rex'
+    path = "/Users/renero/phd/data/RC4/risks"
+    output_path = "/Users/renero/phd/output/RC4/"
+    experiment_name = 'transformed_data'
 
-    ref_graph = utils.graph_from_dot_file(f"{path}{experiment_name}.dot")
+    # ref_graph = utils.graph_from_dot_file(f"{path}{experiment_name}.dot")
 
-    data = pd.read_csv(f"{path}{experiment_name}.csv")
+    data = pd.read_csv(f"{os.path.join(path, experiment_name)}.csv")
     scaler = StandardScaler()
     data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)
 
@@ -585,4 +586,4 @@ def custom_main(score: bool = False, tune: bool = False):
 
 
 if __name__ == "__main__":
-    custom_main()
+    custom_main(tune=True)

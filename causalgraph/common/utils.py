@@ -142,6 +142,9 @@ def valid_output_name(filename: str, path: str, extension=None) -> str:
 
 def graph_from_dot_file(dot_file: Union[str, Path]) -> nx.DiGraph:
     """ Returns a NetworkX DiGraph from a DOT FILE. """
+    # Check if "dot_file" exists
+    if not os.path.exists(dot_file):
+        return None
     dot_object = pydot.graph_from_dot_file(dot_file)
     dot_string = dot_object[0].to_string()
     dot_string = dot_string.replace('\"\\n\"', '')
