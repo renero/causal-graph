@@ -173,10 +173,12 @@ class Rex(BaseEstimator, ClassifierMixin):
             print(
                 f"WARNING: SHAP '{explainer}' not supported for model '{model_type}'. "
                 f"Using 'gradient' instead.")
+            self.explainer = "gradient"
         if (model_type == "gbt" and explainer != "explainer"):
             print(
                 f"WARNING: SHAP '{explainer}' not supported for model '{model_type}'. "
                 f"Using 'explainer' instead.")
+            self.explainer = "explainer"
 
     def _more_tags(self):
         return {
