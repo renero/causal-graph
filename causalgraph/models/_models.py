@@ -55,7 +55,7 @@ torch_log.propagate = False
 torch_log.setLevel(logging.ERROR)
 
 
-DEVICE = "mps" if torch.cuda.is_available() else "cpu"
+DEVICE = "cpu"
 
 
 class BaseModel(object):
@@ -226,7 +226,6 @@ class BaseModel(object):
         """
         real_steps = np.floor(self.n_rows/self.batch_size)-1
         log_every_steps = int(min(real_steps, self.batch_size))
-        # log_every_steps = np.min(int(np.floor(float(self.n_rows)/float(self.batch_size)))-1., self.batch_size)
         self.extra_trainer_args = dict(
             {
                 "enable_model_summary": False,
@@ -258,9 +257,12 @@ class MLPModel(BaseModel):
         test_size (float): The proportion of the data to use for testing.
         device (Union[int, str]): The device to use for training.
         seed (int): The random seed for reproducibility.
-        early_stop (bool, optional): Whether to use early stopping during training. Defaults to True.
-        patience (int, optional): The patience value for early stopping. Defaults to 10.
-        min_delta (float, optional): The minimum change in the monitored metric to be considered an improvement for early stopping. Defaults to 0.001.
+        early_stop (bool, optional): Whether to use early stopping during training.
+            Defaults to True.
+        patience (int, optional): The patience value for early stopping.
+            Defaults to 10.
+        min_delta (float, optional): The minimum change in the monitored metric
+            to be considered an improvement for early stopping. Defaults to 0.001.
         **kwargs: Additional keyword arguments to override the default values.
     """
 
