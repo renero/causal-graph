@@ -23,10 +23,12 @@ torch_log.setLevel(logging.ERROR)
 
 ONEOVERSQRT2PI = 1.0 / math.sqrt(2 * math.pi)
 
+DEVICE = "mps" if torch.backends.mps.is_available() else "cpu"
+
 
 class MLP(pl.LightningModule):
 
-    device = utils.select_device("cpu")
+    device = utils.select_device(DEVICE)
 
     class Block(nn.Module):
         """The main building block of `MLP`."""
@@ -62,6 +64,8 @@ class MLP(pl.LightningModule):
 
         if activation == "relu":
             self.activation = nn.ReLU()
+        elif activation == "gelu":
+            self.activation = nn.GELU()
         elif activation == "selu":
             self.activation = nn.SELU()
         elif activation == "tanh":
@@ -111,7 +115,8 @@ class MLP(pl.LightningModule):
                         param, mode='fan_in', nonlinearity='linear')
 
     def forward(self, x):
-        noise = torch.randn(x.shape[0], 1, device="cpu").to(self.device)
+        # noise = torch.randn(x.shape[0], 1, device="cpu").to(self.device)
+        noise = torch.randn(x.shape[0], 1, device=x.device)
         X = torch.cat([x, noise], dim=1)
         y = self.net(X)
         y = self.head(y)
@@ -297,7 +302,7 @@ class MDN(pl.LightningModule):
     def forward(self, x):
         # this_device = 'mps' if self.on_gpu else 'cpu'
         noise = torch.randn(x.shape[0], 1, device=self.device)
-        X = torch.cat([x.to_device(this_device), noise], dim=1)
+        X = torch.cat([x.to_device(self.device), noise], dim=1)
         z_h = self.mdn(X)
         pi = softmax(self.pi(z_h), -1)
         sigma = torch.exp(self.sigma(z_h))

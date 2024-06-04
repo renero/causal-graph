@@ -55,6 +55,9 @@ torch_log.propagate = False
 torch_log.setLevel(logging.ERROR)
 
 
+DEVICE = "mps" if torch.cuda.is_available() else "cpu"
+
+
 class BaseModel(object):
     """
     Base class for all models in the causalgraph package.
@@ -84,8 +87,7 @@ class BaseModel(object):
     val_loader = None
     n_rows = 0
 
-    # device = torch.device(utils.select_device("cpu"))
-    device = utils.select_device("cpu")
+    device = utils.select_device(DEVICE)
 
     def __init__(
         self,

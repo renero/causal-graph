@@ -77,7 +77,7 @@ class NNRegressor(BaseEstimator):
             batch_size: int = 44,
             num_epochs: int = 40,
             loss_fn: str = 'mse',
-            device: Union[int, str] = "cpu",
+            device: Union[int, str] = "mps", #"cpu",
             test_size: float = 0.1,
             early_stop: bool = False,
             patience: int = 10,
@@ -398,17 +398,17 @@ class NNRegressor(BaseEstimator):
                 self.models = None
 
             def __call__(self, trial):
-                self.n_layers = trial.suggest_int('n_layers', 1, 4)
+                self.n_layers = trial.suggest_int('n_layers', 1, 6)
                 self.layers = []
                 for i in range(self.n_layers):
                     self.layers.append(
-                        trial.suggest_int(f'n_units_l{i}', 1, 81))
+                        trial.suggest_int(f'n_units_l{i}', 1, 182))
                 self.activation = trial.suggest_categorical(
                     'activation', ['relu', 'selu', 'linear'])
                 self.learning_rate = trial.suggest_loguniform(
                     'learning_rate', 1e-5, 1e-1)
                 self.dropout = trial.suggest_uniform('dropout', 0.0, 0.5)
-                self.batch_size = trial.suggest_int('batch_size', 8, 64)
+                self.batch_size = trial.suggest_int('batch_size', 8, 128)
                 self.num_epochs = trial.suggest_int('num_epochs', 10, 80)
 
                 self.models = NNRegressor(
