@@ -77,7 +77,7 @@ class NNRegressor(BaseEstimator):
             batch_size: int = 44,
             num_epochs: int = 40,
             loss_fn: str = 'mse',
-            device: Union[int, str] = "mps", #"cpu",
+            device: Union[int, str] = "cpu",
             test_size: float = 0.1,
             early_stop: bool = False,
             patience: int = 10,
