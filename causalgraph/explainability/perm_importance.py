@@ -259,6 +259,9 @@ class PermutationImportance(BaseEstimator):
         G_pi: nx.DiGraph
             The DAG representing the permutation importance for the features.
         """
+        if self.verbose:
+            print("-----\npermutation_importance.predict()")
+
         self.prior = prior
         first_key = self.feature_names[0]
         if isinstance(self.regressors[first_key], MLPModel):

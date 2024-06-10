@@ -55,6 +55,7 @@ class GraphIndependence(object):
             base_graph,
             condlen: int = 1,
             condsize: int = 0,
+            max_rows: int = 500,
             prog_bar: bool = True,
             verbose: bool = False,
             silent: bool = False):
@@ -62,6 +63,7 @@ class GraphIndependence(object):
         self.base_graph = base_graph
         self.condlen = condlen
         self.condsize = condsize
+        self.max_rows = max_rows
         self.prog_bar = prog_bar
         self.verbose = verbose
         self.silent_ = silent
@@ -213,6 +215,13 @@ class GraphIndependence(object):
         - float: the t-statistic of the HSIC independence test
         - float: the p-value of the independence test
         """
+        if x.shape[0] > self.max_rows:
+            idx = np.random.choice(x.shape[0], self.max_rows, replace=False)
+            x = x[idx]
+            y = y[idx]
+            if Z is not None:
+                Z = Z[idx]
+
         if Z is None:
             stat, pval = Hsic().test(x, y)
         else:
@@ -302,6 +311,11 @@ class GraphIndependence(object):
         `cond_indep_pvals`
         """
         self.cond_indep_pvals = {}
+        if self.verbose and self.data.shape[0] > self.max_rows:
+            print(
+                f"[INFO] Data has more than {self.max_rows} rows. "
+                f"Sampling {self.max_rows} rows for cond. indep. test.")
+
         for x in self.feature_names:
             for y in self.feature_names:
                 if x == y:

@@ -354,6 +354,9 @@ class ShapEstimator(BaseEstimator):
         Builds a causal graph from the shap values using a selection mechanism based
         on clustering, knee or abrupt methods.
         """
+        if self.verbose:
+            print("-----\nshap.predict()")
+
         check_is_fitted(self, 'is_fitted_')
         self.prior = prior
 

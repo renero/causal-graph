@@ -244,7 +244,9 @@ class Rex(BaseEstimator, ClassifierMixin):
     def predict(self,
                 X: pd.DataFrame,
                 ref_graph: nx.DiGraph = None,
-                prior: List[List[str]] = None):
+                prior: List[List[str]] = None,
+                pipeline: list | str = None
+                ):
         """
         Predicts the causal graph from the given data.
 
@@ -298,49 +300,59 @@ class Rex(BaseEstimator, ClassifierMixin):
 
         # Create a new pipeline for the prediction stages.
         prediction = Pipeline(
-            self, description="Predicting causal graph", prog_bar=self.prog_bar,
-            verbose=self.verbose, silent=self.silent, subtask=True)
+            self,
+            description="Predicting causal graph",
+            prog_bar=self.prog_bar,
+            verbose=self.verbose,
+            silent=self.silent,
+            subtask=True)
 
         # Overwrite values for prog_bar and verbosity with current pipeline
         #  values, in case predict is called from a loaded experiment
         self.shaps.prog_bar = self.prog_bar
         self.shaps.verbose = self.verbose
 
-        steps = [
-            # DAGs construction
-            ('G_shap', 'shaps.predict', {'root_causes': 'root_causes', 'prior': prior}),
-            ('G_rho', 'dag_from_discrepancy', {
-                'discrepancy_upper_threshold': self.discrepancy_threshold, "verbose": True}),
-            ('G_adj', 'adjust_discrepancy', {'dag': 'G_shap'}),
-            ('G_pi', 'pi.predict', {'root_causes': 'root_causes', 'prior': prior}),
-            ('indep', GraphIndependence, {'base_graph': 'G_shap'}),
-            ('G_indep', 'indep.fit_predict'),
-            ('G_final', 'shaps.adjust', {'graph': 'G_indep'}),
+        if pipeline is not None:
+            if isinstance(pipeline, list):
+                prediction.from_list(pipeline)
+            elif isinstance(pipeline, str):
+                prediction.from_config(pipeline)
+        else:
+            steps = [
+                # DAGs construction
+                ('G_shap', 'shaps.predict', {'root_causes': 'root_causes', 'prior': prior}),
+                ('G_rho', 'dag_from_discrepancy', {
+                    'discrepancy_upper_threshold': self.discrepancy_threshold, "verbose": True}),
+                ('G_adj', 'adjust_discrepancy', {'dag': 'G_shap'}),
+                ('G_pi', 'pi.predict', {'root_causes': 'root_causes', 'prior': prior}),
+                ('indep', GraphIndependence, {'base_graph': 'G_shap'}),
+                ('G_indep', 'indep.fit_predict'),
+                ('G_final', 'shaps.adjust', {'graph': 'G_indep'}),
 
-            # Knowledge Summarization
-            ('summarize_knowledge', {'ref_graph': ref_graph}),
+                # Knowledge Summarization
+                ('summarize_knowledge', {'ref_graph': ref_graph}),
 
-            # Old: break_cycles is now part of DAG construction
-            # ('G_shag', 'break_cycles', {'dag': 'G_shap'}),
-            # ('G_adjnc', 'break_cycles', {'dag': 'G_adj'}),
+                # Old: break_cycles is now part of DAG construction
+                # ('G_shag', 'break_cycles', {'dag': 'G_shap'}),
+                # ('G_adjnc', 'break_cycles', {'dag': 'G_adj'}),
 
-            # Metrics Generation, here
-            ('metrics_shap', 'score', {
-             'ref_graph': ref_graph, 'predicted_graph': 'G_shap'}),
-            ('metrics_rho', 'score', {
-             'ref_graph': ref_graph, 'predicted_graph': 'G_rho'}),
-            ('metrics_adj', 'score', {
-             'ref_graph': ref_graph, 'predicted_graph': 'G_adj'}),
-            ('metrics_indep', 'score', {
-             'ref_graph': ref_graph, 'predicted_graph': 'G_indep'}),
-            ('metrics_final', 'score', {
-             'ref_graph': ref_graph, 'predicted_graph': 'G_final'})
-            # ('metrics_shag', 'score', {
-            #  'ref_graph': ref_graph, 'predicted_graph': 'G_shag'}),
-            # ('metrics_adjnc', 'score', {
-            #  'ref_graph': ref_graph, 'predicted_graph': 'G_adjnc'}),
-        ]
-        prediction.from_list(steps)
+                # Metrics Generation, here
+                ('metrics_shap', 'score', {
+                'ref_graph': ref_graph, 'predicted_graph': 'G_shap'}),
+                ('metrics_rho', 'score', {
+                'ref_graph': ref_graph, 'predicted_graph': 'G_rho'}),
+                ('metrics_adj', 'score', {
+                'ref_graph': ref_graph, 'predicted_graph': 'G_adj'}),
+                ('metrics_indep', 'score', {
+                'ref_graph': ref_graph, 'predicted_graph': 'G_indep'}),
+                ('metrics_final', 'score', {
+                'ref_graph': ref_graph, 'predicted_graph': 'G_final'})
+                # ('metrics_shag', 'score', {
+                #  'ref_graph': ref_graph, 'predicted_graph': 'G_shag'}),
+                # ('metrics_adjnc', 'score', {
+                #  'ref_graph': ref_graph, 'predicted_graph': 'G_adjnc'}),
+            ]
+            prediction.from_list(steps)
         prediction.run()
         if '\\n' in self.G_final.nodes:
             self.G_final.remove_node('\\n')
@@ -573,6 +585,31 @@ class Rex(BaseEstimator, ClassifierMixin):
 
     def __str__(self):
         return utils.stringfy_object(self)
+
+    def verbose_on(self):
+        self.verbose = True
+        self.silent = False
+        self.prog_bar = False
+        self.shaps.verbose = True
+        self.shaps.prog_bar = False
+        self.hierarchies.verbose = True
+        self.hierarchies.prog_bar = False
+        self.pi.verbose = True
+        self.pi.prog_bar = False
+        self.models.verbose = True
+        self.models.prog_bar = False
+
+    def verbose_off(self):
+        self.verbose = False
+        self.prog_bar = True
+        self.shaps.verbose = False
+        self.shaps.prog_bar = True
+        self.hierarchies.verbose = False
+        self.hierarchies.prog_bar = True
+        self.pi.verbose = False
+        self.pi.prog_bar = True
+        self.models.verbose = False
+        self.models.prog_bar = True
 
 
 def custom_main(dataset_name,
