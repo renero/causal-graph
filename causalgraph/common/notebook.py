@@ -416,7 +416,7 @@ class Experiment(BaseExperiment):
 
         return self
 
-    def load(self, exp_name=None) -> Rex:
+    def load(self, exp_name=None) -> "Experiment":
         """
         Loads the experiment data.
 

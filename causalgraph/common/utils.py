@@ -249,23 +249,31 @@ def graph_intersection(g1: AnyGraph, g2: AnyGraph) -> AnyGraph:
     if len(nodes) == 0:
         return nx.DiGraph()
 
-    # Take the data from the nodes in g1 and g2, as the minimum value of both
-    # first_node = list(g1.nodes)[0]
-    # data_fields = g1.nodes[first_node].keys()
-    # nodes_data = {}
-    # for key in data_fields:
-    #     for n in nodes:
-    #         nodes_data[n] = {key: min(g1.nodes[n][key], g2.nodes[n][key])}
+    # For the nodes in the resulting DAG ("g"), get the data from the nodes in
+    # g1 and g2, as the average value of both
+    first_node = list(g1.nodes)[0]
+    data_fields = g1.nodes[first_node].keys()
+    nodes_data = {}
+    for key in data_fields:
+        # Check if the value for this key is numeric
+        if isinstance(g1.nodes[first_node][key], (int, float, np.number)):
+            for n in nodes:
+                if n in g1.nodes and n in g2.nodes:
+                    nodes_data[n] = {
+                        key: (g1.nodes[n][key] + g2.nodes[n][key]) / 2}
+                elif n in g1.nodes:
+                    nodes_data[n] = {key: g1.nodes[n][key]}
+                elif n in g2.nodes:
+                    nodes_data[n] = {key: g2.nodes[n][key]}
 
     # Get the edges from g1 and g2, and take only those that match completely
-    # edges = set(g1.edges).intersection(set(g2.edges))
     edges = g1.edges & g2.edges
 
     # Create a new graph with the nodes, nodes_data and edges
     g = nx.DiGraph()
     g.add_nodes_from(nodes)
-    # nx.set_node_attributes(g, nodes_data)
     g.add_edges_from(edges)
+    nx.set_node_attributes(g, nodes_data)
 
     return g
 
@@ -282,13 +290,22 @@ def graph_union(g1: AnyGraph, g2: AnyGraph) -> AnyGraph:
     g.add_edges_from(g1.edges)
     g.add_edges_from(g2.edges)
 
-    # Take the data from the nodes in g1 and g2, as the minimum value of both
-    # first_node = list(g1.nodes)[0]
-    # data_fields = g1.nodes[first_node].keys()
-    # nodes_data = {}
-    # for key in data_fields:
-    #     for n in nodes:
-    #         nodes_data[n] = {key: min(g1.nodes[n][key], g2.nodes[n][key])}
+    # For the nodes in the resulting DAG ("g"), get the data from the nodes in
+    # g1 and g2, as the average value of both
+    first_node = list(g1.nodes)[0]
+    data_fields = g1.nodes[first_node].keys()
+    nodes_data = {}
+    for key in data_fields:
+        # Check if the value for this key is numeric
+        if isinstance(g1.nodes[first_node][key], (int, float, np.number)):
+            for n in nodes:
+                if n in g1.nodes and n in g2.nodes:
+                    nodes_data[n] = {key: (g1.nodes[n][key] + g2.nodes[n][key]) / 2}
+                elif n in g1.nodes:
+                    nodes_data[n] = {key: g1.nodes[n][key]}
+                elif n in g2.nodes:
+                    nodes_data[n] = {key: g2.nodes[n][key]}
+    nx.set_node_attributes(g, nodes_data)
 
     return g
 
@@ -408,17 +425,18 @@ def digraph_from_connected_features(
     # Apply a simple fix: if quality of regression for a feature is poor, then
     # that feature can be considered a root or parent node. Therefore, we cannot
     # have an edge pointing to that node.
-    changes = []
-    for parent_node in root_causes:
-        print(f"Checking root cause {parent_node}...") if verbose else None
-        for cause, effect in dag.edges():
-            if effect == parent_node:
-                print(
-                    f"Reverting edge {cause} -> {effect}") if verbose else None
-                changes.append((cause, effect))
-    for cause, effect in changes:
-        dag.remove_edge(cause, effect)
-        dag.add_edge(effect, cause)
+    if root_causes:
+        changes = []
+        for parent_node in root_causes:
+            print(f"Checking root cause {parent_node}...") if verbose else None
+            for cause, effect in dag.edges():
+                if effect == parent_node:
+                    print(
+                        f"Reverting edge {cause} -> {effect}") if verbose else None
+                    changes.append((cause, effect))
+        for cause, effect in changes:
+            dag.remove_edge(cause, effect)
+            dag.add_edge(effect, cause)
 
     return dag
 
@@ -485,12 +503,11 @@ def break_cycles_using_prior(
     nx.DiGraph: The directed acyclic graph with the edges removed according to
         the prior knowledge.
     """
-    dag = nx.DiGraph()
-    dag.add_edges_from(original_dag.edges)
+    new_dag = original_dag.copy()
 
     if verbose:
         print("Prior knowledge:", prior)
-    cycles = list(nx.simple_cycles(dag))
+    cycles = list(nx.simple_cycles(new_dag))
     while len(cycles) > 0:
         cycle = cycles.pop(0)
         if verbose:
@@ -513,10 +530,10 @@ def break_cycles_using_prior(
                         print(
                             f"  ↳ Breaking cycle, removing edge {node} -> {neighbour}")
                         print("** Recomputing cycles **")
-                    dag.remove_edge(node, neighbour)
-                    cycles = list(nx.simple_cycles(dag))
+                    new_dag.remove_edge(node, neighbour)
+                    cycles = list(nx.simple_cycles(new_dag))
                     break
-    return dag
+    return new_dag
 
 
 def potential_misoriented_edges(
