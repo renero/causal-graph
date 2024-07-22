@@ -855,3 +855,36 @@ def stringfy_object(object_: object) -> str:
         ret += f"{attr:25} <{getattr(object_, attr).__class__.__name__}>\n"
 
     return ret
+
+
+def classify_variable(arr):
+    """
+    Classify the type of variable in the array. The classification is done
+    based on the number of unique values in the array. If the array has only
+    two unique values, then the variable is classified as binary. If the
+    unique values are integers, then the variable is classified as multiclass.
+    Otherwise, the variable is classified as continuous.
+
+    Parameters:
+    -----------
+    arr (numpy.ndarray): The array to be classified.
+
+    Returns:
+    --------
+    str: The classification of the variable
+
+    Example:
+    --------
+    >>> arr = np.array([1, 2, 3, 4, 5])
+    >>> classify_variable(arr)
+    'multiclass'
+    """
+    unique_values = np.unique(arr)
+    num_unique = len(unique_values)
+
+    if num_unique == 2:
+        return "binary"
+    elif np.all(unique_values.astype(np.int64) == unique_values):
+        return "multiclass"
+    else:
+        return "continuous"
