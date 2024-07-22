@@ -211,7 +211,20 @@ class Rex(BaseEstimator, ClassifierMixin):
         """
         self.random_state_state = check_random_state(self.random_state)
         self.n_features_in_ = X.shape[1]
-        self.feature_names = list(X.columns)
+
+        # Set the feature names to the names of the columns, if available as a
+        # DataFrame. Otherwise, use the default names.
+        if isinstance(X, pd.DataFrame):
+            self.feature_names = list(X.columns)
+        elif isinstance(X, np.ndarray):
+            self.feature_names = [f"X{i}" for i in range(X.shape[1])]
+        else:
+            self.feature_names = [f"X{i}" for i in range(len(X[0]))]
+
+        self.feature_types = {}
+        for feature_name in self.feature_names:
+            self.feature_types[feature_name] = utils.classify_variable(X[feature_name])
+
         self.X = copy(X)
         self.y = copy(y) if y is not None else None
 
@@ -621,6 +634,8 @@ def custom_main(dataset_name,
 
 
     def get_prior(ref_graph):
+        if ref_graph is None:
+            return None
         root_nodes = [n for n, d in ref_graph.in_degree() if d == 0]
         return [root_nodes, [n for n in ref_graph.nodes if n not in root_nodes]]
 
@@ -635,8 +650,7 @@ def custom_main(dataset_name,
         name=dataset_name, tune_model=tune_model,
         model_type=model_type, explainer=explainer)
 
-    rex.fit_predict(train, test, ref_graph,
-                    prior=get_prior(ref_graph))
+    rex.fit_predict(train, test, ref_graph, prior=get_prior(ref_graph))
 
     if save:
         where_to = utils.save_experiment(rex.name, output_path, rex)
@@ -666,6 +680,7 @@ def prior_main(dataset_name,
 
 
 if __name__ == "__main__":
-    custom_main('rex_generated_gp_add_5',  model_type="nn", explainer="gradient",
+    custom_main('r_cleaned_encoded', input_path="/Users/renero/phd/data/RC4/risks/",
+                model_type="nn", explainer="gradient",
                 tune_model=False, save=False)
     # prior_main('rex_generated_gp_add_5')

@@ -7,7 +7,7 @@ Example:
     >> experiment = Experiment("linear", csv_filename="linear.csv")
     >> rex = experiment.load()
 
-(C) 2023 J. Renero
+(C) 2023, 2024 J. Renero
 """
 
 import glob

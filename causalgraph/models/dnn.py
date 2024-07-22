@@ -169,14 +169,9 @@ class NNRegressor(BaseEstimator):
                 verbose=self.verbose)
             X_original = X.copy()
 
-        # pbar_in = tqdm(
-        #     total=len(self.feature_names),
-        #     **tqdm_params(self._fit_desc, self.prog_bar, silent=self.silent))
         pbar = ProgBar().start_subtask(len(self.feature_names))
 
         for target_name in self.feature_names:
-            # pbar_in.refresh()
-
             # if correlation_th is not None then, remove features that are highly
             # correlated with the target, at each step of the loop
             if self.correlation_th is not None:
@@ -298,39 +293,6 @@ class NNRegressor(BaseEstimator):
 
         self.scoring = np.array(scores)
         return self.scoring
-
-    # def get_input_tensors(self, target_name: str):
-    #     """
-    #     Returns the data used to train the model for the given target.
-
-    #     Parameters
-    #     ----------
-    #     target_name : str
-    #         The name of the target.
-
-    #     Returns
-    #     -------
-    #     Tuple[pd.DataFrame, pd.Series]
-    #         The data used to train the model for the given target.
-
-    #     Examples
-    #     --------
-    #     >>> nn = NNRegressor().fit(data)
-    #     >>> X, y = nn.get_input_tensors('target1')
-
-    #     """
-    #     model = self.regressor[target_name]
-    #     features_tensor = torch.autograd.Variable(
-    #         model.train_loader.dataset.features)
-    #     target_tensor = model.train_loader.dataset.target
-
-    #     cols = list(self.feature_names)
-    #     cols.remove(target_name)
-
-    #     X = pd.DataFrame(features_tensor.detach().numpy(), columns=cols)
-    #     y = pd.DataFrame(target_tensor.detach().numpy(), columns=[target_name])
-
-    #     return X, y
 
     def __repr__(self):
         forbidden_attrs = [
