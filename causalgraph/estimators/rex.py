@@ -173,10 +173,12 @@ class Rex(BaseEstimator, ClassifierMixin):
             print(
                 f"WARNING: SHAP '{explainer}' not supported for model '{model_type}'. "
                 f"Using 'gradient' instead.")
+            self.explainer = "gradient"
         if (model_type == "gbt" and explainer != "explainer"):
             print(
                 f"WARNING: SHAP '{explainer}' not supported for model '{model_type}'. "
                 f"Using 'explainer' instead.")
+            self.explainer = "explainer"
 
     def _more_tags(self):
         return {
@@ -229,7 +231,8 @@ class Rex(BaseEstimator, ClassifierMixin):
             ('root_causes', 'compute_regression_quality'),
             ('shaps', ShapEstimator, {'models': 'models'}),
             ('shaps.fit'),
-            ('pi', PermutationImportance, {'models': 'models'}),
+            ('pi', PermutationImportance, {
+                'models': 'models', 'discrepancies': 'shaps.shap_discrepancies'}),
             ('pi.fit'),
         ]
         pipeline.from_list(steps)
@@ -241,7 +244,9 @@ class Rex(BaseEstimator, ClassifierMixin):
     def predict(self,
                 X: pd.DataFrame,
                 ref_graph: nx.DiGraph = None,
-                prior: List[List[str]] = None):
+                prior: List[List[str]] = None,
+                pipeline: list | str = None
+                ):
         """
         Predicts the causal graph from the given data.
 
@@ -295,39 +300,59 @@ class Rex(BaseEstimator, ClassifierMixin):
 
         # Create a new pipeline for the prediction stages.
         prediction = Pipeline(
-            self, description="Predicting causal graph", prog_bar=self.prog_bar,
-            verbose=self.verbose, silent=self.silent, subtask=True)
+            self,
+            description="Predicting causal graph",
+            prog_bar=self.prog_bar,
+            verbose=self.verbose,
+            silent=self.silent,
+            subtask=True)
 
         # Overwrite values for prog_bar and verbosity with current pipeline
         #  values, in case predict is called from a loaded experiment
         self.shaps.prog_bar = self.prog_bar
         self.shaps.verbose = self.verbose
 
-        steps = [
-            ('G_shap', 'shaps.predict', {'root_causes': 'root_causes', 'prior': prior}),
-            ('G_pi', 'pi.predict', {'root_causes': 'root_causes', 'prior': prior}),
-            ('indep', GraphIndependence, {'base_graph': 'G_shap'}),
-            ('G_indep', 'indep.fit_predict'),
-            ('G_final', 'shaps.adjust', {'graph': 'G_indep'}),
-            ('summarize_knowledge', {'ref_graph': ref_graph}),
-            ('G_adj', 'adjust_discrepancy', {'dag': 'G_shap'}),
-            ('G_shag', 'break_cycles', {'dag': 'G_shap'}),
-            ('G_adjnc', 'break_cycles', {'dag': 'G_adj'}),
-            # Metrics Generation, here
-            ('metrics_shap', 'score', {
-             'ref_graph': ref_graph, 'predicted_graph': 'G_shap'}),
-            ('metrics_shag', 'score', {
-             'ref_graph': ref_graph, 'predicted_graph': 'G_shag'}),
-            ('metrics_adj', 'score', {
-             'ref_graph': ref_graph, 'predicted_graph': 'G_adj'}),
-            ('metrics_adjnc', 'score', {
-             'ref_graph': ref_graph, 'predicted_graph': 'G_adjnc'}),
-            ('metrics_indep', 'score', {
-             'ref_graph': ref_graph, 'predicted_graph': 'G_indep'}),
-            ('metrics_final', 'score', {
-             'ref_graph': ref_graph, 'predicted_graph': 'G_final'})
-        ]
-        prediction.from_list(steps)
+        if pipeline is not None:
+            if isinstance(pipeline, list):
+                prediction.from_list(pipeline)
+            elif isinstance(pipeline, str):
+                prediction.from_config(pipeline)
+        else:
+            steps = [
+                # DAGs construction
+                ('G_shap', 'shaps.predict', {'root_causes': 'root_causes', 'prior': prior}),
+                ('G_rho', 'dag_from_discrepancy', {
+                    'discrepancy_upper_threshold': self.discrepancy_threshold, "verbose": True}),
+                ('G_adj', 'adjust_discrepancy', {'dag': 'G_shap'}),
+                ('G_pi', 'pi.predict', {'root_causes': 'root_causes', 'prior': prior}),
+                ('indep', GraphIndependence, {'base_graph': 'G_shap'}),
+                ('G_indep', 'indep.fit_predict'),
+                ('G_final', 'shaps.adjust', {'graph': 'G_indep'}),
+
+                # Knowledge Summarization
+                ('summarize_knowledge', {'ref_graph': ref_graph}),
+
+                # Old: break_cycles is now part of DAG construction
+                # ('G_shag', 'break_cycles', {'dag': 'G_shap'}),
+                # ('G_adjnc', 'break_cycles', {'dag': 'G_adj'}),
+
+                # Metrics Generation, here
+                ('metrics_shap', 'score', {
+                'ref_graph': ref_graph, 'predicted_graph': 'G_shap'}),
+                ('metrics_rho', 'score', {
+                'ref_graph': ref_graph, 'predicted_graph': 'G_rho'}),
+                ('metrics_adj', 'score', {
+                'ref_graph': ref_graph, 'predicted_graph': 'G_adj'}),
+                ('metrics_indep', 'score', {
+                'ref_graph': ref_graph, 'predicted_graph': 'G_indep'}),
+                ('metrics_final', 'score', {
+                'ref_graph': ref_graph, 'predicted_graph': 'G_final'})
+                # ('metrics_shag', 'score', {
+                #  'ref_graph': ref_graph, 'predicted_graph': 'G_shag'}),
+                # ('metrics_adjnc', 'score', {
+                #  'ref_graph': ref_graph, 'predicted_graph': 'G_adjnc'}),
+            ]
+            prediction.from_list(steps)
         prediction.run()
         if '\\n' in self.G_final.nodes:
             self.G_final.remove_node('\\n')
@@ -456,7 +481,7 @@ class Rex(BaseEstimator, ClassifierMixin):
             dag (nx.DiGraph): The DAG to break the cycle from.
         """
         return utils.break_cycles_if_present(
-            dag, self.learnings, self.prior, verbose=self.verbose)
+            dag, self.shaps.shap_discrepancies, self.prior, verbose=self.verbose)
 
     def adjust_discrepancy(self, dag: nx.DiGraph):
         """
@@ -473,16 +498,15 @@ class Rex(BaseEstimator, ClassifierMixin):
         G_adj = dag.copy()
         gof = np.zeros((len(self.feature_names), len(self.feature_names)))
 
-        # Filter rows based on the condition that origin and target are linked in DAG
-        filtered_rows = self.learnings[
-            ~self.learnings.apply(
-                lambda row: G_adj.has_edge(row['origin'], row['target']) or
-                G_adj.has_edge(row['target'], row['origin']), axis=1)]
-
-        for _, row in filtered_rows.iterrows():
-            i = self.feature_names.index(row['origin'])
-            j = self.feature_names.index(row['target'])
-            gof[i, j] = row['shap_gof']
+        # Loop through all pairs of nodes where the edge is not present in the graph.
+        for origin in self.feature_names:
+            for target in self.feature_names:
+                if origin == target:
+                    continue
+                if not G_adj.has_edge(origin, target) and not G_adj.has_edge(target, origin):
+                    i = self.feature_names.index(origin)
+                    j = self.feature_names.index(target)
+                    gof[i, j] = self.shaps.shap_discrepancies[target][origin].shap_gof
 
         new_edges = set()
         # Loop through the i, j positions in the matrix `gof` that are
@@ -500,11 +524,13 @@ class Rex(BaseEstimator, ClassifierMixin):
         if new_edges:
             G_adj.add_edges_from(new_edges)
 
+        G_adj = self.break_cycles(G_adj)
+
         return G_adj
 
     def dag_from_discrepancy(
             self,
-            discrepancy_upper_threshold:float = 0.99) -> nx.DiGraph:
+            discrepancy_upper_threshold:float = 0.99, verbose:bool=False) -> nx.DiGraph:
         """
         Build a directed acyclic graph (DAG) from the discrepancies in the SHAP values.
         The discrepancies are calculated as 1.0 - GoodnessOfFit, so that a low
@@ -521,25 +547,37 @@ class Rex(BaseEstimator, ClassifierMixin):
         --------
             nx.DiGraph: The directed acyclic graph (DAG) built from the discrepancies.
         """
+        if verbose:
+            print("-----\ndag_from_discrepancies()")
+
         # Find out what pairs of features have low discrepancy, and add them as edges.
         # A low discrepancy means that 1.0 - GoodnesOfFit is lower than the threshold.
         low_discrepancy_edges = defaultdict(list)
+        if verbose:
+            print('    ' + ' '.join([f"{f:^5s}" for f in self.feature_names]))
         for child in self.feature_names:
+            if verbose:
+                print(f"{child}: ", end="")
             for parent in self.feature_names:
                 if child == parent:
+                    if verbose:
+                        print("  X  ", end=" ")
                     continue
                 discrepancy = 1. - self.shaps.shap_discrepancies[child][parent].shap_gof
+                if verbose:
+                    print(f"{discrepancy:+.2f}", end=" ")
                 if discrepancy < discrepancy_upper_threshold:
                     if low_discrepancy_edges[child]:
                         low_discrepancy_edges[child].append(parent)
                     else:
                         low_discrepancy_edges[child] = [parent]
+            if verbose:
+                print()
 
         # Build a DAG from the connected features.
         self.G_rho = utils.digraph_from_connected_features(
             self.X, self.feature_names, self.models, low_discrepancy_edges,
-            root_causes=self.root_causes,
-            prior=self.prior, verbose=self.verbose)
+            root_causes=self.root_causes, prior=self.prior, verbose=verbose)
 
         self.G_rho = self.break_cycles(self.G_rho)
 
@@ -548,6 +586,31 @@ class Rex(BaseEstimator, ClassifierMixin):
     def __str__(self):
         return utils.stringfy_object(self)
 
+    def verbose_on(self):
+        self.verbose = True
+        self.silent = False
+        self.prog_bar = False
+        self.shaps.verbose = True
+        self.shaps.prog_bar = False
+        self.hierarchies.verbose = True
+        self.hierarchies.prog_bar = False
+        self.pi.verbose = True
+        self.pi.prog_bar = False
+        self.models.verbose = True
+        self.models.prog_bar = False
+
+    def verbose_off(self):
+        self.verbose = False
+        self.prog_bar = True
+        self.shaps.verbose = False
+        self.shaps.prog_bar = True
+        self.hierarchies.verbose = False
+        self.hierarchies.prog_bar = True
+        self.pi.verbose = False
+        self.pi.prog_bar = True
+        self.models.verbose = False
+        self.models.prog_bar = True
+
 
 def custom_main(dataset_name,
                 input_path="/Users/renero/phd/data/RC3/",
@@ -555,6 +618,11 @@ def custom_main(dataset_name,
                 tune_model: bool = False,
                 model_type="nn", explainer="gradient",
                 save=False):
+
+
+    def get_prior(ref_graph):
+        root_nodes = [n for n, d in ref_graph.in_degree() if d == 0]
+        return [root_nodes, [n for n in ref_graph.nodes if n not in root_nodes]]
 
     ref_graph = utils.graph_from_dot_file(f"{input_path}{dataset_name}.dot")
     data = pd.read_csv(f"{input_path}{dataset_name}.csv")
@@ -568,8 +636,7 @@ def custom_main(dataset_name,
         model_type=model_type, explainer=explainer)
 
     rex.fit_predict(train, test, ref_graph,
-                    prior=[['V0', 'V1', 'V3', 'V4', 'V5'],
-                           ['V2', 'V6', 'V7', 'V8', 'V9']])
+                    prior=get_prior(ref_graph))
 
     if save:
         where_to = utils.save_experiment(rex.name, output_path, rex)
@@ -599,6 +666,6 @@ def prior_main(dataset_name,
 
 
 if __name__ == "__main__":
-    # custom_main('rex_generated_linear_9',  model_type="nn", explainer="gradient",
-    #             tune_model=False, save=False)
-    prior_main('rex_generated_gp_add_5')
+    custom_main('rex_generated_gp_add_5',  model_type="nn", explainer="gradient",
+                tune_model=False, save=False)
+    # prior_main('rex_generated_gp_add_5')

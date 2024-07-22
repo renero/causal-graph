@@ -353,14 +353,50 @@ class Experiment(BaseExperiment):
             input_path, output_path, train_size=train_size,
             random_state=random_state, verbose=verbose)
         self.model_type = model_type
+        self.is_fitted = False
 
         # Prepare the input
         self.prepare_experiment_input(
             experiment_name, csv_filename, dot_filename)
 
-    def fit(self, estimator='rex', **kwargs):
+    def fit(self, estimator_name='rex', **kwargs):
         """
         Fits the experiment data.
+
+        Args:
+            **kwargs: Additional keyword arguments to pass to the Rex constructor.
+
+        Returns:
+            Rex: The fitted experiment data.
+        """
+
+        self.estimator_name = estimator_name
+        estimator_object = self.create_estimator(
+            estimator_name, name=self.experiment_name, **kwargs)
+        estimator_object.fit(self.train_data, self.test_data)
+        setattr(self, estimator_name, estimator_object)
+        self.is_fitted = True
+
+        return self
+
+    def predict(self, estimator='rex', **kwargs):
+        """
+        Predicts with the experiment data.
+
+        Args:
+            **kwargs: Additional keyword arguments to pass to the `predict()` method
+
+        Returns:
+            Rex: The fitted experiment data.
+        """
+        estimator = getattr(self, self.estimator_name)
+        estimator.predict(self.train_data, self.test_data, **kwargs)
+
+        return self
+
+    def fit_predict(self, estimator='rex', **kwargs):
+        """
+        Fits and predicts with the experiment data.
 
         Args:
             **kwargs: Additional keyword arguments to pass to the Rex constructor.
@@ -380,7 +416,7 @@ class Experiment(BaseExperiment):
 
         return self
 
-    def load(self, exp_name=None) -> Rex:
+    def load(self, exp_name=None) -> "Experiment":
         """
         Loads the experiment data.
 

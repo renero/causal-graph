@@ -64,6 +64,7 @@ class PermutationImportance(BaseEstimator):
     def __init__(
             self,
             models: dict,
+            discrepancies: dict = None,
             correlation_th: float = None,
             n_repeats: int = 10,
             mean_pi_percentile: float = 0.8,
@@ -79,6 +80,9 @@ class PermutationImportance(BaseEstimator):
         models: dict
             A dictionary of models, where the keys are the target variables and
             the values are the models trained to predict the target variables.
+        discrepancies: dict
+            A dictionary of discrepancies for each target variable, based on SHAP
+            values.
         n_repeats: int
             The number of times to repeat the permutation importance algorithm.
         mean_pi_percentile: float
@@ -95,6 +99,7 @@ class PermutationImportance(BaseEstimator):
         """
         super().__init__()
         self.models = models
+        self.shap_discrepancies = discrepancies
         self.regressors = models.regressor
         self.correlation_th = correlation_th
         self.n_repeats = n_repeats
@@ -254,6 +259,9 @@ class PermutationImportance(BaseEstimator):
         G_pi: nx.DiGraph
             The DAG representing the permutation importance for the features.
         """
+        if self.verbose:
+            print("-----\npermutation_importance.predict()")
+
         self.prior = prior
         first_key = self.feature_names[0]
         if isinstance(self.regressors[first_key], MLPModel):
@@ -312,6 +320,8 @@ class PermutationImportance(BaseEstimator):
                 verbose=self.verbose)
 
         self.G_pi = self._build_pi_dag(X, root_causes)
+        self.GP_pi = utils.break_cycles_if_present(
+            self.G_pi, self.shap_discrepancies, self.prior, verbose=self.verbose)
         return self.G_pi
 
     def _predict_sklearn(self, X, root_causes) -> nx.DiGraph:
