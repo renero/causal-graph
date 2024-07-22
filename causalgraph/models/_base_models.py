@@ -91,6 +91,10 @@ class MLP(pl.LightningModule):
             self.loss_fn = nn.L1Loss()
         elif loss == "mmd":
             self.loss_fn = MMDLoss()  # mmd_type="quadratic")
+        elif loss == "binary_crossentropy":
+            self.loss_fn = nn.BCEWithLogitsLoss()
+        elif loss == "crossentropy":
+            self.loss_fn = nn.CrossEntropyLoss()
         else:
             raise ValueError("Unknown loss function.")
 

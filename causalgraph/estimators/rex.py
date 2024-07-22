@@ -211,19 +211,8 @@ class Rex(BaseEstimator, ClassifierMixin):
         """
         self.random_state_state = check_random_state(self.random_state)
         self.n_features_in_ = X.shape[1]
-
-        # Set the feature names to the names of the columns, if available as a
-        # DataFrame. Otherwise, use the default names.
-        if isinstance(X, pd.DataFrame):
-            self.feature_names = list(X.columns)
-        elif isinstance(X, np.ndarray):
-            self.feature_names = [f"X{i}" for i in range(X.shape[1])]
-        else:
-            self.feature_names = [f"X{i}" for i in range(len(X[0]))]
-
-        self.feature_types = {}
-        for feature_name in self.feature_names:
-            self.feature_types[feature_name] = utils.classify_variable(X[feature_name])
+        self.feature_names = utils.get_feature_names(X)
+        self.feature_types = utils.get_feature_types(X)
 
         self.X = copy(X)
         self.y = copy(y) if y is not None else None
@@ -662,6 +651,7 @@ def prior_main(dataset_name,
                output_path="/Users/renero/phd/output/RC4/",
                model_type="nn"):
     from causalgraph.common.notebook import Experiment
+
     experiment_name = f"{dataset_name}_{model_type}"
     data = pd.read_csv(f"{input_path}{dataset_name}.csv")
     scaler = StandardScaler()

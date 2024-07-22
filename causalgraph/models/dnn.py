@@ -33,6 +33,7 @@ from causalgraph.common import GRAY, GREEN, RESET
 from causalgraph.explainability.hierarchies import Hierarchies
 from causalgraph.models._columnar import ColumnsDataset
 from causalgraph.models._models import MLPModel
+from causalgraph.common import utils
 
 warnings.filterwarnings("ignore")
 
@@ -159,7 +160,8 @@ class NNRegressor(BaseEstimator):
         """
         # X, y = check_X_y(X, y)
         self.n_features_in_ = X.shape[1]
-        self.feature_names = list(X.columns)
+        self.feature_names = utils.get_feature_names(X)
+        self.feature_types = utils.get_feature_types(X)
         self.regressor = {}
 
         if self.correlation_th:
@@ -182,6 +184,14 @@ class NNRegressor(BaseEstimator):
                         print("REMOVED CORRELATED FEATURES: ",
                               self.correlated_features[target_name])
 
+            # Determine Loss function based on the type of target variable
+            if self.feature_types[target_name] == 'categorical':
+                loss_fn = 'crossentropy'
+            elif self.feature_types[target_name] == 'binary':
+                loss_fn = 'binary_crossentropy'
+            else:
+                loss_fn = self.loss_fn
+
             self.regressor[target_name] = MLPModel(
                 target=target_name,
                 input_size=X.shape[1],
@@ -189,7 +199,7 @@ class NNRegressor(BaseEstimator):
                 hidden_dim=self.hidden_dim,
                 learning_rate=self.learning_rate,
                 batch_size=self.batch_size,
-                loss_fn=self.loss_fn,
+                loss_fn=loss_fn,
                 dropout=self.dropout,
                 num_epochs=self.num_epochs,
                 dataframe=X,
@@ -202,10 +212,7 @@ class NNRegressor(BaseEstimator):
                 prog_bar=self.prog_bar)
             self.regressor[target_name].train()
 
-            # pbar_in.update(1)
             pbar.update_subtask()
-
-        # pbar_in.close()
 
         self.is_fitted_ = True
         return self
