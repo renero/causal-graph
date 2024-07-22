@@ -359,7 +359,7 @@ class Experiment(BaseExperiment):
         self.prepare_experiment_input(
             experiment_name, csv_filename, dot_filename)
 
-    def fit(self, estimator='rex', **kwargs):
+    def fit(self, estimator_name='rex', **kwargs):
         """
         Fits the experiment data.
 
@@ -370,11 +370,11 @@ class Experiment(BaseExperiment):
             Rex: The fitted experiment data.
         """
 
-        self.estimator_name = estimator
+        self.estimator_name = estimator_name
         estimator_object = self.create_estimator(
-            estimator, name=self.experiment_name, **kwargs)
+            estimator_name, name=self.experiment_name, **kwargs)
         estimator_object.fit(self.train_data, self.test_data)
-        setattr(self, estimator, estimator_object)
+        setattr(self, estimator_name, estimator_object)
         self.is_fitted = True
 
         return self
@@ -389,8 +389,8 @@ class Experiment(BaseExperiment):
         Returns:
             Rex: The fitted experiment data.
         """
-
-        self.estimator.predict(self.train_data, self.test_data, **kwargs)
+        estimator = getattr(self, self.estimator_name)
+        estimator.predict(self.train_data, self.test_data, **kwargs)
 
         return self
 
