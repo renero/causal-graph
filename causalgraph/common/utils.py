@@ -946,7 +946,14 @@ def get_feature_types(X) -> Dict[str, str]:
     """
     feature_names = get_feature_names(X)
     feature_types = {}
-    for i, feature in enumerate(X.T):
-        feature_types[feature_names[i]] = _classify_variable(feature)
+    if isinstance(X, np.ndarray):
+        for i, feature in enumerate(X.T):
+            feature_types[feature_names[i]] = _classify_variable(feature)
+    elif isinstance(X, pd.DataFrame):
+        for feature in X.columns:
+            feature_types[feature] = _classify_variable(X[feature].values)
+    else:
+        for i, feature in enumerate(X[0]):
+            feature_types[feature_names[i]] = _classify_variable(feature)
 
     return feature_types

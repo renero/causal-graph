@@ -630,8 +630,8 @@ def custom_main(dataset_name,
 
     ref_graph = utils.graph_from_dot_file(f"{input_path}{dataset_name}.dot")
     data = pd.read_csv(f"{input_path}{dataset_name}.csv")
-    scaler = StandardScaler()
-    data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)
+    # scaler = StandardScaler()
+    # data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)
     train = data.sample(frac=0.8, random_state=42)
     test = data.drop(train.index)
 
@@ -670,7 +670,8 @@ def prior_main(dataset_name,
 
 
 if __name__ == "__main__":
-    custom_main('r_cleaned_encoded', input_path="/Users/renero/phd/data/RC4/risks/",
+    custom_main('r_cleaned_encoded',
+                input_path="/Users/renero/phd/data/RC4/risks/",
                 model_type="nn", explainer="gradient",
                 tune_model=False, save=False)
     # prior_main('rex_generated_gp_add_5')
