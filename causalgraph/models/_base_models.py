@@ -157,7 +157,7 @@ class MLP(pl.LightningModule):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
         return optimizer
 
-    #  To allow compatibility with SHAP Explainers different from DeepExplainer and
+    # To allow compatibility with SHAP Explainers different from DeepExplainer and
     # GradientExplainer. Taken from:
     # https://jamesmccaffrey.wordpress.com/2022/10/11/an-example-of-using-the-shap-library-for-a-pytorch-model/
     def predict(self, x):
