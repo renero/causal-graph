@@ -46,10 +46,11 @@ Example:
 import numpy as np
 import optuna
 import pandas as pd
-from sklearn.ensemble import GradientBoostingRegressor
+from sklearn.ensemble import GradientBoostingClassifier, GradientBoostingRegressor
 from sklearn.preprocessing import StandardScaler
 from mlforge.progbar import ProgBar
 
+from causalgraph.common import utils
 from causalgraph.explainability.hierarchies import Hierarchies
 
 
@@ -121,7 +122,8 @@ class GBTRegressor(GradientBoostingRegressor):
         feature in the dataframe.
         """
         self.n_features_in_ = X.shape[1]
-        self.feature_names = list(X.columns)
+        self.feature_names = utils.get_feature_names(X)
+        self.feature_types = utils.get_feature_types(X)
         self.regressor = dict()
 
         if self.correlation_th:
@@ -131,9 +133,6 @@ class GBTRegressor(GradientBoostingRegressor):
                 verbose=self.verbose)
             X_original = X.copy()
 
-        # pbar_in = tqdm(total=len(self.feature_names),
-        #                **tqdm_params(self._fit_desc, self.prog_bar,
-        #                              silent=self.silent))
         pbar = ProgBar().start_subtask(len(self.feature_names))
 
         for target_name in self.feature_names:
@@ -147,7 +146,15 @@ class GBTRegressor(GradientBoostingRegressor):
                         print("REMOVED CORRELATED FEATURES: ",
                               self.correlated_features[target_name])
 
-            self.regressor[target_name] = GradientBoostingRegressor(
+            if self.feature_types[target_name] == 'categorical' or \
+                self.feature_types[target_name] == 'binary':
+                    self.loss = 'log_loss'
+                    gbt_model = GradientBoostingClassifier
+            else:
+                self.loss = 'squared_error'
+                gbt_model = GradientBoostingRegressor
+
+            self.regressor[target_name] = gbt_model(
                 loss=self.loss,
                 learning_rate=self.learning_rate,
                 n_estimators=self.n_estimators,
