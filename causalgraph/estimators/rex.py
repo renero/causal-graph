@@ -322,11 +322,13 @@ class Rex(BaseEstimator, ClassifierMixin):
         else:
             steps = [
                 # DAGs construction
-                ('G_shap', 'shaps.predict', {'root_causes': 'root_causes', 'prior': prior}),
+                ('G_shap', 'shaps.predict', {
+                 'root_causes': 'root_causes', 'prior': prior}),
                 ('G_rho', 'dag_from_discrepancy', {
                     'discrepancy_upper_threshold': self.discrepancy_threshold, "verbose": True}),
                 ('G_adj', 'adjust_discrepancy', {'dag': 'G_shap'}),
-                ('G_pi', 'pi.predict', {'root_causes': 'root_causes', 'prior': prior}),
+                ('G_pi', 'pi.predict', {
+                 'root_causes': 'root_causes', 'prior': prior}),
                 ('indep', GraphIndependence, {'base_graph': 'G_shap'}),
                 ('G_indep', 'indep.fit_predict'),
                 ('G_final', 'shaps.adjust', {'graph': 'G_indep'}),
@@ -340,15 +342,15 @@ class Rex(BaseEstimator, ClassifierMixin):
 
                 # Metrics Generation, here
                 ('metrics_shap', 'score', {
-                'ref_graph': ref_graph, 'predicted_graph': 'G_shap'}),
+                    'ref_graph': ref_graph, 'predicted_graph': 'G_shap'}),
                 ('metrics_rho', 'score', {
-                'ref_graph': ref_graph, 'predicted_graph': 'G_rho'}),
+                    'ref_graph': ref_graph, 'predicted_graph': 'G_rho'}),
                 ('metrics_adj', 'score', {
-                'ref_graph': ref_graph, 'predicted_graph': 'G_adj'}),
+                    'ref_graph': ref_graph, 'predicted_graph': 'G_adj'}),
                 ('metrics_indep', 'score', {
-                'ref_graph': ref_graph, 'predicted_graph': 'G_indep'}),
+                    'ref_graph': ref_graph, 'predicted_graph': 'G_indep'}),
                 ('metrics_final', 'score', {
-                'ref_graph': ref_graph, 'predicted_graph': 'G_final'})
+                    'ref_graph': ref_graph, 'predicted_graph': 'G_final'})
                 # ('metrics_shag', 'score', {
                 #  'ref_graph': ref_graph, 'predicted_graph': 'G_shag'}),
                 # ('metrics_adjnc', 'score', {
@@ -532,7 +534,7 @@ class Rex(BaseEstimator, ClassifierMixin):
 
     def dag_from_discrepancy(
             self,
-            discrepancy_upper_threshold:float = 0.99, verbose:bool=False) -> nx.DiGraph:
+            discrepancy_upper_threshold: float = 0.99, verbose: bool = False) -> nx.DiGraph:
         """
         Build a directed acyclic graph (DAG) from the discrepancies in the SHAP values.
         The discrepancies are calculated as 1.0 - GoodnessOfFit, so that a low
@@ -565,7 +567,8 @@ class Rex(BaseEstimator, ClassifierMixin):
                     if verbose:
                         print("  X  ", end=" ")
                     continue
-                discrepancy = 1. - self.shaps.shap_discrepancies[child][parent].shap_gof
+                discrepancy = 1. - \
+                    self.shaps.shap_discrepancies[child][parent].shap_gof
                 if verbose:
                     print(f"{discrepancy:+.2f}", end=" ")
                 if discrepancy < discrepancy_upper_threshold:
@@ -621,7 +624,6 @@ def custom_main(dataset_name,
                 model_type="nn", explainer="gradient",
                 save=False):
 
-
     def get_prior(ref_graph):
         if ref_graph is None:
             return None
@@ -637,7 +639,7 @@ def custom_main(dataset_name,
 
     rex = Rex(
         name=dataset_name, tune_model=tune_model,
-        model_type=model_type, explainer=explainer)
+        model_type=model_type, explainer=explainer, hpo_n_trials=1)
 
     rex.fit_predict(train, test, ref_graph, prior=get_prior(ref_graph))
 
@@ -670,8 +672,9 @@ def prior_main(dataset_name,
 
 
 if __name__ == "__main__":
-    custom_main('r_cleaned_encoded',
-                input_path="/Users/renero/phd/data/RC4/risks/",
-                model_type="nn", explainer="gradient",
-                tune_model=False, save=False)
+    custom_main('short', input_path="/Users/renero/phd/data/RC3/",
+                model_type="nn",
+                explainer="gradient",
+                tune_model=True,
+                save=False)
     # prior_main('rex_generated_gp_add_5')

@@ -707,14 +707,16 @@ class ShapEstimator(BaseEstimator):
             Error contribution of each feature for each target.
         """
         error_contribution = dict()
+        predictions = self.models.predict(self.X_test)
+        # Flatten the predictions
+        predictions = np.concatenate(predictions[0])
+        predictions = predictions.reshape(self.X_test.shape[0], self.X_test.shape[1])
+        y_hat = pd.DataFrame(predictions, columns=self.feature_names)
+        y_true = self.X_test
         for target in self.feature_names:
             shap_values = pd.DataFrame(
                 self.shap_values[target],
                 columns=[c for c in self.feature_names if c != target])
-            y_hat = pd.DataFrame(
-                self.models.predict(self.X_test).T, columns=self.feature_names)
-            y_true = self.X_test
-
             error_contribution[target] = self._individual_error_contribution(
                 shap_values, y_true[target], y_hat[target])
             #  Add a 0.0 value at index target in the error contribution series
@@ -865,23 +867,27 @@ class ShapEstimator(BaseEstimator):
         pass
 
 
-def custom_main(exp_name):
+def custom_main(exp_name,
+                path="/Users/renero/phd/data/RC4/",
+                output_path="/Users/renero/phd/output/RC4/",
+                scale=False):
     """
     Runs a custom main function for the given experiment name.
 
     Args:
         experiment_name (str): The name of the experiment to run.
+        path (str): The path to the data files.
+        output_path (str): The path to the output files.
 
     Returns:
         None
     """
-    path = "/Users/renero/phd/data/RC3/"
-    output_path = "/Users/renero/phd/output/RC3/"
 
     ref_graph = utils.graph_from_dot_file(f"{path}{exp_name}.dot")
     data = pd.read_csv(f"{path}{exp_name}.csv")
-    scaler = StandardScaler()
-    data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)
+    if scale:
+        scaler = StandardScaler()
+        data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)
     # Split the dataframe into train and test
     train = data.sample(frac=0.9, random_state=42)
     test = data.drop(train.index)
@@ -933,4 +939,4 @@ def shachs_main():
 
 
 if __name__ == "__main__":
-    custom_main('rex_generated_linear_9')
+    custom_main('toy_dataset')
