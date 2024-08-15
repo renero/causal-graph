@@ -1,3 +1,10 @@
+version 0.4.3
+-------------
+- Regressors now accept categorical variables, and adapt their loss function
+and architectures
+- plot_dag considers luminance to decide font color.
+- SHAP values are now scaled and that's the value used along the process.
+
 version 0.4.2
 -------------
 - Now it is possible to add a prior to ReX. The prior is in the form of a
