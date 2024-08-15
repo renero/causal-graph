@@ -84,7 +84,8 @@ def select_features(
             f"  Feature_order......: "
             f"{','.join([f'{feature_names[i]}' for i in feature_order])}\n"
             f"  sorted_mean_values.: "
-            f"{','.join([f'{x:.6f}' for x in sorted_shap_values])}")
+            f"{','.join([f'{x:.6f}' for x in sorted_shap_values])}\n"
+            f"  threshold..........: {threshold:.6f}")
 
     sorted_impact_values = copy(sorted_shap_values)
     selected_features = []
