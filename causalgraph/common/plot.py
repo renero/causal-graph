@@ -163,9 +163,24 @@ def subplots(
         num_rows += 1
 
     def blank(ax):
+        """
+        Create a blank subplot.
+        """
         npArray = np.array([[[255, 255, 255, 255]]], dtype="uint8")
         ax.imshow(npArray, interpolation="nearest")
         ax.set_axis_off()
+
+    def ax_index(i, j):
+        """
+        Return the axis index, considering special cases where the number of rows
+        or columns is 1.
+        """
+        nonlocal ax
+        if num_rows == 1:
+            return ax[j]
+        if num_cols == 1:
+            return ax[i]
+        return ax[i][j]
 
     plt.rcParams.update({'font.size': 8})
     fig, ax = plt.subplots(num_rows, num_cols, figsize=fig_size)
@@ -174,9 +189,9 @@ def subplots(
             index = i * num_cols + j
             if index < len(plot_args):
                 # axe = ax[i][j]
-                plot_func(plot_args[index], ax=ax[i][j])
+                plot_func(plot_args[index], ax=ax_index(i,j))
             else:
-                blank(ax[i][j])
+                blank(ax_index(i,j))
 
     if title is not None:
         fig.suptitle(title)
