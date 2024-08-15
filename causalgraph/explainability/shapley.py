@@ -837,10 +837,15 @@ class ShapEstimator(BaseEstimator):
             target_name + r' $\leftarrow$ ' +
             (','.join(selected_features) if selected_features else 'ø'))
 
+        # Recompute mean_shap_percentile here, in case it was changed
+        self.mean_shap_threshold = np.quantile(
+            self.all_mean_shap_values, self.mean_shap_percentile)
+
         xlims = ax.get_xlim()
         if xlims[1] < self.mean_shap_threshold:
             ax.set_xlim(right=self.mean_shap_threshold +
                         ((xlims[1] - xlims[0]) / 20))
+
         ax.axvline(x=self.mean_shap_threshold, color='red', linestyle='--',
                    linewidth=0.5)
 
