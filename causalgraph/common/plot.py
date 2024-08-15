@@ -163,9 +163,24 @@ def subplots(
         num_rows += 1
 
     def blank(ax):
+        """
+        Create a blank subplot.
+        """
         npArray = np.array([[[255, 255, 255, 255]]], dtype="uint8")
         ax.imshow(npArray, interpolation="nearest")
         ax.set_axis_off()
+
+    def ax_index(i, j):
+        """
+        Return the axis index, considering special cases where the number of rows
+        or columns is 1.
+        """
+        nonlocal ax
+        if num_rows == 1:
+            return ax[j]
+        if num_cols == 1:
+            return ax[i]
+        return ax[i][j]
 
     plt.rcParams.update({'font.size': 8})
     fig, ax = plt.subplots(num_rows, num_cols, figsize=fig_size)
@@ -174,9 +189,9 @@ def subplots(
             index = i * num_cols + j
             if index < len(plot_args):
                 # axe = ax[i][j]
-                plot_func(plot_args[index], ax=ax[i][j])
+                plot_func(plot_args[index], ax=ax_index(i,j))
             else:
-                blank(ax[i][j])
+                blank(ax_index(i,j))
 
     if title is not None:
         fig.suptitle(title)
@@ -256,6 +271,13 @@ def draw_graph_subplot(
     edge_colors = list(nx.get_edge_attributes(G, 'color').values())
     widths = list(nx.get_edge_attributes(G, 'width').values())
     styles = list(nx.get_edge_attributes(G, 'style').values())
+    default_font_color = 'black'
+    # create a dictionary with the default font color of each node
+    node_font_color = {node: default_font_color for node in G.nodes}
+
+    def luminance(color):
+        r, g, b, _ = color
+        return 0.299 * r + 0.587 * g + 0.114 * b
 
     # Create a colormap list with the colors of the nodes, based on the regr_score
     if all(['regr_score' in G.nodes[node] for node in G.nodes]):
@@ -263,7 +285,6 @@ def draw_graph_subplot(
                                    for node in G.nodes]
         max_cmap_value = max(*reg_scores, 1.0)
         color_map = set_colormap(0.0, max_cmap_value, 'RdYlGn_r')
-        # color_map_r = set_colormap(0.0, max_cmap_value, 'gist_gray')
         kwargs['font_color'] = "black"
 
         # Set with_labels to False if there is color information of each node,
@@ -274,14 +295,14 @@ def draw_graph_subplot(
         # regr_score of each node.
         node_colors = []
         linewidths = []
-        # label_colors = []
         for node in G:
             node_colors.append(color_map(G.nodes[node]['regr_score']))
             if root_causes is not None and node in root_causes:
                 linewidths.append(3.0)
             else:
                 linewidths.append(1.0)
-            # label_colors.append(color_map_r(G.nodes[node]['regr_score']))
+            lum = luminance(color_map(G.nodes[node]['regr_score']))
+            node_font_color[node] = 'black' if lum > 0.5 else 'white'
         kwargs['node_color'] = node_colors
         kwargs['linewidths'] = linewidths
 
@@ -292,7 +313,8 @@ def draw_graph_subplot(
         for _, node in enumerate(G):
             # font_color = label_colors[i]
             nx.draw_networkx_labels(
-                G, pos=layout, labels={node: node},  # font_color=font_color,
+                G, pos=layout, labels={node: node},
+                font_color=node_font_color[node],
                 font_weight=kwargs['font_weight'],
                 font_family=kwargs['font_family'],
                 horizontalalignment=kwargs['horizontalalignment'],

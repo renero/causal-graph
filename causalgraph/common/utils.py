@@ -855,3 +855,105 @@ def stringfy_object(object_: object) -> str:
         ret += f"{attr:25} <{getattr(object_, attr).__class__.__name__}>\n"
 
     return ret
+
+
+def get_feature_names(X: Union[pd.DataFrame, np.ndarray, list]) -> List[str]:
+    """
+    Get the feature names from the input data. The feature names can be
+    extracted from a pandas DataFrame, a numpy array or a list.
+
+    Parameters:
+    -----------
+    X : Union[pd.DataFrame, np.ndarray, list]
+        The input data.
+
+    Returns:
+    --------
+    List[str]
+        The list of feature names.
+    """
+    assert isinstance(X, (pd.DataFrame, np.ndarray, list)), \
+        "X must be a pandas DataFrame, a numpy array or a list"
+
+    if isinstance(X, pd.DataFrame):
+        feature_names = list(X.columns)
+    elif isinstance(X, np.ndarray):
+        feature_names = [f"X{i}" for i in range(X.shape[1])]
+    else:
+        feature_names = [f"X{i}" for i in range(len(X[0]))]
+
+    return feature_names
+
+
+def _classify_variable(arr):
+    """
+    Classify the type of variable in the array. The classification is done
+    based on the number of unique values in the array. If the array has only
+    two unique values, then the variable is classified as binary. If the
+    unique values are integers, then the variable is classified as multiclass.
+    Otherwise, the variable is classified as continuous.
+
+    Parameters:
+    -----------
+    arr (numpy.ndarray): The array to be classified.
+
+    Returns:
+    --------
+    str: The classification of the variable
+
+    Example:
+    --------
+    >>> arr = np.array([1, 2, 3, 4, 5])
+    >>> classify_variable(arr)
+    'multiclass'
+    """
+    unique_values = np.unique(arr)
+    num_unique = len(unique_values)
+
+    if num_unique == 2:
+        return "binary"
+    elif np.all(unique_values.astype(np.int64) == unique_values):
+        return "multiclass"
+    else:
+        return "continuous"
+
+
+def get_feature_types(X) -> Dict[str, str]:
+    """
+    Get the feature types from the input data. The feature types can be
+    binary, multiclass or continuous. The classification is done based on the
+    number of unique values in the array. If the array has only two unique
+    values, then the variable is classified as binary. If the unique values
+    are integers, then the variable is classified as multiclass. Otherwise,
+    the variable is classified as continuous.
+
+    Parameters:
+    -----------
+    X : Union[pd.DataFrame, np.ndarray, list]
+        The input data.
+
+    Returns:
+    --------
+    Dict[str, str]
+        A dictionary with the feature names as keys and the feature types as
+        values.
+
+    Example:
+    --------
+    >>> X = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9]])
+    >>> get_feature_types(X)
+    {'X0': 'multiclass', 'X1': 'multiclass', 'X2': 'multiclass'}
+    """
+    feature_names = get_feature_names(X)
+    feature_types = {}
+    if isinstance(X, np.ndarray):
+        for i, feature in enumerate(X.T):
+            feature_types[feature_names[i]] = _classify_variable(feature)
+    elif isinstance(X, pd.DataFrame):
+        for feature in X.columns:
+            feature_types[feature] = _classify_variable(X[feature].values)
+    else:
+        for i, feature in enumerate(X[0]):
+            feature_types[feature_names[i]] = _classify_variable(feature)
+
+    return feature_types

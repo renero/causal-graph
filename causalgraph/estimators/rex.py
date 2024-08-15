@@ -211,7 +211,9 @@ class Rex(BaseEstimator, ClassifierMixin):
         """
         self.random_state_state = check_random_state(self.random_state)
         self.n_features_in_ = X.shape[1]
-        self.feature_names = list(X.columns)
+        self.feature_names = utils.get_feature_names(X)
+        self.feature_types = utils.get_feature_types(X)
+
         self.X = copy(X)
         self.y = copy(y) if y is not None else None
 
@@ -320,11 +322,13 @@ class Rex(BaseEstimator, ClassifierMixin):
         else:
             steps = [
                 # DAGs construction
-                ('G_shap', 'shaps.predict', {'root_causes': 'root_causes', 'prior': prior}),
+                ('G_shap', 'shaps.predict', {
+                 'root_causes': 'root_causes', 'prior': prior}),
                 ('G_rho', 'dag_from_discrepancy', {
                     'discrepancy_upper_threshold': self.discrepancy_threshold, "verbose": True}),
                 ('G_adj', 'adjust_discrepancy', {'dag': 'G_shap'}),
-                ('G_pi', 'pi.predict', {'root_causes': 'root_causes', 'prior': prior}),
+                ('G_pi', 'pi.predict', {
+                 'root_causes': 'root_causes', 'prior': prior}),
                 ('indep', GraphIndependence, {'base_graph': 'G_shap'}),
                 ('G_indep', 'indep.fit_predict'),
                 ('G_final', 'shaps.adjust', {'graph': 'G_indep'}),
@@ -338,15 +342,15 @@ class Rex(BaseEstimator, ClassifierMixin):
 
                 # Metrics Generation, here
                 ('metrics_shap', 'score', {
-                'ref_graph': ref_graph, 'predicted_graph': 'G_shap'}),
+                    'ref_graph': ref_graph, 'predicted_graph': 'G_shap'}),
                 ('metrics_rho', 'score', {
-                'ref_graph': ref_graph, 'predicted_graph': 'G_rho'}),
+                    'ref_graph': ref_graph, 'predicted_graph': 'G_rho'}),
                 ('metrics_adj', 'score', {
-                'ref_graph': ref_graph, 'predicted_graph': 'G_adj'}),
+                    'ref_graph': ref_graph, 'predicted_graph': 'G_adj'}),
                 ('metrics_indep', 'score', {
-                'ref_graph': ref_graph, 'predicted_graph': 'G_indep'}),
+                    'ref_graph': ref_graph, 'predicted_graph': 'G_indep'}),
                 ('metrics_final', 'score', {
-                'ref_graph': ref_graph, 'predicted_graph': 'G_final'})
+                    'ref_graph': ref_graph, 'predicted_graph': 'G_final'})
                 # ('metrics_shag', 'score', {
                 #  'ref_graph': ref_graph, 'predicted_graph': 'G_shag'}),
                 # ('metrics_adjnc', 'score', {
@@ -530,7 +534,7 @@ class Rex(BaseEstimator, ClassifierMixin):
 
     def dag_from_discrepancy(
             self,
-            discrepancy_upper_threshold:float = 0.99, verbose:bool=False) -> nx.DiGraph:
+            discrepancy_upper_threshold: float = 0.99, verbose: bool = False) -> nx.DiGraph:
         """
         Build a directed acyclic graph (DAG) from the discrepancies in the SHAP values.
         The discrepancies are calculated as 1.0 - GoodnessOfFit, so that a low
@@ -563,7 +567,8 @@ class Rex(BaseEstimator, ClassifierMixin):
                     if verbose:
                         print("  X  ", end=" ")
                     continue
-                discrepancy = 1. - self.shaps.shap_discrepancies[child][parent].shap_gof
+                discrepancy = 1. - \
+                    self.shaps.shap_discrepancies[child][parent].shap_gof
                 if verbose:
                     print(f"{discrepancy:+.2f}", end=" ")
                 if discrepancy < discrepancy_upper_threshold:
@@ -619,24 +624,24 @@ def custom_main(dataset_name,
                 model_type="nn", explainer="gradient",
                 save=False):
 
-
     def get_prior(ref_graph):
+        if ref_graph is None:
+            return None
         root_nodes = [n for n, d in ref_graph.in_degree() if d == 0]
         return [root_nodes, [n for n in ref_graph.nodes if n not in root_nodes]]
 
     ref_graph = utils.graph_from_dot_file(f"{input_path}{dataset_name}.dot")
     data = pd.read_csv(f"{input_path}{dataset_name}.csv")
-    scaler = StandardScaler()
-    data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)
+    # scaler = StandardScaler()
+    # data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)
     train = data.sample(frac=0.8, random_state=42)
     test = data.drop(train.index)
 
     rex = Rex(
         name=dataset_name, tune_model=tune_model,
-        model_type=model_type, explainer=explainer)
+        model_type=model_type, explainer=explainer, hpo_n_trials=1)
 
-    rex.fit_predict(train, test, ref_graph,
-                    prior=get_prior(ref_graph))
+    rex.fit_predict(train, test, ref_graph, prior=get_prior(ref_graph))
 
     if save:
         where_to = utils.save_experiment(rex.name, output_path, rex)
@@ -648,6 +653,7 @@ def prior_main(dataset_name,
                output_path="/Users/renero/phd/output/RC4/",
                model_type="nn"):
     from causalgraph.common.notebook import Experiment
+
     experiment_name = f"{dataset_name}_{model_type}"
     data = pd.read_csv(f"{input_path}{dataset_name}.csv")
     scaler = StandardScaler()
@@ -666,6 +672,9 @@ def prior_main(dataset_name,
 
 
 if __name__ == "__main__":
-    custom_main('rex_generated_gp_add_5',  model_type="nn", explainer="gradient",
-                tune_model=False, save=False)
+    custom_main('short', input_path="/Users/renero/phd/data/RC3/",
+                model_type="nn",
+                explainer="gradient",
+                tune_model=True,
+                save=False)
     # prior_main('rex_generated_gp_add_5')
