@@ -234,8 +234,6 @@ class ShapEstimator(BaseEstimator):
             X_test_original = self.X_test.copy()
 
         for target_name in self.feature_names:
-            # pbar.refresh()
-
             # if correlation_th is not None then, remove features that are highly
             # correlated with the target, at each step of the loop
             if self.correlation_th is not None:
@@ -271,21 +269,21 @@ class ShapEstimator(BaseEstimator):
 
             # Create the order list of features, in decreasing mean SHAP value
             self.feature_order[target_name] = np.argsort(
-                np.sum(np.abs(self.shap_values[target_name]), axis=0))
+                np.sum(np.abs(self.shap_scaled_values[target_name]), axis=0))
             self.shap_mean_values[target_name] = np.abs(
-                self.shap_values[target_name]).mean(0)
+                self.shap_scaled_values[target_name]).mean(0)
             self.all_mean_shap_values.append(
                 self.shap_mean_values[target_name])
+            if self.verbose:
+                print(f"  Feature order for '{target_name}' "
+                      f"{self.feature_order[target_name]}")
 
             # Add zeroes to positions of correlated features
             if self.correlation_th is not None:
                 self._add_zeroes(
                     target_name, self.correlated_features[target_name])
 
-            # pbar.update(1)
             pbar.update_subtask()
-
-        # pbar.close()
 
         self.all_mean_shap_values = np.array(
             self.all_mean_shap_values).flatten()
@@ -394,7 +392,7 @@ class ShapEstimator(BaseEstimator):
 
             # Select the features that are connected to the target
             self.connections[target] = select_features(
-                values=self.shap_values[target],
+                values=self.shap_scaled_values[target],
                 feature_names=feature_names_wo_target,
                 min_impact=self.min_impact,
                 exhaustive=self.exhaustive,

@@ -304,8 +304,8 @@ class NNRegressor(BaseEstimator):
     def __repr__(self):
         forbidden_attrs = [
             'fit', 'predict', 'score', 'get_params', 'set_params']
-        ret = f"{GREEN}REX object attributes{RESET}\n"
-        ret += f"{GRAY}{'-'*80}{RESET}\n"
+        ret = f"REX object attributes\n"
+        ret += f"{'-'*80}\n"
         for attr in dir(self):
             if attr.startswith('_') or \
                 attr in forbidden_attrs or \

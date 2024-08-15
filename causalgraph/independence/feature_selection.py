@@ -65,13 +65,15 @@ def select_features(
         feature_order = np.argsort(np.abs(values))
         mean_values = np.abs(values)
     sorted_shap_values = np.array([mean_values[idx] for idx in feature_order])
+    if verbose:
+        print(f"  Feature order......: {feature_order}")
 
     # In some cases, the mean SHAP values are 0. We return an empty list in that case.
     if np.all(mean_values < min_impact):
         return []
 
     if verbose:
-        print("  Sum values.........:", end="")
+        print("  Sum values.........: ", end="")
         if len(values.shape) > 1:
             print(','.join([f"({f}:{s:.03f})" for f, s in zip(
                 feature_names, np.sum(np.abs(values), axis=0))]))
@@ -84,7 +86,6 @@ def select_features(
             f"  sorted_mean_values.: "
             f"{','.join([f'{x:.6f}' for x in sorted_shap_values])}")
 
-    # Get a copy of the sorted_shap_values into a new variable called kk
     sorted_impact_values = copy(sorted_shap_values)
     selected_features = []
     max_iterations = len(sorted_impact_values)
@@ -160,7 +161,7 @@ def find_cluster_change_point(X: List, verbose: bool = False) -> int:
         n_noise_ = list(labels).count(-1)
         if n_clusters_ <= 1:
             if verbose:
-                print("  +-> Only 1 cluster generated. Decreasing max_distance.")
+                print("    ↳ Only 1 cluster generated. Decreasing max_distance.")
             pairwise_distances = pairwise_distances[1:]
 
     if pairwise_distances.size == 0:
@@ -172,7 +173,7 @@ def find_cluster_change_point(X: List, verbose: bool = False) -> int:
         if (len(labels) > 3) and (len(labels) < (X.shape[0]-1)):
             print(
                 f"  Silhouette Coeff...: {metrics.silhouette_score(X, labels):.3f}\n"
-                f"  +-> Labels: {labels}")
+                f"    ↳ Labels: {labels}")
 
     winner_label = n_clusters_ - 1
     samples_in_winner_cluster = np.argwhere(X_safe[labels != winner_label])
