@@ -388,7 +388,7 @@ class PermutationImportance(BaseEstimator):
         for shuffle_col in range(num_vars-1):
             feature = regressor.columns[shuffle_col]
             print(
-                f"+-> Feature: {feature} ", end="") if self.verbose else None
+                f"  ↳ Feature: {feature} ", end="") if self.verbose else None
 
             _, _, losses = self._compute_loss_shuffling_column(
                 model, regressor.train_loader, shuffle_col=shuffle_col)

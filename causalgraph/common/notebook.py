@@ -7,7 +7,7 @@ Example:
     >> experiment = Experiment("linear", csv_filename="linear.csv")
     >> rex = experiment.load()
 
-(C) 2023 J. Renero
+(C) 2023, 2024 J. Renero
 """
 
 import glob
@@ -216,12 +216,12 @@ class BaseExperiment:
         if self.verbose:
             print(
                 f"Data for {self.experiment_name}\n"
-                f"+-> Train....: {self.data.shape[0]} rows, "
+                f"  ↳ Train....: {self.data.shape[0]} rows, "
                 f"{self.data.shape[1]} cols\n"
-                f"+-> Test.....: {self.test_data.shape[0]} rows, "
+                f"  ↳ Test.....: {self.test_data.shape[0]} rows, "
                 f"{self.data.shape[1]} cols\n"
-                f"+-> CSV.data.: {csv_filename}\n"
-                f"+-> Ref.graph: {dot_filename}")
+                f"  ↳ CSV.data.: {csv_filename}\n"
+                f"  ↳ Ref.graph: {dot_filename}")
 
     def experiment_exists(self, name):
         """Checks whether the experiment exists in the output path"""
@@ -251,19 +251,19 @@ class BaseExperiment:
         if self.verbose:
             if self.load_experiment:
                 print(
-                    f"    +-> Experiment '{self.experiment_name}' will be LOADED")
+                    f"      ↳ Experiment '{self.experiment_name}' will be LOADED")
             else:
                 print(
-                    f"    +-> Experiment '{self.experiment_name}' will be TRAINED")
+                    f"      ↳ Experiment '{self.experiment_name}' will be TRAINED")
 
         self.save_experiment = True
         # if self.save_experiment and not experiment_exists:
-        #     print("    +-> Experiment will be saved.") if self.verbose else None
+        #     print("      ↳ Experiment will be saved.") if self.verbose else None
         # elif self.save_experiment and experiment_exists:
-        #     print("        +-> Experiment exists and will be overwritten.") \
+        #     print("          ↳ Experiment exists and will be overwritten.") \
         #         if self.verbose else None
         # else:
-        #     print("    +-> Experiment will NOT be saved.") if self.verbose else None
+        #     print("      ↳ Experiment will NOT be saved.") if self.verbose else None
         #     self.save_experiment = False
 
     def list_files(self, input_pattern, where='input') -> list:
@@ -563,7 +563,7 @@ class Experiments(BaseExperiment):
                         graph_from_dot_file(
                             f"{path.join(self.input_path, self.input_name)}.dot")
                     if self.verbose:
-                        print(f"        +-> Loaded {self.experiment_name} "
+                        print(f"          ↳ Loaded {self.experiment_name} "
                               f"({type(self.experiment[self.experiment_name])})")
                     progress.update(task, advance=1, refresh=True,
                                     visible=not self.verbose)

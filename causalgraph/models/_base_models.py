@@ -91,6 +91,10 @@ class MLP(pl.LightningModule):
             self.loss_fn = nn.L1Loss()
         elif loss == "mmd":
             self.loss_fn = MMDLoss()  # mmd_type="quadratic")
+        elif loss == "binary_crossentropy":
+            self.loss_fn = nn.BCEWithLogitsLoss()
+        elif loss == "crossentropy":
+            self.loss_fn = nn.CrossEntropyLoss()
         else:
             raise ValueError("Unknown loss function.")
 
@@ -153,7 +157,7 @@ class MLP(pl.LightningModule):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
         return optimizer
 
-    #  To allow compatibility with SHAP Explainers different from DeepExplainer and
+    # To allow compatibility with SHAP Explainers different from DeepExplainer and
     # GradientExplainer. Taken from:
     # https://jamesmccaffrey.wordpress.com/2022/10/11/an-example-of-using-the-shap-library-for-a-pytorch-model/
     def predict(self, x):
