@@ -689,6 +689,25 @@ class ShapEstimator(BaseEstimator):
 
         return input_vector
 
+    def _adjust_predictions_shape(self, predictions, target_shape):
+        if isinstance(predictions, list):
+            if isinstance(predictions[0], np.ndarray):
+                concatenated = np.concatenate(predictions)
+                if concatenated.shape != target_shape:
+                    predictions = concatenated.reshape(target_shape)
+                else:
+                    predictions = concatenated
+            else:
+                # Handle the case where the list does not contain numpy arrays
+                predictions = np.array(predictions)
+                if predictions.shape != target_shape:
+                    predictions = predictions.reshape(target_shape)
+        else:
+            if predictions.shape != target_shape:
+                predictions = predictions.reshape(target_shape)
+
+        return predictions
+
     def compute_error_contribution(self):
         """
         Computes the error contribution of each feature for each target.
@@ -706,9 +725,14 @@ class ShapEstimator(BaseEstimator):
         """
         error_contribution = dict()
         predictions = self.models.predict(self.X_test)
-        # Flatten the predictions
-        predictions = np.concatenate(predictions[0])
-        predictions = predictions.reshape(self.X_test.shape[0], self.X_test.shape[1])
+
+        # Flatten the predictions if needed
+        # if isinstance(predictions, list):
+        #     predictions = np.concatenate(predictions[0])
+        # predictions = predictions.reshape(self.X_test.shape[0], self.X_test.shape[1])
+        predictions = self._adjust_predictions_shape(
+            predictions, (self.X_test.shape[0], self.X_test.shape[1]))
+
         y_hat = pd.DataFrame(predictions, columns=self.feature_names)
         y_true = self.X_test
         for target in self.feature_names:
