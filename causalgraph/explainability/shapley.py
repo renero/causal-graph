@@ -287,8 +287,7 @@ class ShapEstimator(BaseEstimator):
 
         self.all_mean_shap_values = np.array(
             self.all_mean_shap_values).flatten()
-        self.mean_shap_threshold = np.quantile(
-            self.all_mean_shap_values, self.mean_shap_percentile)
+        self._compute_scaled_shap_threshold()
 
         # Leave X_train and X_test as they originally were
         if self.correlation_th is not None:
@@ -297,6 +296,17 @@ class ShapEstimator(BaseEstimator):
 
         self.is_fitted_ = True
         return self
+
+    def _compute_scaled_shap_threshold(self):
+        """
+        Compute the scaled SHAP threshold based on the given percentile.
+        If the percentile is 0.0 or None, then the threshold is set to 0.0.
+        """
+        if self.mean_shap_percentile:
+            self.mean_shap_threshold = np.quantile(
+                self.all_mean_shap_values, self.mean_shap_percentile)
+        else:
+            self.mean_shap_threshold = 0.0
 
     def _run_selected_shap_explainer(self, target_name, model, X_train, X_test):
         """
@@ -359,8 +369,7 @@ class ShapEstimator(BaseEstimator):
         self.prior = prior
 
         # Recompute mean_shap_percentile here, in case it was changed
-        self.mean_shap_threshold = np.quantile(
-            self.all_mean_shap_values, self.mean_shap_percentile)
+        self._compute_scaled_shap_threshold()
 
         pbar = ProgBar().start_subtask(3 + len(self.feature_names))
 
@@ -690,21 +699,16 @@ class ShapEstimator(BaseEstimator):
         return input_vector
 
     def _adjust_predictions_shape(self, predictions, target_shape):
+        # Concatenate if predictions is a list
         if isinstance(predictions, list):
-            if isinstance(predictions[0], np.ndarray):
-                concatenated = np.concatenate(predictions)
-                if concatenated.shape != target_shape:
-                    predictions = concatenated.reshape(target_shape)
-                else:
-                    predictions = concatenated
-            else:
-                # Handle the case where the list does not contain numpy arrays
-                predictions = np.array(predictions)
-                if predictions.shape != target_shape:
-                    predictions = predictions.reshape(target_shape)
+            predictions = np.concatenate(predictions)
         else:
-            if predictions.shape != target_shape:
-                predictions = predictions.reshape(target_shape)
+            predictions = np.array(predictions)
+
+        # Reshape if necessary
+        if predictions.shape != target_shape:
+            # Flatten
+            predictions = predictions.reshape(target_shape)
 
         return predictions
 
@@ -726,10 +730,6 @@ class ShapEstimator(BaseEstimator):
         error_contribution = dict()
         predictions = self.models.predict(self.X_test)
 
-        # Flatten the predictions if needed
-        # if isinstance(predictions, list):
-        #     predictions = np.concatenate(predictions[0])
-        # predictions = predictions.reshape(self.X_test.shape[0], self.X_test.shape[1])
         predictions = self._adjust_predictions_shape(
             predictions, (self.X_test.shape[0], self.X_test.shape[1]))
 
@@ -862,8 +862,7 @@ class ShapEstimator(BaseEstimator):
             (','.join(selected_features) if selected_features else 'ø'))
 
         # Recompute mean_shap_percentile here, in case it was changed
-        self.mean_shap_threshold = np.quantile(
-            self.all_mean_shap_values, self.mean_shap_percentile)
+        self._compute_scaled_shap_threshold()
 
         xlims = ax.get_xlim()
         if xlims[1] < self.mean_shap_threshold:

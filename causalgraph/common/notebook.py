@@ -371,6 +371,9 @@ class Experiment(BaseExperiment):
         """
 
         self.estimator_name = estimator_name
+        # Add "model_type" to kwargs
+        kwargs['model_type'] = self.model_type
+
         estimator_object = self.create_estimator(
             estimator_name, name=self.experiment_name, **kwargs)
         estimator_object.fit(self.train_data, self.test_data)

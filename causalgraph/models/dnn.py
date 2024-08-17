@@ -217,18 +217,18 @@ class NNRegressor(BaseEstimator):
         self.is_fitted_ = True
         return self
 
-    def predict(self, X):
-        """ A reference implementation of a predicting function.
+    def predict(self, X: pd.DataFrame) -> np.ndarray:
+        """Predicts the values for each target variable.
 
         Parameters
         ----------
-        X : {array-like, sparse matrix}, shape (n_samples, n_features)
-            The training input samples.
+        X : pd.DataFrame
+            The input data to make predictions on.
 
         Returns
         -------
-        y : ndarray, shape (n_samples,)
-            Returns an array of ones.
+        np.ndarray
+            The predictions for each target variable.
         """
         assert X.shape[1] == self.n_features_in_, \
             f"X has {X.shape[1]} features, expected {self.n_features_in_}"
@@ -254,21 +254,31 @@ class NNRegressor(BaseEstimator):
             model = self.regressor[target].model
 
             # Obtain the predictions for the target variable
-            preds = []
+            preds = np.empty((0,), dtype=np.float16)
             for (tensor_X, _) in loader:
                 tensor_X = tensor_X.to(self.device)
                 y_hat = model.forward(tensor_X)
-                preds.append(y_hat.detach().numpy().flatten())
+                preds = np.append(preds, y_hat.detach().numpy().flatten())
             prediction[target] = preds
+
 
         # Concatenate the numpy array for all the batchs
         np_preds = prediction.values
         final_preds = []
-        if np_preds.shape[0] > 1:
+        if np_preds.ndim > 1 and np_preds.shape[0] > 1:
             for i in range(len(self.feature_names)):
-                final_preds.append(np.concatenate(np_preds[:, i], axis=0))
+                column = np_preds[:, i]
+                if column.ndim == 1:
+                    final_preds.append(column)
+                else:
+                    final_preds.append(np.concatenate(column))
+            final_preds = np.array(final_preds)
         else:
             final_preds = np_preds
+
+        # If final_preds is still 1D, reshape it to 2D
+        if final_preds.ndim == 1:
+            final_preds = final_preds.reshape(1, -1)
 
         if len(final_preds) == 0:
             final_preds = np_preds
