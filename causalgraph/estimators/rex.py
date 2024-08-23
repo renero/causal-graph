@@ -323,22 +323,19 @@ class Rex(BaseEstimator, ClassifierMixin):
             steps = [
                 # DAGs construction
                 ('G_shap', 'shaps.predict', {
-                 'root_causes': 'root_causes', 'prior': prior}),
+                    'root_causes': 'root_causes', 'prior': prior}),
                 ('G_rho', 'dag_from_discrepancy', {
-                    'discrepancy_upper_threshold': self.discrepancy_threshold, "verbose": True}),
+                    'discrepancy_upper_threshold': self.discrepancy_threshold,
+                    "verbose": True}),
                 ('G_adj', 'adjust_discrepancy', {'dag': 'G_shap'}),
                 ('G_pi', 'pi.predict', {
-                 'root_causes': 'root_causes', 'prior': prior}),
+                    'root_causes': 'root_causes', 'prior': prior}),
                 ('indep', GraphIndependence, {'base_graph': 'G_shap'}),
                 ('G_indep', 'indep.fit_predict'),
                 ('G_final', 'shaps.adjust', {'graph': 'G_indep'}),
 
                 # Knowledge Summarization
                 ('summarize_knowledge', {'ref_graph': ref_graph}),
-
-                # Old: break_cycles is now part of DAG construction
-                # ('G_shag', 'break_cycles', {'dag': 'G_shap'}),
-                # ('G_adjnc', 'break_cycles', {'dag': 'G_adj'}),
 
                 # Metrics Generation, here
                 ('metrics_shap', 'score', {
@@ -351,10 +348,6 @@ class Rex(BaseEstimator, ClassifierMixin):
                     'ref_graph': ref_graph, 'predicted_graph': 'G_indep'}),
                 ('metrics_final', 'score', {
                     'ref_graph': ref_graph, 'predicted_graph': 'G_final'})
-                # ('metrics_shag', 'score', {
-                #  'ref_graph': ref_graph, 'predicted_graph': 'G_shag'}),
-                # ('metrics_adjnc', 'score', {
-                #  'ref_graph': ref_graph, 'predicted_graph': 'G_adjnc'}),
             ]
             prediction.from_list(steps)
         prediction.run()
@@ -534,7 +527,8 @@ class Rex(BaseEstimator, ClassifierMixin):
 
     def dag_from_discrepancy(
             self,
-            discrepancy_upper_threshold: float = 0.99, verbose: bool = False) -> nx.DiGraph:
+            discrepancy_upper_threshold: float = 0.99,
+            verbose: bool = False) -> nx.DiGraph:
         """
         Build a directed acyclic graph (DAG) from the discrepancies in the SHAP values.
         The discrepancies are calculated as 1.0 - GoodnessOfFit, so that a low
