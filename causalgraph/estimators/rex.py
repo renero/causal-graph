@@ -381,7 +381,8 @@ class Rex(BaseEstimator, ClassifierMixin):
             random_state (int): The random state. Defaults to 1234.
 
         Returns:
-            dict: The predicted adjacency matrices.
+            dict: The predicted adjacency matrices, normalized by the number
+                of iterations.
         """
 
         # Assert that 'shaps' exists and has been fit
@@ -439,12 +440,14 @@ class Rex(BaseEstimator, ClassifierMixin):
                 progress.update(task, advance=1, refresh=True)
             progress.stop()
 
+        for name in dag_names:
+            adjacency[name] = adjacency[name] / num_iterations
+
         return adjacency
 
     def iterative_predict(
         self,
         adjacency: dict,
-        num_iterations: int = 10,
         tolerance: float = 0.3,
         dag_names: list = ['shap', 'rho', 'adjusted',
                            'perm_imp', 'indep', 'final']):
@@ -469,43 +472,50 @@ class Rex(BaseEstimator, ClassifierMixin):
         """
         if not isinstance(adjacency, dict):
             raise TypeError("adjacency must be a dictionary")
-        if not isinstance(num_iterations, int):
-            raise TypeError("num_iterations must be an integer")
         if not isinstance(tolerance, (int, float)):
             raise TypeError("tolerance must be a number")
         if not isinstance(dag_names, list):
             raise TypeError("dag_names must be a list")
-
         if not adjacency:
             raise ValueError("adjacency is empty")
-        if num_iterations < 1:
-            raise ValueError("num_iterations must be at least 1")
         if tolerance < 0:
             raise ValueError("tolerance must be at least 0")
         if not dag_names:
             raise ValueError("dag_names is empty")
+
         dag = {}
         for name in dag_names:
             if name not in adjacency:
                 raise ValueError(f"adjacency does not contain key {name}")
             filtered_matrix = self._filter_adjacency_matrix(
-                adjacency[name], num_iterations, tolerance)
+                adjacency[name], tolerance)
             dag[name] = utils.graph_from_adjacency(
                 filtered_matrix, self.feature_names)
 
         return dag
 
-    def _filter_adjacency_matrix(self,
-                                 adjacency_matrix: np.ndarray,
-                                 num_iterations: int,
-                                 tolerance: float) -> np.ndarray:
+    def _filter_adjacency_matrix(
+            self,
+            adjacency_matrix: np.ndarray,
+            tolerance: float) -> np.ndarray:
         """
         Given an adjacency matrix, return a filtered version of it, where
         all weights with absolute value less than the tolerance are
         set to zero.
+
+        Parameters
+        ----------
+        adjacency_matrix : np.ndarray
+            The adjacency matrix.
+        tolerance : float
+            The tolerance value.
+
+        Returns
+        -------
+        np.ndarray
+            The filtered adjacency matrix.
         """
-        normalized_adjacency = adjacency_matrix / num_iterations
-        filtered_adjacency = normalized_adjacency.copy()
+        filtered_adjacency = adjacency_matrix.copy()
         filtered_adjacency[np.abs(filtered_adjacency) < tolerance] = 0
         return filtered_adjacency
 
