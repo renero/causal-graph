@@ -248,7 +248,7 @@ def get_sufficient_sets_for_pair(dag, x, y, verbose=False):
             print(" No backdoor paths found")
     sufficient_sets = []
     for path in backdoor_paths:
-        print(f"  Checking backdoor path: {path}")
+        print(f"  Checking backdoor path: {path}") if verbose else None
         # get all nodes in the path except the first and last
         sufficient_set = path[1:-1]
         # check that no node in sufficient_set is descendant of x
@@ -354,7 +354,7 @@ def get_sufficient_sets(dag, verbose=False):
             print(f"Checking pair ({x}, {y})...", end="", sep="")
         sufficient_set = get_sufficient_sets_for_pair(dag, x, y, verbose)
         if sufficient_set:
-            print(f"  Adding sufficient set: {sufficient_set}")
+            print(f"  Adding sufficient set: {sufficient_set}") if verbose else None
             suff_sets.add(sufficient_set)
 
     return suff_sets

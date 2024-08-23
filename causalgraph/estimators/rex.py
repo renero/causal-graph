@@ -16,6 +16,7 @@ import pandas as pd
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.preprocessing import StandardScaler
 from sklearn.utils.validation import check_is_fitted, check_random_state
+from rich.progress import Progress
 
 from causalgraph.common import utils
 from causalgraph.estimators.knowledge import Knowledge
@@ -161,6 +162,9 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.dpi = dpi
         self.pdf_filename = pdf_filename
 
+        # This is used to decide how to fit the model in the pipeline
+        self.fit_step = 'models.tune_fit' if self.tune_model else 'models.fit'
+
         for k, v in kwargs.items():
             setattr(self, k, v)
 
@@ -217,10 +221,6 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.X = copy(X)
         self.y = copy(y) if y is not None else None
 
-        # If the model is to be tuned for HPO, then the step for fitting the regressors
-        # is different.
-        fit_step = 'models.tune_fit' if self.tune_model else 'models.fit'
-
         # Create the pipeline for the training stages.
         pipeline = Pipeline(self, description="Fitting models", prog_bar=self.prog_bar,
                             verbose=self.verbose, silent=self.silent, subtask=True)
@@ -228,7 +228,7 @@ class Rex(BaseEstimator, ClassifierMixin):
             ('hierarchies', Hierarchies),
             ('hierarchies.fit'),
             ('models', self.model_type),
-            (fit_step),
+            (self.fit_step),
             ('models.score', {'X': X}),
             ('root_causes', 'compute_regression_quality'),
             ('shaps', ShapEstimator, {'models': 'models'}),
@@ -356,6 +356,158 @@ class Rex(BaseEstimator, ClassifierMixin):
         prediction.close()
 
         return self.G_final
+
+    def iterative_fit(
+            self,
+            X: pd.DataFrame,
+            num_iterations: int = 10,
+            sampling_split: float = 0.5,
+            prior: list = None,
+            dag_names: list = ['shap', 'rho', 'adjusted',
+                               'perm_imp', 'indep', 'final'],
+            random_state: int = 1234) -> dict:
+        """
+        Performs iterative prediction on the given directed acyclic graph (DAG)
+        and adjacency matrix.
+
+        Parameters:
+            X (pd.DataFrame): The input data.
+            num_iterations (int): The number of iterations to perform. Defaults to 10.
+            sampling_split (float): The proportion of the data to use for
+                training. Defaults to 0.5.
+            prior (list): The prior knowledge. Defaults to None.
+            dag_names (list): A list of names for the DAG. Defaults to ['shap', 'rho',
+                'adjusted', 'perm_imp', 'indep', 'final'].
+            random_state (int): The random state. Defaults to 1234.
+
+        Returns:
+            dict: The predicted adjacency matrices.
+        """
+
+        # Assert that 'shaps' exists and has been fit
+        check_is_fitted(self, "is_fitted_")
+
+        # Set adjacency matrices to zero
+        dag = {}
+        adjacency = {}
+        dag_names = ['shap', 'rho', 'adjusted', 'perm_imp', 'indep', 'final']
+        def init_adjacency(n): return np.zeros((n, n))
+        for name in dag_names:
+            adjacency[name] = init_adjacency(self.n_features_in_)
+
+        self.verbose_off()
+        with Progress() as progress:
+            task = progress.add_task(
+                "Iterative predict pipeline...", total=num_iterations)
+            for iter in range(num_iterations):
+                data_sample = X.sample(frac=sampling_split,
+                                       random_state=iter*random_state)
+                # Shap?
+                self.hierarchies.fit(data_sample)
+                self.shaps.fit(data_sample)
+                dag['shap'] = self.shaps.predict(data_sample, prior=prior)
+                adjacency['shap'] += utils.graph_to_adjacency(
+                    dag['shap'], self.feature_names)
+                # Rho?
+                dag['rho'] = self.dag_from_discrepancy(
+                    self.discrepancy_threshold)
+                adjacency['rho'] += utils.graph_to_adjacency(
+                    dag['rho'], self.feature_names)
+
+                # Adjusted?
+                dag['adjusted'] = self.adjust_discrepancy(dag['shap'])
+                adjacency['adjusted'] += utils.graph_to_adjacency(
+                    dag['adjusted'], self.feature_names)
+
+                # Perm Importance?
+                self.pi.fit(data_sample)
+                dag['perm_imp'] = self.pi.predict(
+                    data_sample, root_causes=self.root_causes, prior=prior)
+                adjacency['perm_imp'] += utils.graph_to_adjacency(
+                    dag['perm_imp'], self.feature_names)
+
+                # Independence?
+                dag['indep'] = self.indep.fit_predict(data_sample)
+                adjacency['indep'] += utils.graph_to_adjacency(
+                    dag['indep'], self.feature_names)
+
+                # Final?
+                dag['final'] = self.shaps.adjust(dag['indep'])
+                adjacency['final'] += utils.graph_to_adjacency(
+                    dag['final'], self.feature_names)
+
+                progress.update(task, advance=1, refresh=True)
+            progress.stop()
+
+        return adjacency
+
+    def iterative_predict(
+        self,
+        adjacency: dict,
+        num_iterations: int = 10,
+        tolerance: float = 0.3,
+        dag_names: list = ['shap', 'rho', 'adjusted',
+                           'perm_imp', 'indep', 'final']):
+        """
+        Performs iterative prediction on the given directed acyclic graph (DAG)
+        and adjacency matrix. Prediction is based on the adjacency matrices previously
+        computed, which are here normalized and filtered, so values below tolerance
+        are set to zero. This way, only those edges present in more than "tolerance"
+        percent of the iterations are kept.
+
+        Parameters:
+            dag (dict): The input DAG.
+            adjacency (dict): The adjacency matrix of the graph.
+            num_iterations (int): The number of iterations to perform. Defaults to 10.
+            tolerance (float): The tolerance value for filtering the adjacency matrix.
+                Defaults to 0.3.
+            dag_names (list): A list of names for the DAG. Defaults to ['shap', 'rho',
+                'adjusted', 'perm_imp', 'indep', 'final'].
+
+        Returns:
+            dict: The predicted DAG.
+        """
+        if not isinstance(adjacency, dict):
+            raise TypeError("adjacency must be a dictionary")
+        if not isinstance(num_iterations, int):
+            raise TypeError("num_iterations must be an integer")
+        if not isinstance(tolerance, (int, float)):
+            raise TypeError("tolerance must be a number")
+        if not isinstance(dag_names, list):
+            raise TypeError("dag_names must be a list")
+
+        if not adjacency:
+            raise ValueError("adjacency is empty")
+        if num_iterations < 1:
+            raise ValueError("num_iterations must be at least 1")
+        if tolerance < 0:
+            raise ValueError("tolerance must be at least 0")
+        if not dag_names:
+            raise ValueError("dag_names is empty")
+        dag = {}
+        for name in dag_names:
+            if name not in adjacency:
+                raise ValueError(f"adjacency does not contain key {name}")
+            filtered_matrix = self._filter_adjacency_matrix(
+                adjacency[name], num_iterations, tolerance)
+            dag[name] = utils.graph_from_adjacency(
+                filtered_matrix, self.feature_names)
+
+        return dag
+
+    def _filter_adjacency_matrix(self,
+                                 adjacency_matrix: np.ndarray,
+                                 num_iterations: int,
+                                 tolerance: float) -> np.ndarray:
+        """
+        Given an adjacency matrix, return a filtered version of it, where
+        all weights with absolute value less than the tolerance are
+        set to zero.
+        """
+        normalized_adjacency = adjacency_matrix / num_iterations
+        filtered_adjacency = normalized_adjacency.copy()
+        filtered_adjacency[np.abs(filtered_adjacency) < tolerance] = 0
+        return filtered_adjacency
 
     def fit_predict(
             self,
