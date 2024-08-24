@@ -94,7 +94,7 @@ def load_experiment(obj_name: str, folder: str):
 
     experiment = f"{str(Path(folder, obj_name))}{ext}"
     with open(experiment, 'rb') as h:
-        obj = pickle.load(h)
+        obj = pickle.load(h, encoding="utf-8")
     return obj
 
 
@@ -646,7 +646,11 @@ def break_cycles_if_present(
                     print(f"  {edge[0]} --> {edge[1]} ({edge[2]:.3f})")
             # Check if changing the orientation of the edge would break the cycle
             test_dag = new_dag.copy()
-            test_dag.remove_edge(*min_edge)
+
+            # Check if the edge is yet in the test_dag
+            if min_edge in test_dag.edges:
+                test_dag.remove_edge(*min_edge)
+
             test_dag.add_edge(*potential_misoriented[0][1::-1])
             test_cycles = list(nx.simple_cycles(test_dag))
             if len(test_cycles) == len(cycles):

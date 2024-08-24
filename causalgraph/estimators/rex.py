@@ -158,6 +158,9 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.silent = silent
         self.random_state = random_state
 
+        self.is_fitted_ = False
+        self.is_iterative_fitted_ = False
+
         self.shap_fsize = shap_fsize
         self.dpi = dpi
         self.pdf_filename = pdf_filename
@@ -390,14 +393,14 @@ class Rex(BaseEstimator, ClassifierMixin):
 
         # Set adjacency matrices to zero
         dag = {}
-        adjacency = {}
-        dag_names = ['shap', 'rho', 'adjusted', 'perm_imp', 'indep', 'final']
+        self.iter_adjacency_matrices = {}
         def init_adjacency(n): return np.zeros((n, n))
         for name in dag_names:
-            adjacency[name] = init_adjacency(self.n_features_in_)
+            self.iter_adjacency_matrices[name] = init_adjacency(
+                self.n_features_in_)
 
         self.verbose_off()
-        with Progress() as progress:
+        with Progress(transient=True) as progress:
             task = progress.add_task(
                 "Iterative predict pipeline...", total=num_iterations)
             for iter in range(num_iterations):
@@ -407,47 +410,54 @@ class Rex(BaseEstimator, ClassifierMixin):
                 self.hierarchies.fit(data_sample)
                 self.shaps.fit(data_sample)
                 dag['shap'] = self.shaps.predict(data_sample, prior=prior)
-                adjacency['shap'] += utils.graph_to_adjacency(
+                self.iter_adjacency_matrices['shap'] += utils.graph_to_adjacency(
                     dag['shap'], self.feature_names)
                 # Rho?
-                dag['rho'] = self.dag_from_discrepancy(
-                    self.discrepancy_threshold)
-                adjacency['rho'] += utils.graph_to_adjacency(
-                    dag['rho'], self.feature_names)
+                if 'rho' in dag_names:
+                    dag['rho'] = self.dag_from_discrepancy(
+                        self.discrepancy_threshold)
+                    self.iter_adjacency_matrices['rho'] += utils.graph_to_adjacency(
+                        dag['rho'], self.feature_names)
 
                 # Adjusted?
-                dag['adjusted'] = self.adjust_discrepancy(dag['shap'])
-                adjacency['adjusted'] += utils.graph_to_adjacency(
-                    dag['adjusted'], self.feature_names)
+                if 'adjusted' in dag_names:
+                    dag['adjusted'] = self.adjust_discrepancy(dag['shap'])
+                    self.iter_adjacency_matrices['adjusted'] += utils.graph_to_adjacency(
+                        dag['adjusted'], self.feature_names)
 
                 # Perm Importance?
-                self.pi.fit(data_sample)
-                dag['perm_imp'] = self.pi.predict(
-                    data_sample, root_causes=self.root_causes, prior=prior)
-                adjacency['perm_imp'] += utils.graph_to_adjacency(
-                    dag['perm_imp'], self.feature_names)
+                if 'perm_imp' in dag_names:
+                    self.pi.fit(data_sample)
+                    dag['perm_imp'] = self.pi.predict(
+                        data_sample, root_causes=self.root_causes, prior=prior)
+                    self.iter_adjacency_matrices['perm_imp'] += utils.graph_to_adjacency(
+                        dag['perm_imp'], self.feature_names)
 
                 # Independence?
-                dag['indep'] = self.indep.fit_predict(data_sample)
-                adjacency['indep'] += utils.graph_to_adjacency(
-                    dag['indep'], self.feature_names)
+                if 'indep' in dag_names:
+                    dag['indep'] = self.indep.fit_predict(data_sample)
+                    self.iter_adjacency_matrices['indep'] += utils.graph_to_adjacency(
+                        dag['indep'], self.feature_names)
 
                 # Final?
-                dag['final'] = self.shaps.adjust(dag['indep'])
-                adjacency['final'] += utils.graph_to_adjacency(
-                    dag['final'], self.feature_names)
+                if 'final' in dag_names:
+                    dag['final'] = self.shaps.adjust(dag['indep'])
+                    self.iter_adjacency_matrices['final'] += utils.graph_to_adjacency(
+                        dag['final'], self.feature_names)
 
                 progress.update(task, advance=1, refresh=True)
             progress.stop()
 
         for name in dag_names:
-            adjacency[name] = adjacency[name] / num_iterations
+            self.iter_adjacency_matrices[name] = \
+                self.iter_adjacency_matrices[name] / num_iterations
 
-        return adjacency
+        self.is_iterative_fitted_ = True
+
+        return self.iter_adjacency_matrices
 
     def iterative_predict(
         self,
-        adjacency: dict,
         tolerance: float = 0.3,
         dag_names: list = ['shap', 'rho', 'adjusted',
                            'perm_imp', 'indep', 'final']):
@@ -460,7 +470,6 @@ class Rex(BaseEstimator, ClassifierMixin):
 
         Parameters:
             dag (dict): The input DAG.
-            adjacency (dict): The adjacency matrix of the graph.
             num_iterations (int): The number of iterations to perform. Defaults to 10.
             tolerance (float): The tolerance value for filtering the adjacency matrix.
                 Defaults to 0.3.
@@ -470,29 +479,30 @@ class Rex(BaseEstimator, ClassifierMixin):
         Returns:
             dict: The predicted DAG.
         """
-        if not isinstance(adjacency, dict):
+        assert self.is_iterative_fitted_, "Model must be fitted iteratively first"
+        if not isinstance(self.iter_adjacency_matrices, dict):
             raise TypeError("adjacency must be a dictionary")
         if not isinstance(tolerance, (int, float)):
             raise TypeError("tolerance must be a number")
         if not isinstance(dag_names, list):
             raise TypeError("dag_names must be a list")
-        if not adjacency:
+        if not self.iter_adjacency_matrices:
             raise ValueError("adjacency is empty")
         if tolerance < 0:
             raise ValueError("tolerance must be at least 0")
         if not dag_names:
             raise ValueError("dag_names is empty")
 
-        dag = {}
+        self.iterative_dags = {}
         for name in dag_names:
-            if name not in adjacency:
+            if name not in self.iter_adjacency_matrices:
                 raise ValueError(f"adjacency does not contain key {name}")
             filtered_matrix = self._filter_adjacency_matrix(
-                adjacency[name], tolerance)
-            dag[name] = utils.graph_from_adjacency(
+                self.iter_adjacency_matrices[name], tolerance)
+            self.iterative_dags[name] = utils.graph_from_adjacency(
                 filtered_matrix, self.feature_names)
 
-        return dag
+        return self.iterative_dags
 
     def _filter_adjacency_matrix(
             self,

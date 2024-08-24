@@ -701,8 +701,8 @@ def dags(
 
     Parameters:
     -----------
-    reference: The reference DAG.
     graph: The DAG to compare.
+    reference: The reference DAG.
     names: The names of the reference graph and the dag.
     figsize: The size of the figure.
     **kwargs: Additional arguments to format the graphs:
