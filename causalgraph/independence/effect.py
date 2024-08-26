@@ -42,8 +42,8 @@ def estimate(digraph:nx.DiGraph, data:pd.DataFrame, verbose=False) -> nx.DiGraph
 
     # Compute the effect of each treatment in the outcome
     for t, o in graph.edges():
-            ate, refute_result = estimate_edge(graph, t, o, data, verbose)
-            graph.add_edge(t, o, ate=ate, refute_result=refute_result)
+            ate, refute_pval = estimate_edge(graph, t, o, data, verbose)
+            graph.add_edge(t, o, ate=ate, refute_pval=refute_pval)
 
     print(graph.edges(data=True)) if verbose else None
 

@@ -3,20 +3,21 @@ Main class for the REX estimator.
 (C) J. Renero, 2022, 2023
 """
 
-from collections import defaultdict
 import os
 import warnings
+from collections import defaultdict
 from copy import copy
 from typing import List, Tuple, Union
 
-from mlforge.mlforge import Pipeline
 import networkx as nx
 import numpy as np
 import pandas as pd
+from mlforge.mlforge import Pipeline
+from mlforge.progbar import ProgBar
+from rich.progress import Progress
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.preprocessing import StandardScaler
 from sklearn.utils.validation import check_is_fitted, check_random_state
-from rich.progress import Progress
 
 from causalgraph.common import utils
 from causalgraph.estimators.knowledge import Knowledge
@@ -399,54 +400,56 @@ class Rex(BaseEstimator, ClassifierMixin):
             self.iter_adjacency_matrices[name] = init_adjacency(
                 self.n_features_in_)
 
-        self.verbose_off()
-        with Progress(transient=True) as progress:
-            task = progress.add_task(
-                "Iterative predict pipeline...", total=num_iterations)
-            for iter in range(num_iterations):
-                data_sample = X.sample(frac=sampling_split,
-                                       random_state=iter*random_state)
-                # Shap?
-                self.hierarchies.fit(data_sample)
-                self.shaps.fit(data_sample)
-                dag['shap'] = self.shaps.predict(data_sample, prior=prior)
-                self.iter_adjacency_matrices['shap'] += utils.graph_to_adjacency(
-                    dag['shap'], self.feature_names)
-                # Rho?
-                if 'rho' in dag_names:
-                    dag['rho'] = self.dag_from_discrepancy(
-                        self.discrepancy_threshold)
-                    self.iter_adjacency_matrices['rho'] += utils.graph_to_adjacency(
-                        dag['rho'], self.feature_names)
+        # self.verbose_off()
+        # with Progress(transient=True) as progress:
+        #     task = progress.add_task(
+        #         "Iterative predict pipeline...", total=num_iterations)
 
-                # Adjusted?
-                if 'adjusted' in dag_names:
-                    dag['adjusted'] = self.adjust_discrepancy(dag['shap'])
-                    self.iter_adjacency_matrices['adjusted'] += utils.graph_to_adjacency(
-                        dag['adjusted'], self.feature_names)
+        pbar = ProgBar().start_subtask(num_iterations)
+        for iter in range(num_iterations):
+            data_sample = X.sample(frac=sampling_split,
+                                    random_state=iter*random_state)
+            # Shap?
+            self.hierarchies.fit(data_sample)
+            self.shaps.fit(data_sample)
+            dag['shap'] = self.shaps.predict(data_sample, prior=prior)
+            self.iter_adjacency_matrices['shap'] += utils.graph_to_adjacency(
+                dag['shap'], self.feature_names)
+            # Rho?
+            if 'rho' in dag_names:
+                dag['rho'] = self.dag_from_discrepancy(
+                    self.discrepancy_threshold)
+                self.iter_adjacency_matrices['rho'] += utils.graph_to_adjacency(
+                    dag['rho'], self.feature_names)
 
-                # Perm Importance?
-                if 'perm_imp' in dag_names:
-                    self.pi.fit(data_sample)
-                    dag['perm_imp'] = self.pi.predict(
-                        data_sample, root_causes=self.root_causes, prior=prior)
-                    self.iter_adjacency_matrices['perm_imp'] += utils.graph_to_adjacency(
-                        dag['perm_imp'], self.feature_names)
+            # Adjusted?
+            if 'adjusted' in dag_names:
+                dag['adjusted'] = self.adjust_discrepancy(dag['shap'])
+                self.iter_adjacency_matrices['adjusted'] += utils.graph_to_adjacency(
+                    dag['adjusted'], self.feature_names)
 
-                # Independence?
-                if 'indep' in dag_names:
-                    dag['indep'] = self.indep.fit_predict(data_sample)
-                    self.iter_adjacency_matrices['indep'] += utils.graph_to_adjacency(
-                        dag['indep'], self.feature_names)
+            # Perm Importance?
+            if 'perm_imp' in dag_names:
+                self.pi.fit(data_sample)
+                dag['perm_imp'] = self.pi.predict(
+                    data_sample, root_causes=self.root_causes, prior=prior)
+                self.iter_adjacency_matrices['perm_imp'] += utils.graph_to_adjacency(
+                    dag['perm_imp'], self.feature_names)
 
-                # Final?
-                if 'final' in dag_names:
-                    dag['final'] = self.shaps.adjust(dag['indep'])
-                    self.iter_adjacency_matrices['final'] += utils.graph_to_adjacency(
-                        dag['final'], self.feature_names)
+            # Independence?
+            if 'indep' in dag_names:
+                dag['indep'] = self.indep.fit_predict(data_sample)
+                self.iter_adjacency_matrices['indep'] += utils.graph_to_adjacency(
+                    dag['indep'], self.feature_names)
 
-                progress.update(task, advance=1, refresh=True)
-            progress.stop()
+            # Final?
+            if 'final' in dag_names:
+                dag['final'] = self.shaps.adjust(dag['indep'])
+                self.iter_adjacency_matrices['final'] += utils.graph_to_adjacency(
+                    dag['final'], self.feature_names)
+
+            pbar.update_subtask(1)
+            # progress.update(task, advance=1, refresh=True)
 
         for name in dag_names:
             self.iter_adjacency_matrices[name] = \
