@@ -475,10 +475,12 @@ class Experiment(BaseExperiment):
         - overwrite (bool, optional): Whether to overwrite an existing
             experiment with the same name. Defaults to False.
         """
-        # estimator_object = getattr(self, self.estimator)
         save_as = exp_name if exp_name is not None else self.experiment_name
         where_to = save_experiment(
-            save_as, self.output_path, getattr(self, self.estimator_name), overwrite)
+            f"{save_as}_{self.model_type}",
+            self.output_path, getattr(self, self.estimator_name),
+            overwrite)
+
         if self.verbose:
             print(f"Saved '{self.experiment_name}' to '{where_to}'")
 

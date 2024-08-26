@@ -14,7 +14,7 @@ from sklearn.preprocessing import StandardScaler
 from causalgraph.common import utils
 
 
-def estimate(digraph:nx.DiGraph, data:pd.DataFrame, verbose=False) -> nx.DiGraph:
+def estimate(digraph: nx.DiGraph, data: pd.DataFrame, in_place: bool = True, verbose=False) -> nx.DiGraph:
     """
     Takes the original digraph passed as argument, and computes the effect of
     each treatment in the outcome, given the graph. Treament and outcome are
@@ -29,6 +29,8 @@ def estimate(digraph:nx.DiGraph, data:pd.DataFrame, verbose=False) -> nx.DiGraph
         The causal graph.
     data : pd.DataFrame
         The data.
+    in_place : bool, optional
+        Whether to modify the graph in place. Defaults to True.
     verbose : bool, optional
         If True, print the results. Defaults to False.
 
@@ -38,17 +40,16 @@ def estimate(digraph:nx.DiGraph, data:pd.DataFrame, verbose=False) -> nx.DiGraph
         The estimated causal graph.
     """
     # Create a copy of the graph
-    graph = digraph.copy()
+    graph = digraph if in_place else digraph.copy()
 
     # Compute the effect of each treatment in the outcome
     for t, o in graph.edges():
-            ate, refute_pval = estimate_edge(graph, t, o, data, verbose)
-            graph.add_edge(t, o, ate=ate, refute_pval=refute_pval)
+        ate, refute_pval = estimate_edge(graph, t, o, data, verbose)
+        graph.add_edge(t, o, ate=ate, refute_pval=refute_pval)
 
     print(graph.edges(data=True)) if verbose else None
 
     return graph
-
 
 
 def estimate_edge(
