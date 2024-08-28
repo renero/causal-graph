@@ -330,7 +330,7 @@ class Rex(BaseEstimator, ClassifierMixin):
                     'root_causes': 'root_causes', 'prior': prior}),
                 ('G_rho', 'dag_from_discrepancy', {
                     'discrepancy_upper_threshold': self.discrepancy_threshold,
-                    "verbose": True}),
+                    "verbose": False}),
                 ('G_adj', 'adjust_discrepancy', {'dag': 'G_shap'}),
                 ('G_pi', 'pi.predict', {
                     'root_causes': 'root_causes', 'prior': prior}),
@@ -400,15 +400,10 @@ class Rex(BaseEstimator, ClassifierMixin):
             self.iter_adjacency_matrices[name] = init_adjacency(
                 self.n_features_in_)
 
-        # self.verbose_off()
-        # with Progress(transient=True) as progress:
-        #     task = progress.add_task(
-        #         "Iterative predict pipeline...", total=num_iterations)
-
         pbar = ProgBar().start_subtask(num_iterations)
         for iter in range(num_iterations):
             data_sample = X.sample(frac=sampling_split,
-                                    random_state=iter*random_state)
+                                   random_state=iter*random_state)
             # Shap?
             self.hierarchies.fit(data_sample)
             self.shaps.fit(data_sample)
@@ -449,7 +444,6 @@ class Rex(BaseEstimator, ClassifierMixin):
                     dag['final'], self.feature_names)
 
             pbar.update_subtask(1)
-            # progress.update(task, advance=1, refresh=True)
 
         for name in dag_names:
             self.iter_adjacency_matrices[name] = \
@@ -789,6 +783,7 @@ class Rex(BaseEstimator, ClassifierMixin):
 def custom_main(dataset_name,
                 input_path="/Users/renero/phd/data/RC3/",
                 output_path="/Users/renero/phd/output/RC4/",
+                scale_data: bool = False,
                 tune_model: bool = False,
                 model_type="nn", explainer="gradient",
                 save=False):
@@ -801,8 +796,9 @@ def custom_main(dataset_name,
 
     ref_graph = utils.graph_from_dot_file(f"{input_path}{dataset_name}.dot")
     data = pd.read_csv(f"{input_path}{dataset_name}.csv")
-    # scaler = StandardScaler()
-    # data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)
+    if scale_data:
+        scaler = StandardScaler()
+        data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)
     train = data.sample(frac=0.8, random_state=42)
     test = data.drop(train.index)
 
@@ -844,6 +840,6 @@ if __name__ == "__main__":
     custom_main('short', input_path="/Users/renero/phd/data/RC3/",
                 model_type="nn",
                 explainer="gradient",
-                tune_model=True,
+                tune_model=False,
                 save=False)
     # prior_main('rex_generated_gp_add_5')
