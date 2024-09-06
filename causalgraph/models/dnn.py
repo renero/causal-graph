@@ -171,9 +171,9 @@ class NNRegressor(BaseEstimator):
                 verbose=self.verbose)
             X_original = X.copy()
 
-        pbar = ProgBar().start_subtask(len(self.feature_names))
+        pbar = ProgBar().start_subtask("DNN_fit", len(self.feature_names))
 
-        for target_name in self.feature_names:
+        for target_idx, target_name in enumerate(self.feature_names):
             # if correlation_th is not None then, remove features that are highly
             # correlated with the target, at each step of the loop
             if self.correlation_th is not None:
@@ -212,23 +212,24 @@ class NNRegressor(BaseEstimator):
                 prog_bar=self.prog_bar)
             self.regressor[target_name].train()
 
-            pbar.update_subtask()
+            pbar.update_subtask("DNN_fit", target_idx+1)
 
+        pbar.remove("DNN_fit")
         self.is_fitted_ = True
         return self
 
-    def predict(self, X):
-        """ A reference implementation of a predicting function.
+    def predict(self, X: pd.DataFrame) -> np.ndarray:
+        """Predicts the values for each target variable.
 
         Parameters
         ----------
-        X : {array-like, sparse matrix}, shape (n_samples, n_features)
-            The training input samples.
+        X : pd.DataFrame
+            The input data to make predictions on.
 
         Returns
         -------
-        y : ndarray, shape (n_samples,)
-            Returns an array of ones.
+        np.ndarray
+            The predictions for each target variable.
         """
         assert X.shape[1] == self.n_features_in_, \
             f"X has {X.shape[1]} features, expected {self.n_features_in_}"
@@ -254,21 +255,31 @@ class NNRegressor(BaseEstimator):
             model = self.regressor[target].model
 
             # Obtain the predictions for the target variable
-            preds = []
+            preds = np.empty((0,), dtype=np.float16)
             for (tensor_X, _) in loader:
                 tensor_X = tensor_X.to(self.device)
                 y_hat = model.forward(tensor_X)
-                preds.append(y_hat.detach().numpy().flatten())
+                preds = np.append(preds, y_hat.detach().numpy().flatten())
             prediction[target] = preds
+
 
         # Concatenate the numpy array for all the batchs
         np_preds = prediction.values
         final_preds = []
-        if np_preds.shape[0] > 1:
+        if np_preds.ndim > 1 and np_preds.shape[0] > 1:
             for i in range(len(self.feature_names)):
-                final_preds.append(np.concatenate(np_preds[:, i], axis=0))
+                column = np_preds[:, i]
+                if column.ndim == 1:
+                    final_preds.append(column)
+                else:
+                    final_preds.append(np.concatenate(column))
+            final_preds = np.array(final_preds)
         else:
             final_preds = np_preds
+
+        # If final_preds is still 1D, reshape it to 2D
+        if final_preds.ndim == 1:
+            final_preds = final_preds.reshape(1, -1)
 
         if len(final_preds) == 0:
             final_preds = np_preds

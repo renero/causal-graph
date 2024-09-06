@@ -3,16 +3,18 @@ Main class for the REX estimator.
 (C) J. Renero, 2022, 2023
 """
 
-from collections import defaultdict
 import os
 import warnings
+from collections import defaultdict
 from copy import copy
 from typing import List, Tuple, Union
 
-from mlforge.mlforge import Pipeline
 import networkx as nx
 import numpy as np
 import pandas as pd
+from mlforge.mlforge import Pipeline
+from mlforge.progbar import ProgBar
+from rich.progress import Progress
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.preprocessing import StandardScaler
 from sklearn.utils.validation import check_is_fitted, check_random_state
@@ -157,9 +159,15 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.silent = silent
         self.random_state = random_state
 
+        self.is_fitted_ = False
+        self.is_iterative_fitted_ = False
+
         self.shap_fsize = shap_fsize
         self.dpi = dpi
         self.pdf_filename = pdf_filename
+
+        # This is used to decide how to fit the model in the pipeline
+        self.fit_step = 'models.tune_fit' if self.tune_model else 'models.fit'
 
         for k, v in kwargs.items():
             setattr(self, k, v)
@@ -217,10 +225,6 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.X = copy(X)
         self.y = copy(y) if y is not None else None
 
-        # If the model is to be tuned for HPO, then the step for fitting the regressors
-        # is different.
-        fit_step = 'models.tune_fit' if self.tune_model else 'models.fit'
-
         # Create the pipeline for the training stages.
         pipeline = Pipeline(self, description="Fitting models", prog_bar=self.prog_bar,
                             verbose=self.verbose, silent=self.silent, subtask=True)
@@ -228,7 +232,7 @@ class Rex(BaseEstimator, ClassifierMixin):
             ('hierarchies', Hierarchies),
             ('hierarchies.fit'),
             ('models', self.model_type),
-            (fit_step),
+            (self.fit_step),
             ('models.score', {'X': X}),
             ('root_causes', 'compute_regression_quality'),
             ('shaps', ShapEstimator, {'models': 'models'}),
@@ -323,22 +327,19 @@ class Rex(BaseEstimator, ClassifierMixin):
             steps = [
                 # DAGs construction
                 ('G_shap', 'shaps.predict', {
-                 'root_causes': 'root_causes', 'prior': prior}),
+                    'root_causes': 'root_causes', 'prior': prior}),
                 ('G_rho', 'dag_from_discrepancy', {
-                    'discrepancy_upper_threshold': self.discrepancy_threshold, "verbose": True}),
+                    'discrepancy_upper_threshold': self.discrepancy_threshold,
+                    "verbose": False}),
                 ('G_adj', 'adjust_discrepancy', {'dag': 'G_shap'}),
                 ('G_pi', 'pi.predict', {
-                 'root_causes': 'root_causes', 'prior': prior}),
+                    'root_causes': 'root_causes', 'prior': prior}),
                 ('indep', GraphIndependence, {'base_graph': 'G_shap'}),
                 ('G_indep', 'indep.fit_predict'),
                 ('G_final', 'shaps.adjust', {'graph': 'G_indep'}),
 
                 # Knowledge Summarization
                 ('summarize_knowledge', {'ref_graph': ref_graph}),
-
-                # Old: break_cycles is now part of DAG construction
-                # ('G_shag', 'break_cycles', {'dag': 'G_shap'}),
-                # ('G_adjnc', 'break_cycles', {'dag': 'G_adj'}),
 
                 # Metrics Generation, here
                 ('metrics_shap', 'score', {
@@ -351,10 +352,6 @@ class Rex(BaseEstimator, ClassifierMixin):
                     'ref_graph': ref_graph, 'predicted_graph': 'G_indep'}),
                 ('metrics_final', 'score', {
                     'ref_graph': ref_graph, 'predicted_graph': 'G_final'})
-                # ('metrics_shag', 'score', {
-                #  'ref_graph': ref_graph, 'predicted_graph': 'G_shag'}),
-                # ('metrics_adjnc', 'score', {
-                #  'ref_graph': ref_graph, 'predicted_graph': 'G_adjnc'}),
             ]
             prediction.from_list(steps)
         prediction.run()
@@ -363,6 +360,171 @@ class Rex(BaseEstimator, ClassifierMixin):
         prediction.close()
 
         return self.G_final
+
+    def iterative_fit(
+            self,
+            X: pd.DataFrame,
+            num_iterations: int = 10,
+            sampling_split: float = 0.5,
+            prior: list = None,
+            dag_names: list = ['shap', 'rho', 'adjusted',
+                               'perm_imp', 'indep', 'final'],
+            random_state: int = 1234) -> dict:
+        """
+        Performs iterative prediction on the given directed acyclic graph (DAG)
+        and adjacency matrix.
+
+        Parameters:
+            X (pd.DataFrame): The input data.
+            num_iterations (int): The number of iterations to perform. Defaults to 10.
+            sampling_split (float): The proportion of the data to use for
+                training. Defaults to 0.5.
+            prior (list): The prior knowledge. Defaults to None.
+            dag_names (list): A list of names for the DAG. Defaults to ['shap', 'rho',
+                'adjusted', 'perm_imp', 'indep', 'final'].
+            random_state (int): The random state. Defaults to 1234.
+
+        Returns:
+            dict: The predicted adjacency matrices, normalized by the number
+                of iterations.
+        """
+
+        # Assert that 'shaps' exists and has been fit
+        check_is_fitted(self, "is_fitted_")
+
+        # Set adjacency matrices to zero
+        dag = {}
+        self.iter_adjacency_matrices = {}
+        def init_adjacency(n): return np.zeros((n, n))
+        for name in dag_names:
+            self.iter_adjacency_matrices[name] = init_adjacency(
+                self.n_features_in_)
+
+        pbar = ProgBar().start_subtask(num_iterations)
+        for iter in range(num_iterations):
+            data_sample = X.sample(frac=sampling_split,
+                                   random_state=iter*random_state)
+            # Shap?
+            self.hierarchies.fit(data_sample)
+            self.shaps.fit(data_sample)
+            dag['shap'] = self.shaps.predict(data_sample, prior=prior)
+            self.iter_adjacency_matrices['shap'] += utils.graph_to_adjacency(
+                dag['shap'], self.feature_names)
+            # Rho?
+            if 'rho' in dag_names:
+                dag['rho'] = self.dag_from_discrepancy(
+                    self.discrepancy_threshold)
+                self.iter_adjacency_matrices['rho'] += utils.graph_to_adjacency(
+                    dag['rho'], self.feature_names)
+
+            # Adjusted?
+            if 'adjusted' in dag_names:
+                dag['adjusted'] = self.adjust_discrepancy(dag['shap'])
+                self.iter_adjacency_matrices['adjusted'] += utils.graph_to_adjacency(
+                    dag['adjusted'], self.feature_names)
+
+            # Perm Importance?
+            if 'perm_imp' in dag_names:
+                self.pi.fit(data_sample)
+                dag['perm_imp'] = self.pi.predict(
+                    data_sample, root_causes=self.root_causes, prior=prior)
+                self.iter_adjacency_matrices['perm_imp'] += utils.graph_to_adjacency(
+                    dag['perm_imp'], self.feature_names)
+
+            # Independence?
+            if 'indep' in dag_names:
+                dag['indep'] = self.indep.fit_predict(data_sample)
+                self.iter_adjacency_matrices['indep'] += utils.graph_to_adjacency(
+                    dag['indep'], self.feature_names)
+
+            # Final?
+            if 'final' in dag_names:
+                dag['final'] = self.shaps.adjust(dag['indep'])
+                self.iter_adjacency_matrices['final'] += utils.graph_to_adjacency(
+                    dag['final'], self.feature_names)
+
+            pbar.update_subtask(1)
+
+        for name in dag_names:
+            self.iter_adjacency_matrices[name] = \
+                self.iter_adjacency_matrices[name] / num_iterations
+
+        self.is_iterative_fitted_ = True
+
+        return self.iter_adjacency_matrices
+
+    def iterative_predict(
+        self,
+        tolerance: float = 0.3,
+        dag_names: list = ['shap', 'rho', 'adjusted',
+                           'perm_imp', 'indep', 'final']):
+        """
+        Performs iterative prediction on the given directed acyclic graph (DAG)
+        and adjacency matrix. Prediction is based on the adjacency matrices previously
+        computed, which are here normalized and filtered, so values below tolerance
+        are set to zero. This way, only those edges present in more than "tolerance"
+        percent of the iterations are kept.
+
+        Parameters:
+            dag (dict): The input DAG.
+            num_iterations (int): The number of iterations to perform. Defaults to 10.
+            tolerance (float): The tolerance value for filtering the adjacency matrix.
+                Defaults to 0.3.
+            dag_names (list): A list of names for the DAG. Defaults to ['shap', 'rho',
+                'adjusted', 'perm_imp', 'indep', 'final'].
+
+        Returns:
+            dict: The predicted DAG.
+        """
+        assert self.is_iterative_fitted_, "Model must be fitted iteratively first"
+        if not isinstance(self.iter_adjacency_matrices, dict):
+            raise TypeError("adjacency must be a dictionary")
+        if not isinstance(tolerance, (int, float)):
+            raise TypeError("tolerance must be a number")
+        if not isinstance(dag_names, list):
+            raise TypeError("dag_names must be a list")
+        if not self.iter_adjacency_matrices:
+            raise ValueError("adjacency is empty")
+        if tolerance < 0:
+            raise ValueError("tolerance must be at least 0")
+        if not dag_names:
+            raise ValueError("dag_names is empty")
+
+        self.iterative_dags = {}
+        for name in dag_names:
+            if name not in self.iter_adjacency_matrices:
+                raise ValueError(f"adjacency does not contain key {name}")
+            filtered_matrix = self._filter_adjacency_matrix(
+                self.iter_adjacency_matrices[name], tolerance)
+            self.iterative_dags[name] = utils.graph_from_adjacency(
+                filtered_matrix, self.feature_names)
+
+        return self.iterative_dags
+
+    def _filter_adjacency_matrix(
+            self,
+            adjacency_matrix: np.ndarray,
+            tolerance: float) -> np.ndarray:
+        """
+        Given an adjacency matrix, return a filtered version of it, where
+        all weights with absolute value less than the tolerance are
+        set to zero.
+
+        Parameters
+        ----------
+        adjacency_matrix : np.ndarray
+            The adjacency matrix.
+        tolerance : float
+            The tolerance value.
+
+        Returns
+        -------
+        np.ndarray
+            The filtered adjacency matrix.
+        """
+        filtered_adjacency = adjacency_matrix.copy()
+        filtered_adjacency[np.abs(filtered_adjacency) < tolerance] = 0
+        return filtered_adjacency
 
     def fit_predict(
             self,
@@ -534,7 +696,8 @@ class Rex(BaseEstimator, ClassifierMixin):
 
     def dag_from_discrepancy(
             self,
-            discrepancy_upper_threshold: float = 0.99, verbose: bool = False) -> nx.DiGraph:
+            discrepancy_upper_threshold: float = 0.99,
+            verbose: bool = False) -> nx.DiGraph:
         """
         Build a directed acyclic graph (DAG) from the discrepancies in the SHAP values.
         The discrepancies are calculated as 1.0 - GoodnessOfFit, so that a low
@@ -620,6 +783,7 @@ class Rex(BaseEstimator, ClassifierMixin):
 def custom_main(dataset_name,
                 input_path="/Users/renero/phd/data/RC3/",
                 output_path="/Users/renero/phd/output/RC4/",
+                scale_data: bool = False,
                 tune_model: bool = False,
                 model_type="nn", explainer="gradient",
                 save=False):
@@ -632,8 +796,9 @@ def custom_main(dataset_name,
 
     ref_graph = utils.graph_from_dot_file(f"{input_path}{dataset_name}.dot")
     data = pd.read_csv(f"{input_path}{dataset_name}.csv")
-    # scaler = StandardScaler()
-    # data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)
+    if scale_data:
+        scaler = StandardScaler()
+        data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)
     train = data.sample(frac=0.8, random_state=42)
     test = data.drop(train.index)
 
@@ -675,6 +840,6 @@ if __name__ == "__main__":
     custom_main('short', input_path="/Users/renero/phd/data/RC3/",
                 model_type="nn",
                 explainer="gradient",
-                tune_model=True,
+                tune_model=False,
                 save=False)
     # prior_main('rex_generated_gp_add_5')

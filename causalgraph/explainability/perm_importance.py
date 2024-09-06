@@ -153,15 +153,10 @@ class PermutationImportance(BaseEstimator):
         """
         Fit the model to compute the base loss for each feature for pyTorch models.
         """
-        # pbar = tqdm(
-        #     total=len(self.feature_names),
-        #     **tqdm_params(self._fit_desc, self.prog_bar, silent=self.silent))
-        pbar = ProgBar().start_subtask(len(self.feature_names))
+        pbar = ProgBar().start_subtask("Perm.Imp_fit", len(self.feature_names))
         print("Computing base loss (PyTorch)") if self.verbose else None
 
-        for feature in self.feature_names:
-            # pbar.refresh()
-            pbar.update_subtask(1)
+        for feature_idx, feature in enumerate(self.feature_names):
             print(f"Feature: {feature} ", end="") if self.verbose else None
 
             regressor = self.regressors[feature]
@@ -176,10 +171,9 @@ class PermutationImportance(BaseEstimator):
                 print(f"Base loss: {self.base_loss[feature]:.6f} ", end="")
                 print(f"+/- {self.base_std[feature]:.6f}")
 
-            pbar.update_subtask()
-        #     pbar.update(1)
-        # pbar.close()
+            pbar.update_subtask("Perm.Imp_fit", feature_idx + 1)
 
+        pbar.remove("Perm.Imp_fit")
         self.is_fitted_ = True
 
         return self
@@ -188,10 +182,7 @@ class PermutationImportance(BaseEstimator):
         """
         Fit the model to compute the base loss for each feature, for SKLearn models.
         """
-        # pbar = tqdm(
-        #     total=len(self.feature_names),
-        #     **tqdm_params(self._fit_desc, self.prog_bar, silent=self.silent))
-        pbar = ProgBar().start_subtask(len(self.feature_names))
+        pbar = ProgBar().start_subtask("Perm.Imp_fit(sklearn)", len(self.feature_names))
 
         # If me must exclude features due to correlation, we must do it before
         # computing the base loss
@@ -204,9 +195,7 @@ class PermutationImportance(BaseEstimator):
         self.pi = {}
         self.all_pi = []
         X_original = X.copy()
-        for target_name in self.feature_names:
-            # pbar.refresh()
-            pbar.update_subtask(1)
+        for target_idx, target_name in enumerate(self.feature_names):
             X = X_original.copy()
 
             # if correlation_th is not None then, remove features that are highly
@@ -233,10 +222,9 @@ class PermutationImportance(BaseEstimator):
 
             self.all_pi.append(self.pi[target_name]['importances_mean'])
 
-            # pbar.update(1)
-            pbar.update_subtask()
+            pbar.update_subtask("Perm.Imp_fit(sklearn)", target_idx + 1)
 
-        # pbar.close()
+        pbar.remove("Perm.Imp_fit(sklearn)")
 
         self.all_pi = np.array(self.all_pi).flatten()
         self.mean_pi_threshold = np.quantile(
@@ -275,12 +263,12 @@ class PermutationImportance(BaseEstimator):
         Predict the permutation importance for each feature, for each target,
         under the PyTorch implementation of the algorithm.
         """
-        pbar = ProgBar().start_subtask(len(self.feature_names))
+        pbar = ProgBar().start_subtask("Perm.Imp_predict", len(self.feature_names))
         print("Computing permutation loss (PyTorch)") if self.verbose else None
 
         self.all_pi = []
         num_vars = len(self.feature_names)
-        for target in self.feature_names:
+        for target_idx, target in enumerate(self.feature_names):
             regressor = self.regressors[target]
             model = regressor.model
             feature_names_wo_target = [
@@ -305,7 +293,6 @@ class PermutationImportance(BaseEstimator):
             self.pi[target]['importances_mean'], self.pi[target]['importances_std'] = \
                 self._compute_perm_imp(target, regressor, model, num_vars)
 
-            pbar.update_subtask()
 
             if self.correlation_th is not None:
                 self._add_zeroes(target, self.correlated_features[target])
@@ -319,6 +306,9 @@ class PermutationImportance(BaseEstimator):
                 threshold=self.mean_pi_threshold,
                 verbose=self.verbose)
 
+            pbar.update_subtask("Perm.Imp_predict", target_idx)
+
+        pbar.remove("Perm.Imp_predict")
         self.G_pi = self._build_pi_dag(X, root_causes)
         self.GP_pi = utils.break_cycles_if_present(
             self.G_pi, self.shap_discrepancies, self.prior, verbose=self.verbose)

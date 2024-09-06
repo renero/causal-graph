@@ -133,9 +133,9 @@ class GBTRegressor(GradientBoostingRegressor):
                 verbose=self.verbose)
             X_original = X.copy()
 
-        pbar = ProgBar().start_subtask(len(self.feature_names))
+        pbar = ProgBar().start_subtask("GBT_fit", len(self.feature_names))
 
-        for target_name in self.feature_names:
+        for target_idx, target_name in enumerate(self.feature_names):
             # if correlation_th is not None then, remove features that are highly
             # correlated with the target, at each step of the loop
             if self.correlation_th is not None:
@@ -179,8 +179,9 @@ class GBTRegressor(GradientBoostingRegressor):
             )
             self.regressor[target_name].fit(
                 X.drop(target_name, axis=1), X[target_name])
-            pbar.update_subtask(1)
+            pbar.update_subtask("GBT_fit", target_idx+1)
 
+        pbar.remove("GBT_fit")
         self.is_fitted_ = True
         return self
 
