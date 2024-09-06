@@ -1,3 +1,10 @@
+version 0.4.4
+-------------
+- Iterative method added to Rex pipeline. Now it is possible to use the
+  `Rex.iterative_fit` method to build a DAG from SHAP discrepancies multiple times
+  and discarding edges not present a significant number of times.
+- Added `CAM` estimator (Causal Additive Method).
+
 version 0.4.3
 -------------
 - Regressors now accept categorical variables, and adapt their loss function
@@ -8,7 +15,7 @@ and architectures
 version 0.4.2
 -------------
 - Now it is possible to add a prior to ReX. The prior is in the form of a
-temporal hierarchy of node names (`List[List[str]]`), so there can be no 
+temporal hierarchy of node names (`List[List[str]]`), so there can be no
 links from a node in a list which is after/deeper to another node in a
 previous/higher list.
 - Build a DAG (`DAG_rho`) from SHAP discrepancies.
