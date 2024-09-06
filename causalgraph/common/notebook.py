@@ -354,6 +354,7 @@ class Experiment(BaseExperiment):
             random_state=random_state, verbose=verbose)
         self.model_type = model_type
         self.is_fitted = False
+        self.verbose = verbose
 
         # Prepare the input
         self.prepare_experiment_input(
@@ -376,7 +377,9 @@ class Experiment(BaseExperiment):
 
         estimator_object = self.create_estimator(
             estimator_name, name=self.experiment_name, **kwargs)
-        estimator_object.fit(self.train_data, self.test_data)
+        # Extract pipeline from kwargs, if any
+        pipeline = kwargs.pop('pipeline') if 'pipeline' in kwargs else None
+        estimator_object.fit(self.train_data, self.test_data, pipeline=pipeline)
         setattr(self, estimator_name, estimator_object)
         self.is_fitted = True
 

@@ -200,7 +200,7 @@ class Rex(BaseEstimator, ClassifierMixin):
             }
         }
 
-    def fit(self, X, y=None):
+    def fit(self, X, y=None, pipeline: list|str=None):
         """Fit the model according to the given training data.
 
         Parameters
@@ -226,25 +226,32 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.y = copy(y) if y is not None else None
 
         # Create the pipeline for the training stages.
-        pipeline = Pipeline(self, description="Fitting models", prog_bar=self.prog_bar,
+        fit_steps = Pipeline(self, description="Fitting models", prog_bar=self.prog_bar,
                             verbose=self.verbose, silent=self.silent, subtask=True)
-        steps = [
-            ('hierarchies', Hierarchies),
-            ('hierarchies.fit'),
-            ('models', self.model_type),
-            (self.fit_step),
-            ('models.score', {'X': X}),
-            ('root_causes', 'compute_regression_quality'),
-            ('shaps', ShapEstimator, {'models': 'models'}),
-            ('shaps.fit'),
-            ('pi', PermutationImportance, {
-                'models': 'models', 'discrepancies': 'shaps.shap_discrepancies'}),
-            ('pi.fit'),
-        ]
-        pipeline.from_list(steps)
-        pipeline.run()
+        if pipeline is not None:
+            if isinstance(pipeline, list):
+                fit_steps.from_list(pipeline)
+            elif isinstance(pipeline, str):
+                fit_steps.from_config(pipeline)
+        else:
+            steps = [
+                ('hierarchies', Hierarchies),
+                ('hierarchies.fit'),
+                ('models', self.model_type),
+                (self.fit_step),
+                ('models.score', {'X': X}),
+                ('root_causes', 'compute_regression_quality'),
+                ('shaps', ShapEstimator, {'models': 'models'}),
+                ('shaps.fit'),
+                ('pi', PermutationImportance, {
+                    'models': 'models', 'discrepancies': 'shaps.shap_discrepancies'}),
+                ('pi.fit'),
+            ]
+            pipeline.from_list(steps)
+        fit_steps.run()
+        fit_steps.close()
         self.is_fitted_ = True
-        pipeline.close()
+
         return self
 
     def predict(self,
@@ -355,11 +362,13 @@ class Rex(BaseEstimator, ClassifierMixin):
             ]
             prediction.from_list(steps)
         prediction.run()
-        if '\\n' in self.G_final.nodes:
-            self.G_final.remove_node('\\n')
+        # Check if "G_final" exists in this object (self)
+        if 'G_final' in self.__dict__:
+            if '\\n' in self.G_final.nodes:
+                self.G_final.remove_node('\\n')
         prediction.close()
 
-        return self.G_final
+        return self
 
     def iterative_fit(
             self,

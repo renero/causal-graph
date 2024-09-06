@@ -218,7 +218,10 @@ class ShapEstimator(BaseEstimator):
         self.feature_order = {}
         self.all_mean_shap_values = []
 
-        pbar = ProgBar().start_subtask("Shap_fit", len(self.feature_names))
+        if self.prog_bar and not self.verbose:
+            pbar = ProgBar().start_subtask("Shap_fit", len(self.feature_names))
+        else:
+            pbar = None
 
         self.X_train, self.X_test = train_test_split(
             X, test_size=min(0.2, 250 / len(X)), random_state=42)
@@ -283,9 +286,9 @@ class ShapEstimator(BaseEstimator):
                 self._add_zeroes(
                     target_name, self.correlated_features[target_name])
 
-            pbar.update_subtask("Shap_fit", target_idx + 1)
+            pbar.update_subtask("Shap_fit", target_idx + 1) if pbar else None
 
-        pbar.remove("Shap_fit")
+        pbar.remove("Shap_fit") if pbar else None
         self.all_mean_shap_values = np.array(
             self.all_mean_shap_values).flatten()
         self._compute_scaled_shap_threshold()
@@ -296,6 +299,7 @@ class ShapEstimator(BaseEstimator):
             self.X_test = X_test_original
 
         self.is_fitted_ = True
+
         return self
 
     def _compute_scaled_shap_threshold(self):
@@ -372,15 +376,18 @@ class ShapEstimator(BaseEstimator):
         # Recompute mean_shap_percentile here, in case it was changed
         self._compute_scaled_shap_threshold()
 
-        pbar = ProgBar().start_subtask("Shap_predict", 4 + len(self.feature_names))
+        if self.prog_bar and (not self.verbose):
+            pbar = ProgBar().start_subtask("Shap_predict", 4 + len(self.feature_names))
+        else:
+            pbar = None
 
         # Compute error contribution at this stage, since it needs the individual
         # SHAP values
         self.compute_error_contribution()
-        pbar.update_subtask("Shap_predict", 1)
+        pbar.update_subtask("Shap_predict", 1) if pbar else None
 
         self._compute_discrepancies(self.X_test)
-        pbar.update_subtask("Shap_predict", 2)
+        pbar.update_subtask("Shap_predict", 2) if pbar else None
 
         self.connections = {}
         for target_idx, target in enumerate(self.feature_names):
@@ -408,19 +415,22 @@ class ShapEstimator(BaseEstimator):
                 exhaustive=self.exhaustive,
                 threshold=self.mean_shap_threshold,
                 verbose=self.verbose)
-            pbar.update_subtask("Shap_predict", target_idx + 3)
+            pbar.update_subtask(
+                "Shap_predict", target_idx + 3) if pbar else None
 
         G_shap = utils.digraph_from_connected_features(
             X, self.feature_names, self.models, self.connections, root_causes, prior,
             reciprocity=self.reciprocity, anm_iterations=self.iters,
             verbose=self.verbose)
-        pbar.update_subtask("Shap_predict", len(self.feature_names) + 3)
+        pbar.update_subtask("Shap_predict", len(
+            self.feature_names) + 3) if pbar else None
 
         G_shap = utils.break_cycles_if_present(
             G_shap, self.shap_discrepancies, self.prior, verbose=self.verbose)
-        pbar.update_subtask("Shap_predict", len(self.feature_names) + 4)
+        pbar.update_subtask("Shap_predict", len(
+            self.feature_names) + 4) if pbar else None
 
-        pbar.remove("Shap_predict")
+        pbar.remove("Shap_predict") if pbar else None
 
         return G_shap
 

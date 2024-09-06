@@ -142,6 +142,9 @@ class NNRegressor(BaseEstimator):
         self.regressor = None
         self._fit_desc = "Training NNs"
 
+        if self.verbose:
+            self.prog_bar = False
+
     def fit(self, X):
         """A reference implementation of a fitting function.
 
@@ -171,7 +174,10 @@ class NNRegressor(BaseEstimator):
                 verbose=self.verbose)
             X_original = X.copy()
 
-        pbar = ProgBar().start_subtask("DNN_fit", len(self.feature_names))
+        if self.prog_bar and not self.verbose:
+            pbar = ProgBar().start_subtask("DNN_fit", len(self.feature_names))
+        else:
+            pbar = None
 
         for target_idx, target_name in enumerate(self.feature_names):
             # if correlation_th is not None then, remove features that are highly
@@ -212,9 +218,9 @@ class NNRegressor(BaseEstimator):
                 prog_bar=self.prog_bar)
             self.regressor[target_name].train()
 
-            pbar.update_subtask("DNN_fit", target_idx+1)
+            pbar.update_subtask("DNN_fit", target_idx+1) if pbar else None
 
-        pbar.remove("DNN_fit")
+        pbar.remove("DNN_fit") if pbar else None
         self.is_fitted_ = True
         return self
 
@@ -261,7 +267,6 @@ class NNRegressor(BaseEstimator):
                 y_hat = model.forward(tensor_X)
                 preds = np.append(preds, y_hat.detach().numpy().flatten())
             prediction[target] = preds
-
 
         # Concatenate the numpy array for all the batchs
         np_preds = prediction.values
@@ -364,7 +369,12 @@ class NNRegressor(BaseEstimator):
             dataframes.
             """
 
-            def __init__(self, train_data, test_data, device='cpu'):
+            def __init__(
+                    self,
+                    train_data,
+                    test_data,
+                    device='cpu',
+                    verbose=False):
                 self.train_data = train_data
                 self.test_data = test_data
                 self.device = device
@@ -376,6 +386,7 @@ class NNRegressor(BaseEstimator):
                 self.batch_size = None
                 self.num_epochs = None
                 self.models = None
+                self.verbose = verbose
 
             def __call__(self, trial):
                 self.n_layers = trial.suggest_int('n_layers', 1, 6)
@@ -401,8 +412,8 @@ class NNRegressor(BaseEstimator):
                     loss_fn='mse',
                     device=self.device,
                     random_state=42,
-                    verbose=False,
-                    prog_bar=True,
+                    verbose=self.verbose,
+                    prog_bar=True & (not self.verbose),
                     silent=True)
 
                 self.models.fit(self.train_data)
@@ -475,8 +486,11 @@ class NNRegressor(BaseEstimator):
             direction='minimize', study_name=study_name, storage=storage,
             load_if_exists=load_if_exists)
         study.optimize(
-            Objective(training_data, test_data), n_trials=n_trials,
-            show_progress_bar=(self.prog_bar & (not self.silent)), callbacks=[callback])
+            Objective(training_data, test_data, verbose=self.verbose),
+            n_trials=n_trials,
+            show_progress_bar=(self.prog_bar & (not self.silent) & (not self.verbose)),
+            callbacks=[callback]
+        )
 
         # Capture the best parameters and the minimum loss.
         best_trials = sorted(study.best_trials, key=lambda x: x.values[0])
