@@ -3,6 +3,8 @@ import networkx as nx
 import numpy as np
 
 
+from causalgraph.estimators.pc.independencies import Independencies
+
 class DAG(nx.DiGraph):
     """
     Base class for all Directed Graphical Models.
@@ -382,7 +384,9 @@ class DAG(nx.DiGraph):
 
         References
         ----------
-        [1] Algorithm 4, Page 10: Tian, Jin, Azaria Paz, and Judea Pearl. Finding minimal d-separators. Computer Science Department, University of California, 1998.
+        [1] Algorithm 4, Page 10: Tian, Jin, Azaria Paz, and Judea Pearl. Finding
+        minimal d-separators. Computer Science Department, University of California,
+        1998.
         """
         if (end in self.neighbors(start)) or (start in self.neighbors(end)):
             raise ValueError(

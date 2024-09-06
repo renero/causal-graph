@@ -117,14 +117,13 @@ class GraphIndependence(object):
             if col not in self.G_skl.nodes():
                 self.G_skl.add_node(col)
 
-        # pbar = tqdm(total=len(self.feature_names),
-        #             **tqdm_params(self._fit_desc, self.prog_bar, silent=self.silent_))
-        pbar = ProgBar().start_subtask(len(self.feature_names))
-        for feature_name in self.feature_names:
+        pbar = ProgBar().start_subtask("Graph.Indep_fit", len(self.feature_names))
+        for feature_idx, feature_name in enumerate(self.feature_names):
             self._remove_independent_edges(
                 feature_name, self.condlen, self.condsize)
-            pbar.update_subtask(1)
+            pbar.update_subtask("Graph.Indep_fit", feature_idx+1)
 
+        pbar.remove("Graph.Indep_fit")
         return self
 
     def predict(self):

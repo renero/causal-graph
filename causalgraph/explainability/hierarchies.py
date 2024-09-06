@@ -616,7 +616,7 @@ def connect_isolated_nodes(G, linkage_mat, feature_names, verbose=False):
     return G_h
 
 
-def connect_hierarchies(G, linkage_mat, feature_names, verbose=True):
+def connect_hierarchies(G, linkage_mat, feature_names, verbose=False):
     cluster_id = len(feature_names)
     node_names = [f for f in feature_names]
     clusters = {}

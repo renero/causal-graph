@@ -218,7 +218,7 @@ class ShapEstimator(BaseEstimator):
         self.feature_order = {}
         self.all_mean_shap_values = []
 
-        pbar = ProgBar().start_subtask(len(self.feature_names))
+        pbar = ProgBar().start_subtask("Shap_fit", len(self.feature_names))
 
         self.X_train, self.X_test = train_test_split(
             X, test_size=min(0.2, 250 / len(X)), random_state=42)
@@ -233,7 +233,7 @@ class ShapEstimator(BaseEstimator):
             X_train_original = self.X_train.copy()
             X_test_original = self.X_test.copy()
 
-        for target_name in self.feature_names:
+        for target_idx, target_name in enumerate(self.feature_names):
             # if correlation_th is not None then, remove features that are highly
             # correlated with the target, at each step of the loop
             if self.correlation_th is not None:
@@ -283,12 +283,12 @@ class ShapEstimator(BaseEstimator):
                 self._add_zeroes(
                     target_name, self.correlated_features[target_name])
 
-            pbar.update_subtask()
+            pbar.update_subtask("Shap_fit", target_idx + 1)
 
+        pbar.remove("Shap_fit")
         self.all_mean_shap_values = np.array(
             self.all_mean_shap_values).flatten()
-        self.mean_shap_threshold = np.quantile(
-            self.all_mean_shap_values, self.mean_shap_percentile)
+        self._compute_scaled_shap_threshold()
 
         # Leave X_train and X_test as they originally were
         if self.correlation_th is not None:
@@ -297,6 +297,17 @@ class ShapEstimator(BaseEstimator):
 
         self.is_fitted_ = True
         return self
+
+    def _compute_scaled_shap_threshold(self):
+        """
+        Compute the scaled SHAP threshold based on the given percentile.
+        If the percentile is 0.0 or None, then the threshold is set to 0.0.
+        """
+        if self.mean_shap_percentile:
+            self.mean_shap_threshold = np.quantile(
+                self.all_mean_shap_values, self.mean_shap_percentile)
+        else:
+            self.mean_shap_threshold = 0.0
 
     def _run_selected_shap_explainer(self, target_name, model, X_train, X_test):
         """
@@ -359,21 +370,20 @@ class ShapEstimator(BaseEstimator):
         self.prior = prior
 
         # Recompute mean_shap_percentile here, in case it was changed
-        self.mean_shap_threshold = np.quantile(
-            self.all_mean_shap_values, self.mean_shap_percentile)
+        self._compute_scaled_shap_threshold()
 
-        pbar = ProgBar().start_subtask(3 + len(self.feature_names))
+        pbar = ProgBar().start_subtask("Shap_predict", 4 + len(self.feature_names))
 
         # Compute error contribution at this stage, since it needs the individual
         # SHAP values
         self.compute_error_contribution()
-        pbar.update_subtask()
+        pbar.update_subtask("Shap_predict", 1)
 
         self._compute_discrepancies(self.X_test)
-        pbar.update_subtask()
+        pbar.update_subtask("Shap_predict", 2)
 
         self.connections = {}
-        for target in self.feature_names:
+        for target_idx, target in enumerate(self.feature_names):
             # The valid parents are the features that are in the same level of the
             # hierarchy as the target, or in previous levels. In case prior is not
             # provided, all features are valid candidates.
@@ -398,16 +408,19 @@ class ShapEstimator(BaseEstimator):
                 exhaustive=self.exhaustive,
                 threshold=self.mean_shap_threshold,
                 verbose=self.verbose)
-            pbar.update_subtask()
+            pbar.update_subtask("Shap_predict", target_idx + 3)
 
         G_shap = utils.digraph_from_connected_features(
             X, self.feature_names, self.models, self.connections, root_causes, prior,
             reciprocity=self.reciprocity, anm_iterations=self.iters,
             verbose=self.verbose)
-        pbar.update_subtask()
+        pbar.update_subtask("Shap_predict", len(self.feature_names) + 3)
 
         G_shap = utils.break_cycles_if_present(
             G_shap, self.shap_discrepancies, self.prior, verbose=self.verbose)
+        pbar.update_subtask("Shap_predict", len(self.feature_names) + 4)
+
+        pbar.remove("Shap_predict")
 
         return G_shap
 
@@ -689,6 +702,20 @@ class ShapEstimator(BaseEstimator):
 
         return input_vector
 
+    def _adjust_predictions_shape(self, predictions, target_shape):
+        # Concatenate if predictions is a list
+        if isinstance(predictions, list):
+            predictions = np.concatenate(predictions)
+        else:
+            predictions = np.array(predictions)
+
+        # Reshape if necessary
+        if predictions.shape != target_shape:
+            # Flatten
+            predictions = predictions.reshape(target_shape)
+
+        return predictions
+
     def compute_error_contribution(self):
         """
         Computes the error contribution of each feature for each target.
@@ -706,9 +733,10 @@ class ShapEstimator(BaseEstimator):
         """
         error_contribution = dict()
         predictions = self.models.predict(self.X_test)
-        # Flatten the predictions
-        predictions = np.concatenate(predictions[0])
-        predictions = predictions.reshape(self.X_test.shape[0], self.X_test.shape[1])
+
+        predictions = self._adjust_predictions_shape(
+            predictions, (self.X_test.shape[0], self.X_test.shape[1]))
+
         y_hat = pd.DataFrame(predictions, columns=self.feature_names)
         y_true = self.X_test
         for target in self.feature_names:
@@ -838,8 +866,7 @@ class ShapEstimator(BaseEstimator):
             (','.join(selected_features) if selected_features else 'ø'))
 
         # Recompute mean_shap_percentile here, in case it was changed
-        self.mean_shap_threshold = np.quantile(
-            self.all_mean_shap_values, self.mean_shap_percentile)
+        self._compute_scaled_shap_threshold()
 
         xlims = ax.get_xlim()
         if xlims[1] < self.mean_shap_threshold:
