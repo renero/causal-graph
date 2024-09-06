@@ -49,7 +49,7 @@ def computeScoreMatParallel(
         X2 = X
 
     if node2 not in parents_to_check and \
-            bool(np.prod(sel_mat[parents_to_check, node2])) is True:
+            np.prod(sel_mat[parents_to_check, node2]) is True:
         if verbose:
             print(". . node2 not in parentsToCheck AND all parents are selected")
         if score_name == "SEMSEV":

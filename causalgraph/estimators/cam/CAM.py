@@ -35,7 +35,8 @@ from selGamBoost import selGamBoost
 from updateScoreMat import updateScoreMat
 
 from causalgraph.metrics.compare_graphs import evaluate_graph
-from causalgraph.common.utils import graph_from_adjacency
+from causalgraph.common import utils
+from causalgraph.common import plot
 
 
 class CAM:
@@ -116,6 +117,9 @@ class CAM:
         edgeList = []
 
         counterUpdate = 0
+
+        self.feature_names = list(X.columns)
+        X = X.values
         p = X.shape[1]
 
         if self.variableSel:
@@ -270,7 +274,7 @@ class CAM:
                 f"This {self.__class__.__name__} instance is not fitted yet."
                 f"Call 'fit' with appropriate arguments before using this method.")
 
-        self.dag = graph_from_adjacency(self.adj)
+        self.dag = utils.graph_from_adjacency(self.adj, self.feature_names)
         if ref_graph is not None:
             self.metrics = evaluate_graph(
                 ref_graph, self.dag, self.feature_names)
@@ -280,6 +284,7 @@ class CAM:
     def fit_predict(self, X, ref_graph: nx.DiGraph = None):
         self.fit(X)
         self.predict(ref_graph)
+        # self.metrics = evaluate_graph(ref_graph, self.dag)
 
         return self.dag
 
@@ -287,15 +292,19 @@ class CAM:
 def main(dataset_name,
          input_path="/Users/renero/phd/data/RC3/",
          output_path="/Users/renero/phd/output/RC4/",
-         scale_data: bool = False,
-         tune_model: bool = False,
-         model_type="nn", explainer="gradient",
+         do_plot:bool=False,
          save=False):
 
     data = pd.read_csv(f"{input_path}{dataset_name}.csv")
-    cam = CAM(pruning=True, verbose=False)
-    cam.fit_predict(data.values)
-    print(cam.dag)
+    ref_graph = utils.graph_from_dot_file(f"{input_path}{dataset_name}.dot")
+
+    cam = CAM(pruning=True,
+              pruneMethodPars={"cutOffPVal": 0.05, "numBasisFcts": 10},
+              verbose=False)
+    cam.fit_predict(data, ref_graph)
+    print(cam.metrics)
+    if do_plot:
+        plot.dag(cam.dag, reference=ref_graph)
 
 
 if __name__ == "__main__":

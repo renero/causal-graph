@@ -79,8 +79,7 @@ def updateScoreMat(
     # if there is something left that we need to update
     if len(existing_par_of_j) + len(not_allowed_par_of_j) < p - 1:
         # update column for j
-        row_parents = np.full(
-            (p, len(existing_par_of_j) + 1), np.nan, dtype=int)
+        row_parents = np.full((p, len(existing_par_of_j) + 1), np.nan)
         row_parents[:, :len(existing_par_of_j)] = existing_par_of_j
         row_parents[:, len(existing_par_of_j)] = np.arange(p)
         to_update = np.setdiff1d(np.arange(p), np.append(
@@ -90,18 +89,22 @@ def updateScoreMat(
             if num_cores == 1:
                 score_update = [
                     computeScoreMatParallel(
-                        row_parents=row_parents, sel_mat=np.ones(
-                            (p, p), dtype=bool),
+                        row_parents=row_parents,
+                        sel_mat=np.ones((p, p), dtype=bool),
                         score_name=score_name, X=X, verbose=verbose, node2=j,
                         pars_score=pars_score, interv_mat=interv_mat,
-                        interv_data=interv_data, i=idx) for idx in to_update]
+                        interv_data=interv_data, i=idx) \
+                            for idx in to_update
+                    ]
             else:
                 with Pool(num_cores) as pool:
                     score_update = pool.starmap(
                         computeScoreMatParallel, [
                             (row_parents, np.ones((p, p), dtype=bool),
                              score_name, X, verbose, j, pars_score, interv_mat,
-                             interv_data, idx) for idx in to_update])
+                             interv_data, idx) \
+                                 for idx in to_update
+                        ])
         else:
             score_update = -np.inf
 
