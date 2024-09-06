@@ -12,6 +12,7 @@ Example:
 
 import glob
 import os
+import time
 import warnings
 from collections import defaultdict
 from os import path
@@ -19,19 +20,18 @@ from os import path
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-
-from sklearn.preprocessing import StandardScaler
 from rich.progress import Progress
+from sklearn.preprocessing import StandardScaler
 
-from causalgraph.common import utils
+from causalgraph.common import plot, utils
 from causalgraph.common.utils import (graph_from_dot_file, load_experiment,
                                       save_experiment)
-from causalgraph.common import plot
-from causalgraph.estimators.rex import Rex
+from causalgraph.estimators.cam import CAM
 from causalgraph.estimators.fci.fci import FCI
-from causalgraph.estimators.pc.pc import PC
 from causalgraph.estimators.ges.ges import GES
 from causalgraph.estimators.lingam.lingam import DirectLiNGAM as LiNGAM
+from causalgraph.estimators.pc.pc import PC
+from causalgraph.estimators.rex import Rex
 from causalgraph.metrics.compare_graphs import evaluate_graph
 
 warnings.filterwarnings('ignore')
@@ -370,7 +370,7 @@ class Experiment(BaseExperiment):
         Returns:
             Rex: The fitted experiment data.
         """
-
+        self.init_fit_time = time.time()
         self.estimator_name = estimator_name
         # Add "model_type" to kwargs
         kwargs['model_type'] = self.model_type
@@ -382,6 +382,8 @@ class Experiment(BaseExperiment):
         estimator_object.fit(self.train_data, self.test_data, pipeline=pipeline)
         setattr(self, estimator_name, estimator_object)
         self.is_fitted = True
+        self.end_fit_time = time.time()
+        self.fit_time = self.end_fit_time - self.init_fit_time
 
         return self
 
@@ -395,8 +397,11 @@ class Experiment(BaseExperiment):
         Returns:
             Rex: The fitted experiment data.
         """
+        self.init_predict_time = time.time()
         estimator = getattr(self, self.estimator_name)
         estimator.predict(self.train_data, self.test_data, **kwargs)
+        self.end_predict_time = time.time()
+        self.predict_time = self.end_predict_time - self.init_predict_time
 
         return self
 
@@ -455,6 +460,8 @@ class Experiment(BaseExperiment):
             self.estimator_name = 'ges'
         elif isinstance(exp_object, FCI):
             self.estimator_name = 'fci'
+        elif isinstance(exp_object, CAM):
+            self.estimator_name = 'cam'
         else:
             raise ValueError(
                 f"Estimator '{exp_name}' not recognized.")

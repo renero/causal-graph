@@ -28,11 +28,12 @@ from multiprocessing import Pool
 import networkx as nx
 import numpy as np
 import pandas as pd
-from computeScoreMat import computeScoreMat
-from pruning import pruning
-from selGam import selGam
-from selGamBoost import selGamBoost
-from updateScoreMat import updateScoreMat
+
+from causalgraph.estimators.cam.computeScoreMat import computeScoreMat
+from causalgraph.estimators.cam.pruning import pruning
+from causalgraph.estimators.cam.selGam import selGam
+from causalgraph.estimators.cam.selGamBoost import selGamBoost
+from causalgraph.estimators.cam.updateScoreMat import updateScoreMat
 
 from causalgraph.metrics.compare_graphs import evaluate_graph
 from causalgraph.common import utils

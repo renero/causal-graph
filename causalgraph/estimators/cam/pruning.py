@@ -12,7 +12,7 @@
 """
 import numpy as np
 
-from selGam import selGam
+from causalgraph.estimators.cam.selGam import selGam
 
 
 def pruning(

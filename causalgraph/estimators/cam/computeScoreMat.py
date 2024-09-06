@@ -27,7 +27,7 @@ from multiprocessing import Pool
 import numpy as np
 import pandas as pd
 
-from computeScoreMatParallel import computeScoreMatParallel
+from causalgraph.estimators.cam.computeScoreMatParallel import computeScoreMatParallel
 
 
 def computeScoreMat(

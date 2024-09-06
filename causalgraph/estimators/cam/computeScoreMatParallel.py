@@ -15,8 +15,8 @@
 
 
 import numpy as np
-from train_gam import train_gam
-from train_linear import train_linear
+from causalgraph.estimators.cam.train_gam import train_gam
+from causalgraph.estimators.cam.train_linear import train_linear
 
 
 def computeScoreMatParallel(

@@ -17,7 +17,8 @@ details between R's `gam` and Python's `pygam`. You may need to fine-tune the GA
 model creation and fitting process to match the exact behavior of the R version.
 """
 import numpy as np
-from train_gam import train_gam
+
+from causalgraph.estimators.cam.train_gam import train_gam
 
 
 def selGam(X, pars=None, verbose=False, k=None):
