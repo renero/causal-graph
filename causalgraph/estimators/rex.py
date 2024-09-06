@@ -409,12 +409,16 @@ class Rex(BaseEstimator, ClassifierMixin):
             self.iter_adjacency_matrices[name] = init_adjacency(
                 self.n_features_in_)
 
-        pbar = ProgBar().start_subtask(num_iterations)
+        if self.prog_bar and (not self.verbose):
+            pbar = ProgBar().start_subtask("Iterative Fit", num_iterations)
+        else:
+            pbar = None
+
         for iter in range(num_iterations):
             data_sample = X.sample(frac=sampling_split,
                                    random_state=iter*random_state)
             # Shap?
-            self.hierarchies.fit(data_sample)
+            # self.hierarchies.fit(data_sample)
             self.shaps.fit(data_sample)
             dag['shap'] = self.shaps.predict(data_sample, prior=prior)
             self.iter_adjacency_matrices['shap'] += utils.graph_to_adjacency(
@@ -452,7 +456,7 @@ class Rex(BaseEstimator, ClassifierMixin):
                 self.iter_adjacency_matrices['final'] += utils.graph_to_adjacency(
                     dag['final'], self.feature_names)
 
-            pbar.update_subtask(1)
+            pbar.update_subtask(1) if pbar else None
 
         for name in dag_names:
             self.iter_adjacency_matrices[name] = \
@@ -815,7 +819,8 @@ def custom_main(dataset_name,
         name=dataset_name, tune_model=tune_model,
         model_type=model_type, explainer=explainer, hpo_n_trials=1)
 
-    rex.fit_predict(train, test, ref_graph, prior=get_prior(ref_graph))
+    # rex.fit_predict(train, test, ref_graph, prior=get_prior(ref_graph))
+    rex.fit(data, pipeline=".fast_fit_pipeline.yaml")
 
     if save:
         where_to = utils.save_experiment(rex.name, output_path, rex)

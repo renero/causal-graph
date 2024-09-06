@@ -8,7 +8,7 @@
         {
             "python": "/Users/renero/.virtualenvs/causality/bin/python",
             "name": "Python: Current File",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${file}",
             "cwd": "/Users/renero/phd/code/causal-graph/",

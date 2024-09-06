@@ -1,0 +1,23 @@
+step1:
+  attribute: models
+  method: model_type
+step2:
+  method: models.tune_fit
+step3:
+  method: models.score
+step4:
+  attribute: root_causes
+  method: compute_regression_quality
+step5:
+  attribute: shaps
+  class: ShapEstimator
+  arguments:
+    models: models
+step6:
+  method: shaps.fit
+step7:
+  method: iterative_fit
+  arguments:
+    num_iterations: 12
+    sampling_split: 0.2
+    dag_names: ['shap']
