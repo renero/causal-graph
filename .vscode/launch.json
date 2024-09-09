@@ -4,16 +4,18 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
-
         {
-            "python": "/Users/renero/.virtualenvs/causality/bin/python",
-            "name": "Python: Current File",
+            "python": "/Users/renero/.pyenv/versions/causality/bin/python",
+            "cwd": "/Users/renero/Documents/Universidades/PhD/code/causal-graph",
+            "name": "Debug: Current File",
             "type": "debugpy",
             "request": "launch",
             "program": "${file}",
-            "cwd": "/Users/renero/phd/code/causal-graph/",
+            "purpose": [
+                "debug-test"
+            ],
             "console": "integratedTerminal",
-            "justMyCode": false
+            "justMyCode": false,
         }
     ]
 }

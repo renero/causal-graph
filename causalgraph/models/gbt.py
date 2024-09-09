@@ -43,14 +43,24 @@ Example:
 
 """
 
+# pylint: disable=E1101:no-member, W0201:attribute-defined-outside-init, W0511:fixme
+# pylint: disable=C0103:invalid-name
+# pylint: disable=C0116:missing-function-docstring
+# pylint: disable=R0913:too-many-arguments
+# pylint: disable=R0914:too-many-locals, R0915:too-many-statements
+# pylint: disable=W0106:expression-not-assigned, R1702:too-many-branches
+# pylint: disable=W0102:dangerous-default-value
+
+
 import numpy as np
 import optuna
 import pandas as pd
-from sklearn.ensemble import GradientBoostingClassifier, GradientBoostingRegressor
-from sklearn.preprocessing import StandardScaler
 from mlforge.progbar import ProgBar
+from sklearn.ensemble import (GradientBoostingClassifier,
+                              GradientBoostingRegressor)
+from sklearn.preprocessing import StandardScaler
 
-from causalgraph.common import utils
+from causalgraph.common import DEFAULT_HPO_TRIALS, utils
 from causalgraph.explainability.hierarchies import Hierarchies
 
 
@@ -83,7 +93,8 @@ class GBTRegressor(GradientBoostingRegressor):
             correlation_th: float = None,
             verbose=False,
             silent=False,
-            prog_bar=True):
+            prog_bar=True,
+            optuna_prog_bar=False):
 
         self.loss = loss
         self.learning_rate = learning_rate
@@ -110,6 +121,7 @@ class GBTRegressor(GradientBoostingRegressor):
         self.verbose = verbose
         self.silent = silent
         self.prog_bar = prog_bar
+        self.optuna_prog_bar = optuna_prog_bar
         self.regressor = None
         self._estimator_name = 'gbt'
         self._estimator_class = GradientBoostingRegressor
@@ -147,9 +159,9 @@ class GBTRegressor(GradientBoostingRegressor):
                               self.correlated_features[target_name])
 
             if self.feature_types[target_name] == 'categorical' or \
-                self.feature_types[target_name] == 'binary':
-                    self.loss = 'log_loss'
-                    gbt_model = GradientBoostingClassifier
+                    self.feature_types[target_name] == 'binary':
+                self.loss = 'log_loss'
+                gbt_model = GradientBoostingClassifier
             else:
                 self.loss = 'squared_error'
                 gbt_model = GradientBoostingRegressor
@@ -231,7 +243,7 @@ class GBTRegressor(GradientBoostingRegressor):
                     self.correlated_features[target_name], axis=1)
 
             R2 = self.regressor[target_name].score(
-                    X.drop(target_name, axis=1), X[target_name])
+                X.drop(target_name, axis=1), X[target_name])
 
             # Append 1.0 if R2 is negative, or 1.0 - R2 otherwise since we're
             # in the minimization mode of the error function.
@@ -241,14 +253,15 @@ class GBTRegressor(GradientBoostingRegressor):
         return self.scoring
 
     def tune(
-            self,
-            training_data: pd.DataFrame,
-            test_data: pd.DataFrame,
-            study_name: str = None,
-            min_loss: float = 0.05,
-            storage: str = "sqlite:///rex_tuning.db",
-            load_if_exists: bool = True,
-            n_trials: int = 100):
+        self,
+        training_data: pd.DataFrame,
+        test_data: pd.DataFrame,
+        study_name: str = None,
+        min_loss: float = 0.05,
+        storage: str = "sqlite:///rex_tuning.db",
+        load_if_exists: bool = True,
+        n_trials: int = DEFAULT_HPO_TRIALS
+    ):
         """
         Tune the hyperparameters of the model using Optuna.
         """
@@ -281,7 +294,6 @@ class GBTRegressor(GradientBoostingRegressor):
                 self.silent = silent
                 self.prog_bar = prog_bar
 
-
             def __call__(self, trial):
                 """
                 This method is called by Optuna to evaluate the objective function.
@@ -291,16 +303,22 @@ class GBTRegressor(GradientBoostingRegressor):
                 self.tol = 0.0001
 
                 # Define the hyperparameters to optimize
-                self.learning_rate = trial.suggest_float("learning_rate", 0.001, 0.2)
+                self.learning_rate = trial.suggest_float(
+                    "learning_rate", 0.001, 0.2)
                 self.n_estimators = trial.suggest_int("n_estimators", 10, 1000)
                 self.subsample = trial.suggest_float("subsample", 0.1, 1.0)
-                self.min_samples_split = trial.suggest_int("min_samples_split", 2, 10)
-                self.min_samples_leaf = trial.suggest_int("min_samples_leaf", 1, 10)
-                self.min_weight_fraction_leaf = trial.suggest_float("min_weight_fraction_leaf", 0.0, 0.5)
+                self.min_samples_split = trial.suggest_int(
+                    "min_samples_split", 2, 10)
+                self.min_samples_leaf = trial.suggest_int(
+                    "min_samples_leaf", 1, 10)
+                self.min_weight_fraction_leaf = trial.suggest_float(
+                    "min_weight_fraction_leaf", 0.0, 0.5)
                 self.max_depth = trial.suggest_int("max_depth", 3, 20)
-                self.max_leaf_nodes = trial.suggest_int("max_leaf_nodes", 10, 1000)
+                self.max_leaf_nodes = trial.suggest_int(
+                    "max_leaf_nodes", 10, 1000)
                 # self.max_features = trial.suggest_categorical("max_features", ["auto", "sqrt", "log2"])
-                self.min_impurity_decrease = trial.suggest_float("min_impurity_decrease", 0.0, 0.5)
+                self.min_impurity_decrease = trial.suggest_float(
+                    "min_impurity_decrease", 0.0, 0.5)
 
                 # Extract feature_names from the train_data dataframe
 
@@ -351,7 +369,8 @@ class GBTRegressor(GradientBoostingRegressor):
         study.optimize(Objective(training_data, test_data, verbose=self.verbose,
                                  silent=self.silent, prog_bar=self.prog_bar),
                        n_trials=n_trials,
-                       show_progress_bar=(self.prog_bar & (not self.silent)),
+                       show_progress_bar=(
+                           self.optuna_prog_bar & (not self.silent)),
                        callbacks=[callback])
 
         # Capture the best hyperparameters and the minimum loss
@@ -413,7 +432,7 @@ class GBTRegressor(GradientBoostingRegressor):
 # Main function
 #
 
-def custom_main(experiment_name = 'custom_rex', score:bool=False, tune: bool = False):
+def custom_main(experiment_name='custom_rex', score: bool = False, tune: bool = False):
     from causalgraph.common import utils
     path = "/Users/renero/phd/data/RC3/"
     output_path = "/Users/renero/phd/output/RC3/"
@@ -434,7 +453,7 @@ def custom_main(experiment_name = 'custom_rex', score:bool=False, tune: bool = F
         print(f"Loaded experiment {experiment_name}")
         rex.models.score(test)
     elif tune:
-        gbt = GBTRegressor(silent=True, prog_bar=False)#verbose=True)
+        gbt = GBTRegressor(silent=True, prog_bar=False)  # verbose=True)
         gbt.tune_fit(train, hpo_study_name=experiment_name, hpo_n_trials=100)
         print(gbt.score(test))
 

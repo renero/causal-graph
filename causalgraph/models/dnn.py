@@ -6,7 +6,6 @@ source of random noise.
 (C) 2022,2023,2024, J. Renero
 """
 
-
 # pylint: disable=E1101:no-member, W0201:attribute-defined-outside-init, W0511:fixme
 # pylint: disable=C0103:invalid-name
 # pylint: disable=C0116:missing-function-docstring
@@ -17,7 +16,7 @@ source of random noise.
 
 import types
 import warnings
-from typing import List, Tuple, Union
+from typing import Dict, List, Tuple, Union, Any
 
 import numpy as np
 import optuna
@@ -29,7 +28,7 @@ from sklearn.utils.validation import check_is_fitted
 from torch.utils.data import DataLoader
 from mlforge.progbar import ProgBar
 
-from causalgraph.common import GRAY, GREEN, RESET
+from causalgraph.common import DEFAULT_HPO_TRIALS
 from causalgraph.explainability.hierarchies import Hierarchies
 from causalgraph.models._columnar import ColumnsDataset
 from causalgraph.models._models import MLPModel
@@ -87,7 +86,8 @@ class NNRegressor(BaseEstimator):
             random_state: int = 1234,
             verbose: bool = False,
             prog_bar: bool = True,
-            silent: bool = False):
+            silent: bool = False,
+            optuna_prog_bar: bool = False):
         """
         Train DFF networks for all variables in data. Each network will be trained to
         predict one of the variables in the data, using the rest as predictors plus one
@@ -138,6 +138,7 @@ class NNRegressor(BaseEstimator):
         self.verbose = verbose
         self.prog_bar = prog_bar
         self.silent = silent
+        self.optuna_prog_bar = optuna_prog_bar
 
         self.regressor = None
         self._fit_desc = "Training NNs"
@@ -346,7 +347,7 @@ class NNRegressor(BaseEstimator):
             min_loss: float = 0.05,
             storage: str = 'sqlite:///rex_tuning.db',
             load_if_exists: bool = True,
-            n_trials: int = 20):
+            n_trials: int = DEFAULT_HPO_TRIALS) -> Dict[str, Any]:
         """
         Tune the hyperparameters of the model using Optuna.
         """
@@ -488,7 +489,7 @@ class NNRegressor(BaseEstimator):
         study.optimize(
             Objective(training_data, test_data, verbose=self.verbose),
             n_trials=n_trials,
-            show_progress_bar=(self.prog_bar & (not self.silent) & (not self.verbose)),
+            show_progress_bar=(self.optuna_prog_bar & (not self.silent) & (not self.verbose)),
             callbacks=[callback]
         )
 

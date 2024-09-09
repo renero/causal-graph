@@ -6,20 +6,20 @@ Main class for the REX estimator.
 import os
 import warnings
 from collections import defaultdict
-from copy import copy
+from copy import deepcopy, copy
 from typing import List, Tuple, Union
 
 import networkx as nx
 import numpy as np
 import pandas as pd
-from mlforge.mlforge import Pipeline
-from mlforge.progbar import ProgBar
+from mlforge.mlforge import Pipeline  # type: ignore
+from mlforge.progbar import ProgBar   # type: ignore
 from rich.progress import Progress
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.preprocessing import StandardScaler
 from sklearn.utils.validation import check_is_fitted, check_random_state
 
-from causalgraph.common import utils
+from causalgraph.common import utils, DEFAULT_ITERATIVE_TRIALS, DEFAULT_HPO_TRIALS
 from causalgraph.estimators.knowledge import Knowledge
 from causalgraph.explainability.hierarchies import Hierarchies
 from causalgraph.explainability.perm_importance import PermutationImportance
@@ -44,6 +44,7 @@ warnings.filterwarnings('ignore')
 # TODO:
 # - Instead of building a DAG in a single step, build it in several steps, using
 #   different samples.
+
 
 class Rex(BaseEstimator, ClassifierMixin):
     """
@@ -144,6 +145,9 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.explainer = explainer
         self._check_model_and_explainer(model_type, explainer)
 
+        # Get a copy of kwargs
+        self.kwargs = deepcopy(kwargs)
+
         self.tune_model = tune_model
         self.correlation_th = correlation_th
         self.corr_method = corr_method
@@ -174,31 +178,6 @@ class Rex(BaseEstimator, ClassifierMixin):
 
         self._fit_desc = "Running Causal Discovery pipeline"
         os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-
-    def _check_model_and_explainer(self, model_type, explainer):
-        """ Check that the explainer is supported for the model type. """
-        if (model_type == "nn" and explainer != "gradient"):
-            print(
-                f"WARNING: SHAP '{explainer}' not supported for model '{model_type}'. "
-                f"Using 'gradient' instead.")
-            self.explainer = "gradient"
-        if (model_type == "gbt" and explainer != "explainer"):
-            print(
-                f"WARNING: SHAP '{explainer}' not supported for model '{model_type}'. "
-                f"Using 'explainer' instead.")
-            self.explainer = "explainer"
-
-    def _more_tags(self):
-        return {
-            'multioutput_only': True,
-            "non_deterministic": True,
-            "no_validation": True,
-            "poor_score": True,
-            "_xfail_checks": {
-                "check_methods_sample_order_invariance": "This test shouldn't be running at all!",
-                "check_methods_subset_invariance": "This test shouldn't be running at all!",
-            }
-        }
 
     def fit(self, X, y=None, pipeline: list|str=None):
         """Fit the model according to the given training data.
@@ -248,11 +227,63 @@ class Rex(BaseEstimator, ClassifierMixin):
                 ('pi.fit'),
             ]
             pipeline.from_list(steps)
-        fit_steps.run()
+
+        n_steps = fit_steps.len()
+        n_steps += self._steps_from_hpo(fit_steps)
+        n_steps += (self._steps_from_iterations(fit_steps) * 2)
+
+        fit_steps.run(n_steps)
         fit_steps.close()
         self.is_fitted_ = True
 
         return self
+
+    def _steps_from_hpo(self, fit_steps) -> int:
+        """
+        Update the number of trials for the HPO.
+
+        Parameters
+        ----------
+        fit_steps: Pipeline
+            The pipeline where looking for the number of trials.
+
+        Returns
+        -------
+        int
+        """
+        if fit_steps.contains_method('tune_fit', exact_match=False):
+            if 'hpo_n_trials' in self.kwargs:
+                return self.kwargs['hpo_n_trials'] - 1
+            else:
+                if fit_steps.contains_argument('hpo_n_trials'):
+                    return fit_steps.get_argument_value('hpo_n_trials') - 1
+                else:
+                    return DEFAULT_HPO_TRIALS
+
+        return 0
+
+    def _steps_from_iterations(self, fit_steps) -> int:
+        """
+        Check if the pipeline contains a stage called iterative_fit and
+        retrieve the number of iterations.
+
+        Parameters
+        ----------
+        fit_steps: Pipeline
+            The pipeline where looking for the number of trials.
+
+        Returns
+        -------
+        int
+        """
+        if fit_steps.contains_method('iterative_fit', exact_match=False):
+            if fit_steps.contains_argument('num_iterations'):
+                return fit_steps.get_argument_value('num_iterations') - 1
+            else:
+                return DEFAULT_ITERATIVE_TRIALS - 1
+
+        return 0
+
 
     def predict(self,
                 X: pd.DataFrame,
@@ -373,7 +404,7 @@ class Rex(BaseEstimator, ClassifierMixin):
     def iterative_fit(
             self,
             X: pd.DataFrame,
-            num_iterations: int = 10,
+            num_iterations: int = DEFAULT_ITERATIVE_TRIALS,
             sampling_split: float = 0.5,
             prior: list = None,
             dag_names: list = ['shap', 'rho', 'adjusted',
@@ -409,10 +440,10 @@ class Rex(BaseEstimator, ClassifierMixin):
             self.iter_adjacency_matrices[name] = init_adjacency(
                 self.n_features_in_)
 
-        if self.prog_bar and (not self.verbose):
-            pbar = ProgBar().start_subtask("Iterative Fit", num_iterations)
-        else:
-            pbar = None
+        # if self.prog_bar and (not self.verbose):
+        #     pbar = ProgBar().start_subtask("Iterative Fit", num_iterations)
+        # else:
+        #     pbar = None
 
         for iter in range(num_iterations):
             data_sample = X.sample(frac=sampling_split,
@@ -456,8 +487,9 @@ class Rex(BaseEstimator, ClassifierMixin):
                 self.iter_adjacency_matrices['final'] += utils.graph_to_adjacency(
                     dag['final'], self.feature_names)
 
-            pbar.update_subtask(1) if pbar else None
+            # pbar.update_subtask("Iterative Fit", iter+1) if pbar else None
 
+        # pbar.remove("Iterative Fit") if pbar else None
         for name in dag_names:
             self.iter_adjacency_matrices[name] = \
                 self.iter_adjacency_matrices[name] / num_iterations
@@ -513,31 +545,6 @@ class Rex(BaseEstimator, ClassifierMixin):
                 filtered_matrix, self.feature_names)
 
         return self.iterative_dags
-
-    def _filter_adjacency_matrix(
-            self,
-            adjacency_matrix: np.ndarray,
-            tolerance: float) -> np.ndarray:
-        """
-        Given an adjacency matrix, return a filtered version of it, where
-        all weights with absolute value less than the tolerance are
-        set to zero.
-
-        Parameters
-        ----------
-        adjacency_matrix : np.ndarray
-            The adjacency matrix.
-        tolerance : float
-            The tolerance value.
-
-        Returns
-        -------
-        np.ndarray
-            The filtered adjacency matrix.
-        """
-        filtered_adjacency = adjacency_matrix.copy()
-        filtered_adjacency[np.abs(filtered_adjacency) < tolerance] = 0
-        return filtered_adjacency
 
     def fit_predict(
             self,
@@ -764,6 +771,56 @@ class Rex(BaseEstimator, ClassifierMixin):
 
         return self.G_rho
 
+    def _filter_adjacency_matrix(
+            self,
+            adjacency_matrix: np.ndarray,
+            tolerance: float) -> np.ndarray:
+        """
+        Given an adjacency matrix, return a filtered version of it, where
+        all weights with absolute value less than the tolerance are
+        set to zero.
+
+        Parameters
+        ----------
+        adjacency_matrix : np.ndarray
+            The adjacency matrix.
+        tolerance : float
+            The tolerance value.
+
+        Returns
+        -------
+        np.ndarray
+            The filtered adjacency matrix.
+        """
+        filtered_adjacency = adjacency_matrix.copy()
+        filtered_adjacency[np.abs(filtered_adjacency) < tolerance] = 0
+        return filtered_adjacency
+
+    def _check_model_and_explainer(self, model_type, explainer):
+        """ Check that the explainer is supported for the model type. """
+        if (model_type == "nn" and explainer != "gradient"):
+            print(
+                f"WARNING: SHAP '{explainer}' not supported for model '{model_type}'. "
+                f"Using 'gradient' instead.")
+            self.explainer = "gradient"
+        if (model_type == "gbt" and explainer != "explainer"):
+            print(
+                f"WARNING: SHAP '{explainer}' not supported for model '{model_type}'. "
+                f"Using 'explainer' instead.")
+            self.explainer = "explainer"
+
+    def _more_tags(self):
+        return {
+            'multioutput_only': True,
+            "non_deterministic": True,
+            "no_validation": True,
+            "poor_score": True,
+            "_xfail_checks": {
+                "check_methods_sample_order_invariance": "This test shouldn't be running at all!",
+                "check_methods_subset_invariance": "This test shouldn't be running at all!",
+            }
+        }
+
     def __str__(self):
         return utils.stringfy_object(self)
 
@@ -794,7 +851,7 @@ class Rex(BaseEstimator, ClassifierMixin):
 
 
 def custom_main(dataset_name,
-                input_path="/Users/renero/phd/data/RC3/",
+                input_path="/Users/renero/phd/data/RC4/",
                 output_path="/Users/renero/phd/output/RC4/",
                 scale_data: bool = False,
                 tune_model: bool = False,
@@ -802,8 +859,6 @@ def custom_main(dataset_name,
                 save=False):
 
     def get_prior(ref_graph):
-        if ref_graph is None:
-            return None
         root_nodes = [n for n, d in ref_graph.in_degree() if d == 0]
         return [root_nodes, [n for n in ref_graph.nodes if n not in root_nodes]]
 
@@ -821,6 +876,9 @@ def custom_main(dataset_name,
 
     # rex.fit_predict(train, test, ref_graph, prior=get_prior(ref_graph))
     rex.fit(data, pipeline=".fast_fit_pipeline.yaml")
+
+    prior = get_prior(ref_graph)
+    rex.predict(data, ref_graph, prior=prior, pipeline=".fast_predict_pipeline.yaml")
 
     if save:
         where_to = utils.save_experiment(rex.name, output_path, rex)

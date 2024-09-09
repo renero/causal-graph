@@ -15,9 +15,9 @@ step5:
     models: models
 step6:
   method: shaps.fit
-step7:
-  method: iterative_fit
-  arguments:
-    num_iterations: 12
-    sampling_split: 0.2
-    dag_names: ['shap']
+# step7:
+#   method: iterative_fit
+#   arguments:
+#     num_iterations: 1
+#     sampling_split: 0.2
+#     dag_names: ['shap']

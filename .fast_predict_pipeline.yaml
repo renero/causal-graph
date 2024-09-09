@@ -1,0 +1,11 @@
+# Predict pipeline WITHOUT reference graph.
+step0:
+  attribute: G_shap
+  method: shaps.predict
+  arguments:
+    prior: prior
+step1:
+  attribute: G_rho
+  method: dag_from_discrepancy
+  # arguments:
+  #   discrepancy_upper_threshold: discrepancy_threshold
