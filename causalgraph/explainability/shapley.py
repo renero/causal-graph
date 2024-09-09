@@ -13,6 +13,7 @@ is then used to build the graph.
 # pylint: disable=R0914:too-many-locals, R0915:too-many-statements
 # pylint: disable=W0106:expression-not-assigned, R1702:too-many-branches
 
+import inspect
 import math
 from collections import defaultdict
 from dataclasses import dataclass
@@ -218,8 +219,19 @@ class ShapEstimator(BaseEstimator):
         self.feature_order = {}
         self.all_mean_shap_values = []
 
+        # Who is calling me?
+        try:
+            curframe = inspect.currentframe()
+            calframe = inspect.getouterframes(curframe, 2)
+            caller_name = calframe[1][3]
+            if caller_name == "__call__" or caller_name == "_run_step":
+                caller_name = "ReX"
+        except Exception:  # pylint: disable=broad-except
+            caller_name = "unknown"
+
         if self.prog_bar and not self.verbose:
-            pbar = ProgBar().start_subtask("Shap_fit", len(self.feature_names))
+            pbar_name = f"({caller_name}) SHAP_fit"
+            pbar = ProgBar().start_subtask(pbar_name, len(self.feature_names))
         else:
             pbar = None
 
@@ -286,9 +298,9 @@ class ShapEstimator(BaseEstimator):
                 self._add_zeroes(
                     target_name, self.correlated_features[target_name])
 
-            pbar.update_subtask("Shap_fit", target_idx + 1) if pbar else None
+            pbar.update_subtask(pbar_name, target_idx + 1) if pbar else None
 
-        pbar.remove("Shap_fit") if pbar else None
+        pbar.remove(pbar_name) if pbar else None
         self.all_mean_shap_values = np.array(
             self.all_mean_shap_values).flatten()
         self._compute_scaled_shap_threshold()
@@ -376,18 +388,29 @@ class ShapEstimator(BaseEstimator):
         # Recompute mean_shap_percentile here, in case it was changed
         self._compute_scaled_shap_threshold()
 
+        # Who is calling me?
+        try:
+            curframe = inspect.currentframe()
+            calframe = inspect.getouterframes(curframe, 2)
+            caller_name = calframe[1][3]
+            if caller_name == "__call__" or caller_name == "_run_step":
+                caller_name = "ReX"
+        except Exception:  # pylint: disable=broad-except
+            caller_name = "unknown"
+
         if self.prog_bar and (not self.verbose):
-            pbar = ProgBar().start_subtask("Shap_predict", 4 + len(self.feature_names))
+            pbar_name = f"({caller_name}) SHAP_predict"
+            pbar = ProgBar().start_subtask(pbar_name, 4 + len(self.feature_names))
         else:
             pbar = None
 
         # Compute error contribution at this stage, since it needs the individual
         # SHAP values
         self.compute_error_contribution()
-        pbar.update_subtask("Shap_predict", 1) if pbar else None
+        pbar.update_subtask(pbar_name, 1) if pbar else None
 
         self._compute_discrepancies(self.X_test)
-        pbar.update_subtask("Shap_predict", 2) if pbar else None
+        pbar.update_subtask(pbar_name, 2) if pbar else None
 
         self.connections = {}
         for target_idx, target in enumerate(self.feature_names):
@@ -416,21 +439,21 @@ class ShapEstimator(BaseEstimator):
                 threshold=self.mean_shap_threshold,
                 verbose=self.verbose)
             pbar.update_subtask(
-                "Shap_predict", target_idx + 3) if pbar else None
+                pbar_name, target_idx + 3) if pbar else None
 
         G_shap = utils.digraph_from_connected_features(
             X, self.feature_names, self.models, self.connections, root_causes, prior,
             reciprocity=self.reciprocity, anm_iterations=self.iters,
             verbose=self.verbose)
-        pbar.update_subtask("Shap_predict", len(
+        pbar.update_subtask(pbar_name, len(
             self.feature_names) + 3) if pbar else None
 
         G_shap = utils.break_cycles_if_present(
             G_shap, self.shap_discrepancies, self.prior, verbose=self.verbose)
-        pbar.update_subtask("Shap_predict", len(
+        pbar.update_subtask(pbar_name, len(
             self.feature_names) + 4) if pbar else None
 
-        pbar.remove("Shap_predict") if pbar else None
+        pbar.remove(pbar_name) if pbar else None
 
         return G_shap
 

@@ -52,6 +52,7 @@ Example:
 # pylint: disable=W0102:dangerous-default-value
 
 
+import inspect
 import numpy as np
 import optuna
 import pandas as pd
@@ -145,7 +146,21 @@ class GBTRegressor(GradientBoostingRegressor):
                 verbose=self.verbose)
             X_original = X.copy()
 
-        pbar = ProgBar().start_subtask("GBT_fit", len(self.feature_names))
+        # Who is calling me?
+        try:
+            curframe = inspect.currentframe()
+            calframe = inspect.getouterframes(curframe, 2)
+            caller_name = calframe[1][3]
+            if caller_name == "__call__":
+                caller_name = "ReX"
+        except Exception:  # pylint: disable=broad-except
+            caller_name = "unknown"
+
+        if self.prog_bar and not self.verbose:
+            pbar_name = f"({caller_name}) GBT_fit"
+            pbar = ProgBar().start_subtask(pbar_name, len(self.feature_names))
+        else:
+            pbar = None
 
         for target_idx, target_name in enumerate(self.feature_names):
             # if correlation_th is not None then, remove features that are highly
@@ -191,9 +206,9 @@ class GBTRegressor(GradientBoostingRegressor):
             )
             self.regressor[target_name].fit(
                 X.drop(target_name, axis=1), X[target_name])
-            pbar.update_subtask("GBT_fit", target_idx+1)
+            pbar.update_subtask(pbar_name, target_idx+1)
 
-        pbar.remove("GBT_fit")
+        pbar.remove(pbar_name)
         self.is_fitted_ = True
         return self
 

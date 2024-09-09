@@ -14,6 +14,7 @@ source of random noise.
 # pylint: disable=W0106:expression-not-assigned, R1702:too-many-branches
 # pylint: disable=W0102:dangerous-default-value
 
+import inspect
 import types
 import warnings
 from typing import Dict, List, Tuple, Union, Any
@@ -168,6 +169,16 @@ class NNRegressor(BaseEstimator):
         self.feature_types = utils.get_feature_types(X)
         self.regressor = {}
 
+        # Who is calling me?
+        try:
+            curframe = inspect.currentframe()
+            calframe = inspect.getouterframes(curframe, 2)
+            caller_name = calframe[1][3]
+            if caller_name == "__call__":
+                caller_name = "ReX"
+        except Exception:  # pylint: disable=broad-except
+            caller_name = "unknown"
+
         if self.correlation_th:
             self.corr_matrix = Hierarchies.compute_correlation_matrix(X)
             self.correlated_features = Hierarchies.compute_correlated_features(
@@ -176,7 +187,8 @@ class NNRegressor(BaseEstimator):
             X_original = X.copy()
 
         if self.prog_bar and not self.verbose:
-            pbar = ProgBar().start_subtask("DNN_fit", len(self.feature_names))
+            pbar_name = f"({caller_name}) DNN_fit"
+            pbar = ProgBar().start_subtask(pbar_name, len(self.feature_names))
         else:
             pbar = None
 
@@ -219,9 +231,9 @@ class NNRegressor(BaseEstimator):
                 prog_bar=self.prog_bar)
             self.regressor[target_name].train()
 
-            pbar.update_subtask("DNN_fit", target_idx+1) if pbar else None
+            pbar.update_subtask(pbar_name, target_idx+1) if pbar else None
 
-        pbar.remove("DNN_fit") if pbar else None
+        pbar.remove(pbar_name) if pbar else None
         self.is_fitted_ = True
         return self
 
