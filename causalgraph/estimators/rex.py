@@ -238,53 +238,6 @@ class Rex(BaseEstimator, ClassifierMixin):
 
         return self
 
-    def _steps_from_hpo(self, fit_steps) -> int:
-        """
-        Update the number of trials for the HPO.
-
-        Parameters
-        ----------
-        fit_steps: Pipeline
-            The pipeline where looking for the number of trials.
-
-        Returns
-        -------
-        int
-        """
-        if fit_steps.contains_method('tune_fit', exact_match=False):
-            if 'hpo_n_trials' in self.kwargs:
-                return self.kwargs['hpo_n_trials'] - 1
-            else:
-                if fit_steps.contains_argument('hpo_n_trials'):
-                    return fit_steps.get_argument_value('hpo_n_trials') - 1
-                else:
-                    return DEFAULT_HPO_TRIALS
-
-        return 0
-
-    def _steps_from_iterations(self, fit_steps) -> int:
-        """
-        Check if the pipeline contains a stage called iterative_fit and
-        retrieve the number of iterations.
-
-        Parameters
-        ----------
-        fit_steps: Pipeline
-            The pipeline where looking for the number of trials.
-
-        Returns
-        -------
-        int
-        """
-        if fit_steps.contains_method('iterative_fit', exact_match=False):
-            if fit_steps.contains_argument('num_iterations'):
-                return fit_steps.get_argument_value('num_iterations') - 1
-            else:
-                return DEFAULT_ITERATIVE_TRIALS - 1
-
-        return 0
-
-
     def predict(self,
                 X: pd.DataFrame,
                 ref_graph: nx.DiGraph = None,
@@ -407,8 +360,7 @@ class Rex(BaseEstimator, ClassifierMixin):
             num_iterations: int = DEFAULT_ITERATIVE_TRIALS,
             sampling_split: float = 0.5,
             prior: list = None,
-            dag_names: list = ['shap', 'rho', 'adjusted',
-                               'perm_imp', 'indep', 'final'],
+            dag_names: list = None,
             random_state: int = 1234) -> dict:
         """
         Performs iterative prediction on the given directed acyclic graph (DAG)
@@ -431,6 +383,15 @@ class Rex(BaseEstimator, ClassifierMixin):
 
         # Assert that 'shaps' exists and has been fit
         check_is_fitted(self, "is_fitted_")
+
+        if dag_names is None:
+            dag_names = ['shap']
+        else:
+            for name in dag_names:
+                if name not in ['shap', 'rho', 'adjusted', 'perm_imp', 'indep', 'final']:
+                    raise ValueError(
+                        "Invalid dag_name. Valid dag_names are 'shap', 'rho', " +
+                        "'adjusted', 'perm_imp', 'indep', and 'final'.")
 
         # Set adjacency matrices to zero
         dag = {}
@@ -501,8 +462,7 @@ class Rex(BaseEstimator, ClassifierMixin):
     def iterative_predict(
         self,
         tolerance: float = 0.3,
-        dag_names: list = ['shap', 'rho', 'adjusted',
-                           'perm_imp', 'indep', 'final']):
+        dag_names: list = None):
         """
         Performs iterative prediction on the given directed acyclic graph (DAG)
         and adjacency matrix. Prediction is based on the adjacency matrices previously
@@ -534,6 +494,15 @@ class Rex(BaseEstimator, ClassifierMixin):
             raise ValueError("tolerance must be at least 0")
         if not dag_names:
             raise ValueError("dag_names is empty")
+        if dag_names is None:
+            dag_names = ['shap']
+        else:
+            for name in dag_names:
+                if name not in ['shap', 'rho', 'adjusted',
+                                'perm_imp', 'indep', 'final']:
+                    raise ValueError(
+                        "Invalid dag_name. Valid dag_names are 'shap', 'rho', " +
+                        "'adjusted', 'perm_imp', 'indep', and 'final'.")
 
         self.iterative_dags = {}
         for name in dag_names:
@@ -771,6 +740,72 @@ class Rex(BaseEstimator, ClassifierMixin):
 
         return self.G_rho
 
+    def get_prior_from_ref_graph(self) -> List[List[str]]:
+        """
+        Get the prior from a reference graph.
+
+        Returns
+        -------
+        List[List[str]]
+            A list of two lists of nodes. The first list contains the root nodes,
+            and the second list contains the rest of the nodes. The root nodes are
+            the nodes with no incoming edges, and the rest of the nodes are the
+            ones with at least one incoming edge.
+        """
+        ref_graph_file = self.name.replace(f"_{self.model_type}", "")
+        ref_graph_file = f"{ref_graph_file}.dot"
+        ref_graph = utils.graph_from_dot_file(os.path.join(
+            os.path.expanduser("~/phd/data/RC4"), ref_graph_file))
+
+        root_nodes = [node for node, degree in ref_graph.in_degree() if degree == 0]
+        return [root_nodes, [node for node in ref_graph.nodes if node not in root_nodes]]
+
+    def _steps_from_hpo(self, fit_steps) -> int:
+        """
+        Update the number of trials for the HPO.
+
+        Parameters
+        ----------
+        fit_steps: Pipeline
+            The pipeline where looking for the number of trials.
+
+        Returns
+        -------
+        int
+        """
+        if fit_steps.contains_method('tune_fit', exact_match=False):
+            if 'hpo_n_trials' in self.kwargs:
+                return self.kwargs['hpo_n_trials'] - 1
+            else:
+                if fit_steps.contains_argument('hpo_n_trials'):
+                    return fit_steps.get_argument_value('hpo_n_trials') - 1
+                else:
+                    return DEFAULT_HPO_TRIALS
+
+        return 0
+
+    def _steps_from_iterations(self, fit_steps) -> int:
+        """
+        Check if the pipeline contains a stage called iterative_fit and
+        retrieve the number of iterations.
+
+        Parameters
+        ----------
+        fit_steps: Pipeline
+            The pipeline where looking for the number of trials.
+
+        Returns
+        -------
+        int
+        """
+        if fit_steps.contains_method('iterative_fit', exact_match=False):
+            if fit_steps.contains_argument('num_iterations'):
+                return fit_steps.get_argument_value('num_iterations') - 1
+            else:
+                return DEFAULT_ITERATIVE_TRIALS - 1
+
+        return 0
+
     def _filter_adjacency_matrix(
             self,
             adjacency_matrix: np.ndarray,
@@ -877,7 +912,8 @@ def custom_main(dataset_name,
     # rex.fit_predict(train, test, ref_graph, prior=get_prior(ref_graph))
     rex.fit(data, pipeline=".fast_fit_pipeline.yaml")
 
-    prior = get_prior(ref_graph)
+    # prior = get_prior(ref_graph)
+    prior = rex.get_prior_from_ref_graph()
     rex.predict(data, ref_graph, prior=prior, pipeline=".fast_predict_pipeline.yaml")
 
     if save:
@@ -909,7 +945,7 @@ def prior_main(dataset_name,
 
 
 if __name__ == "__main__":
-    custom_main('short', input_path="/Users/renero/phd/data/RC3/",
+    custom_main('generated_10vars_linear_0', input_path="/Users/renero/phd/data/RC4/",
                 model_type="nn",
                 explainer="gradient",
                 tune_model=False,

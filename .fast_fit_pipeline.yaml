@@ -3,6 +3,8 @@ step1:
   method: model_type
 step2:
   method: models.tune_fit
+  arguments:
+    hpo_n_trials: 1
 step3:
   method: models.score
 step4:
@@ -18,6 +20,6 @@ step6:
 step7:
   method: iterative_fit
   arguments:
-    num_iterations: 20
+    num_iterations: 1
     sampling_split: 0.2
     dag_names: ['shap']

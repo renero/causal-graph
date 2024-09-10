@@ -533,7 +533,7 @@ class NNRegressor(BaseEstimator):
             hpo_min_loss: float = 0.05,
             hpo_storage: str = 'sqlite:///rex_tuning.db',
             hpo_load_if_exists: bool = True,
-            hpo_n_trials: int = 20):
+            hpo_n_trials: int = DEFAULT_HPO_TRIALS):
         """
         Tune the hyperparameters of the model using Optuna, and the fit the model
         with the best parameters.
