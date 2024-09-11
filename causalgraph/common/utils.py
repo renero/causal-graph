@@ -1011,3 +1011,55 @@ def find_crossing_point(
                 f1[i-1], f2[i-1], x_values[i-1], x_values[i], f1[i], f2[i])
 
     return None  # No crossing found
+
+def format_time(seconds: float) -> (float, str): # type: ignore
+    """
+    Convert the time in seconds to a more convenient time unit.
+
+    Parameters
+    ----------
+    seconds : float
+        The time in seconds.
+
+    Returns
+    -------
+    (float, str)
+        The time in the most appropriate unit and the unit string.
+
+    Examples
+    --------
+    >>> format_time(1.0)
+    (1.0, 's')
+    >>> format_time(60.0)
+    (1.0, 'm')
+    >>> format_time(3600.0)
+    (1.0, 'h')
+    >>> format_time(86400.0)
+    (1.0, 'd')
+    >>> format_time(604800.0)
+    (1.0, 'w')
+    >>> format_time(2592000.0)
+    (1.0, 'm')
+    >>> format_time(31536000.0)
+    (1.0, 'y')
+    >>> format_time(315360000.0)
+    (1.0, 'a')
+    """
+    if seconds < 0:
+        raise ValueError("time cannot be negative")
+    if seconds < 60.0:
+        return seconds, 's'
+    elif seconds < 3600.0:
+        return seconds / 60.0, 'm'
+    elif seconds < 86400.0:
+        return seconds / 3600.0, 'h'
+    elif seconds < 604800.0:
+        return seconds / 86400.0, 'd'
+    elif seconds < 2592000.0:
+        return seconds / 604800.0, 'w'
+    elif seconds < 31536000.0:
+        return seconds / 2592000.0, 'm'
+    elif seconds < 315360000.0:
+        return seconds / 31536000.0, 'y'
+    else:
+        return seconds / 315360000.0, 'a'

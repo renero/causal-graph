@@ -384,8 +384,8 @@ class GBTRegressor(GradientBoostingRegressor):
         study.optimize(Objective(training_data, test_data, verbose=self.verbose,
                                  silent=self.silent, prog_bar=self.prog_bar),
                        n_trials=n_trials,
-                       show_progress_bar=(
-                           self.optuna_prog_bar & (not self.silent)),
+                       show_progress_bar=(self.optuna_prog_bar & (
+                           not self.silent) & (not self.verbose)),
                        callbacks=[callback])
 
         # Capture the best hyperparameters and the minimum loss

@@ -501,7 +501,8 @@ class NNRegressor(BaseEstimator):
         study.optimize(
             Objective(training_data, test_data, verbose=self.verbose),
             n_trials=n_trials,
-            show_progress_bar=(self.optuna_prog_bar & (not self.silent) & (not self.verbose)),
+            show_progress_bar=(self.optuna_prog_bar & (
+                not self.silent) & (not self.verbose)),
             callbacks=[callback]
         )
 

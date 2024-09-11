@@ -233,7 +233,7 @@ class Rex(BaseEstimator, ClassifierMixin):
 
         n_steps = self.fit_pipeline.len()
         n_steps += self._steps_from_hpo(self.fit_pipeline)
-        n_steps += (self._steps_from_iterations(self.fit_pipeline) * 2)
+        n_steps += ((self._steps_from_iterations(self.fit_pipeline)) * 2)
 
         self.fit_pipeline.run(n_steps)
         self.fit_pipeline.close()
@@ -446,11 +446,6 @@ class Rex(BaseEstimator, ClassifierMixin):
             self.iter_adjacency_matrices[name] = init_adjacency(
                 self.n_features_in_)
 
-        # if self.prog_bar and (not self.verbose):
-        #     pbar = ProgBar().start_subtask("Iterative Fit", num_iterations)
-        # else:
-        #     pbar = None
-
         for iter in range(num_iterations):
             data_sample = X.sample(frac=sampling_split,
                                    random_state=iter*random_state)
@@ -493,9 +488,6 @@ class Rex(BaseEstimator, ClassifierMixin):
                 self.iter_adjacency_matrices['final'] += utils.graph_to_adjacency(
                     dag['final'], self.feature_names)
 
-            # pbar.update_subtask("Iterative Fit", iter+1) if pbar else None
-
-        # pbar.remove("Iterative Fit") if pbar else None
         for name in dag_names:
             self.iter_adjacency_matrices[name] = \
                 self.iter_adjacency_matrices[name] / num_iterations
@@ -596,7 +588,7 @@ class Rex(BaseEstimator, ClassifierMixin):
 
         # This lambda expression is used to compare values, depending on the direction
         _is_better_value = {
-            'maximize': lambda x, y: x > y,
+            'maximize': lambda x, y: x >= y,
             'minimize': lambda x, y: x < y
         }[direction]
 
