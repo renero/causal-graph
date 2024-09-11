@@ -5,6 +5,7 @@ Main class for the REX estimator.
 
 import os
 import warnings
+import time
 from collections import defaultdict
 from copy import deepcopy, copy
 from typing import List, Tuple, Union
@@ -196,6 +197,8 @@ class Rex(BaseEstimator, ClassifierMixin):
         self : object
             Returns self
         """
+        self.init_fit_time = time.time()
+
         self.random_state_state = check_random_state(self.random_state)
         self.n_features_in_ = X.shape[1]
         self.feature_names = utils.get_feature_names(X)
@@ -205,13 +208,13 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.y = copy(y) if y is not None else None
 
         # Create the pipeline for the training stages.
-        fit_steps = Pipeline(self, description="Fitting models", prog_bar=self.prog_bar,
+        self.fit_pipeline = Pipeline(self, description="Fitting models", prog_bar=self.prog_bar,
                             verbose=self.verbose, silent=self.silent, subtask=True)
         if pipeline is not None:
             if isinstance(pipeline, list):
-                fit_steps.from_list(pipeline)
+                self.fit_pipeline.from_list(pipeline)
             elif isinstance(pipeline, str):
-                fit_steps.from_config(pipeline)
+                self.fit_pipeline.from_config(pipeline)
         else:
             steps = [
                 ('hierarchies', Hierarchies),
@@ -228,13 +231,16 @@ class Rex(BaseEstimator, ClassifierMixin):
             ]
             pipeline.from_list(steps)
 
-        n_steps = fit_steps.len()
-        n_steps += self._steps_from_hpo(fit_steps)
-        n_steps += (self._steps_from_iterations(fit_steps) * 2)
+        n_steps = self.fit_pipeline.len()
+        n_steps += self._steps_from_hpo(self.fit_pipeline)
+        n_steps += (self._steps_from_iterations(self.fit_pipeline) * 2)
 
-        fit_steps.run(n_steps)
-        fit_steps.close()
+        self.fit_pipeline.run(n_steps)
+        self.fit_pipeline.close()
         self.is_fitted_ = True
+
+        self.end_fit_time = time.time()
+        self.fit_time = self.end_fit_time - self.init_fit_time
 
         return self
 
@@ -287,6 +293,8 @@ class Rex(BaseEstimator, ClassifierMixin):
         """
         check_is_fitted(self, "is_fitted_")
 
+        self.init_predict_time = time.time()
+
         # Check that prior is a list of lists and does not contain repeated elements.
         if prior is not None:
             if not isinstance(prior, list):
@@ -295,8 +303,12 @@ class Rex(BaseEstimator, ClassifierMixin):
                 raise ValueError("The prior cannot contain repeated elements.")
             self.prior = prior
 
+        # If reference graph is passed, store it in the object.
+        if ref_graph is not None:
+            self.ref_graph = ref_graph
+
         # Create a new pipeline for the prediction stages.
-        prediction = Pipeline(
+        self.predict_pipeline = Pipeline(
             self,
             description="Predicting causal graph",
             prog_bar=self.prog_bar,
@@ -311,9 +323,9 @@ class Rex(BaseEstimator, ClassifierMixin):
 
         if pipeline is not None:
             if isinstance(pipeline, list):
-                prediction.from_list(pipeline)
+                self.predict_pipeline.from_list(pipeline)
             elif isinstance(pipeline, str):
-                prediction.from_config(pipeline)
+                self.predict_pipeline.from_config(pipeline)
         else:
             steps = [
                 # DAGs construction
@@ -344,14 +356,47 @@ class Rex(BaseEstimator, ClassifierMixin):
                 ('metrics_final', 'score', {
                     'ref_graph': ref_graph, 'predicted_graph': 'G_final'})
             ]
-            prediction.from_list(steps)
-        prediction.run()
+            self.predict_pipeline.from_list(steps)
+        self.predict_pipeline.run()
         # Check if "G_final" exists in this object (self)
         if 'G_final' in self.__dict__:
             if '\\n' in self.G_final.nodes:
                 self.G_final.remove_node('\\n')
-        prediction.close()
+        self.predict_pipeline.close()
 
+        self.end_predict_time = time.time()
+        self.predict_time = self.end_predict_time - self.init_predict_time
+
+        return self
+
+    def fit_predict(
+            self,
+            train: pd.DataFrame,
+            test: pd.DataFrame,
+            ref_graph: nx.DiGraph,
+            prior: List[List[str]] = None):
+        """
+        Fit the model according to the given training data and predict
+        the outcome of the treatment.
+
+        Parameters
+        ----------
+        train : {array-like, sparse matrix}, shape (n_samples, n_features)
+            Training vector, where n_samples is the number of samples and
+            n_features is the number of features.
+        test : {array-like, sparse matrix}, shape (n_samples, n_features)
+            Test vector, where n_samples is the number of samples and
+            n_features is the number of features.
+        ref_graph : nx.DiGraph
+            The reference graph, or ground truth.
+
+        Returns
+        -------
+        G_final : nx.DiGraph
+            The final graph, after the correction stage.
+        """
+        self.fit(train)
+        self.predict(test, ref_graph, prior)
         return self
 
     def iterative_fit(
@@ -486,14 +531,10 @@ class Rex(BaseEstimator, ClassifierMixin):
             raise TypeError("adjacency must be a dictionary")
         if not isinstance(tolerance, (int, float)):
             raise TypeError("tolerance must be a number")
-        if not isinstance(dag_names, list):
-            raise TypeError("dag_names must be a list")
         if not self.iter_adjacency_matrices:
             raise ValueError("adjacency is empty")
         if tolerance < 0:
             raise ValueError("tolerance must be at least 0")
-        if not dag_names:
-            raise ValueError("dag_names is empty")
         if dag_names is None:
             dag_names = ['shap']
         else:
@@ -515,35 +556,73 @@ class Rex(BaseEstimator, ClassifierMixin):
 
         return self.iterative_dags
 
-    def fit_predict(
+    def predict_optimal_dag(
             self,
-            train: pd.DataFrame,
-            test: pd.DataFrame,
             ref_graph: nx.DiGraph,
-            prior: List[List[str]] = None):
+            key_metric: str = 'f1',
+            direction: str = 'maximize',
+            target_dag: str = 'shap'):
         """
-        Fit the model according to the given training data and predict
-        the outcome of the treatment.
+        Finds the best tolerance value for the iterative predict method by iterating
+        over different tolerance values and selecting the one that gives the best
+        `key_metric` with respect to the reference graph.
 
         Parameters
         ----------
-        train : {array-like, sparse matrix}, shape (n_samples, n_features)
-            Training vector, where n_samples is the number of samples and
-            n_features is the number of features.
-        test : {array-like, sparse matrix}, shape (n_samples, n_features)
-            Test vector, where n_samples is the number of samples and
-            n_features is the number of features.
         ref_graph : nx.DiGraph
-            The reference graph, or ground truth.
+            The reference graph to evaluate the F1 score against.
+        target : str, optional
+            The target DAG to evaluate. Defaults to 'shap'.
+            Possible values: 'shap', 'rho', 'adjusted', 'perm_imp', 'indep', and 'final'
+        key_metric : str, optional
+            The key metric to evaluate. Defaults to 'f1'.
+            Possible values: 'f1', 'precision', 'recall', 'shd', sid', 'aupr',
+            'Tp', 'Tn', 'Fp', 'Fn'    '
+        direction : str, optional
+            The direction of the key metric. Defaults to 'maximize'.
+            Possible values: 'maximize' or 'minimize'
 
         Returns
         -------
-        G_final : nx.DiGraph
-            The final graph, after the correction stage.
+        float
+            The best tolerance reached. The best tolerance is stored in `self.best_tol`
+            The method also keeps track of the metrics for each tolerance in
+            `self.iterative_metrics`.
         """
-        self.fit(train)
-        self.predict(test, ref_graph, prior)
-        return self
+        if ref_graph is None:
+            raise ValueError("ref_graph must be specified")
+        if direction != 'maximize' and direction != 'minimize':
+            raise ValueError("direction must be 'maximize' or 'minimize'")
+
+        # This lambda expression is used to compare values, depending on the direction
+        _is_better_value = {
+            'maximize': lambda x, y: x > y,
+            'minimize': lambda x, y: x < y
+        }[direction]
+
+        reference_key_metric = -100000.0 if direction == 'maximize' else +100000.0
+        self.iterative_metrics = []
+        self.best_tol = 0.0
+        for tol in np.arange(0.1, 1.0, 0.05):
+            dags_nn = self.iterative_predict(tolerance=tol, dag_names=[target_dag])
+            if target_dag not in dags_nn:
+                raise ValueError(f"Target {target_dag} is UNKNOWN or not yet computed")
+
+            metric = evaluate_graph(ref_graph, dags_nn[target_dag])
+            self.iterative_metrics.append(metric)
+            value_obtained = getattr(metric, key_metric)
+            if _is_better_value(value_obtained, reference_key_metric):
+                reference_key_metric = value_obtained
+                self.best_tol = tol
+
+        if self.verbose:
+            print(f"DNN Best tolerance: {self.best_tol:.2f}, "
+                  f"f1: {reference_key_metric:.4f}")
+
+        # Now, predict with selected tolerance
+        self.iterative_predict(tolerance=self.best_tol, dag_names=[target_dag])
+
+        return self.iterative_metrics
 
     def custom_pipeline(self, steps):
         """
@@ -778,7 +857,7 @@ class Rex(BaseEstimator, ClassifierMixin):
                 return self.kwargs['hpo_n_trials'] - 1
             else:
                 if fit_steps.contains_argument('hpo_n_trials'):
-                    return fit_steps.get_argument_value('hpo_n_trials') - 1
+                    return fit_steps.get_argument_value('hpo_n_trials')
                 else:
                     return DEFAULT_HPO_TRIALS
 
@@ -800,9 +879,9 @@ class Rex(BaseEstimator, ClassifierMixin):
         """
         if fit_steps.contains_method('iterative_fit', exact_match=False):
             if fit_steps.contains_argument('num_iterations'):
-                return fit_steps.get_argument_value('num_iterations') - 1
+                return fit_steps.get_argument_value('num_iterations')
             else:
-                return DEFAULT_ITERATIVE_TRIALS - 1
+                return DEFAULT_ITERATIVE_TRIALS
 
         return 0
 

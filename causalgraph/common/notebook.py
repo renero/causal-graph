@@ -257,14 +257,6 @@ class BaseExperiment:
                     f"      ↳ Experiment '{self.experiment_name}' will be TRAINED")
 
         self.save_experiment = True
-        # if self.save_experiment and not experiment_exists:
-        #     print("      ↳ Experiment will be saved.") if self.verbose else None
-        # elif self.save_experiment and experiment_exists:
-        #     print("          ↳ Experiment exists and will be overwritten.") \
-        #         if self.verbose else None
-        # else:
-        #     print("      ↳ Experiment will NOT be saved.") if self.verbose else None
-        #     self.save_experiment = False
 
     def list_files(self, input_pattern, where='input') -> list:
         """
@@ -372,14 +364,15 @@ class Experiment(BaseExperiment):
         """
         self.init_fit_time = time.time()
         self.estimator_name = estimator_name
-        # Add "model_type" to kwargs
         kwargs['model_type'] = self.model_type
 
         estimator_object = self.create_estimator(
             estimator_name, name=self.experiment_name, **kwargs)
-        # Extract pipeline from kwargs, if any
+
         pipeline = kwargs.pop('pipeline') if 'pipeline' in kwargs else None
+
         estimator_object.fit(self.train_data, self.test_data, pipeline=pipeline)
+
         setattr(self, estimator_name, estimator_object)
         self.is_fitted = True
         self.end_fit_time = time.time()
@@ -399,7 +392,9 @@ class Experiment(BaseExperiment):
         """
         self.init_predict_time = time.time()
         estimator = getattr(self, self.estimator_name)
-        estimator.predict(self.train_data, self.test_data, **kwargs)
+
+        estimator.predict(self.train_data, **kwargs)
+
         self.end_predict_time = time.time()
         self.predict_time = self.end_predict_time - self.init_predict_time
 

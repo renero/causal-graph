@@ -961,3 +961,53 @@ def get_feature_types(X) -> Dict[str, str]:
             feature_types[feature_names[i]] = _classify_variable(feature)
 
     return feature_types
+
+
+def find_crossing_point(
+        f1: List[float],  # Values of the first curve (precision, for example)
+        f2: List[float],  # Values of the second curve (recall, for example)
+        x_values: List[float]  # X values (thresholds, for example) corresponding
+                               # to the curve evaluations
+) -> Optional[float]:
+    """
+    This function finds the exact crossing point between two curves defined by
+    f1 and f2 over x_values. It interpolates between points to provide a more
+    accurate crossing point.
+
+    Parameters:
+    -----------
+    f1: List[float]
+        Values of the first curve (precision, for example).
+    f2: List[float]
+        Values of the second curve (recall, for example).
+    x_values: List[float]
+        X values (thresholds, for example) corresponding to the curve evaluations.
+
+    Returns:
+    --------
+    Optional[float]
+        The x value where the first crossing occurs between the two curves.
+        If no crossing is found, returns None.
+    """
+    def interpolate_crossing(
+            f1_prev: float,  # Value of f1 at the previous x value
+            f2_prev: float,  # Value of f2 at the previous x value
+            x_prev: float,  # Previous x value
+            x_next: float,  # Next x value
+            f1_next: float,  # Value of f1 at the next x value
+            f2_next: float  # Value of f2 at the next x value
+    ) -> float:
+        # Linear interpolation formula to find the exact crossing point between two points
+        return x_prev + (x_next - x_prev) * abs(f1_prev - f2_prev) / \
+            (abs(f1_prev - f1_next) + abs(f2_prev - f2_next))
+
+    # Loop through the x values and find where the first crossing occurs
+    for i in range(1, len(x_values)):
+        # Check for a crossing between consecutive points
+        if (f1[i-1] < f2[i-1] and f1[i] > f2[i]) or \
+            (f1[i-1] > f2[i-1] and f1[i] < f2[i]):
+            # Interpolate to find the exact crossing point
+            return interpolate_crossing(
+                f1[i-1], f2[i-1], x_values[i-1], x_values[i], f1[i], f2[i])
+
+    return None  # No crossing found

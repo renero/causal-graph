@@ -5,8 +5,6 @@ step0:
 step1:
   attribute: prior
   method: get_prior_from_ref_graph
-  arguments:
-    ref_graph: ref_graph
 step2:
   attribute: G_prior
   method: shaps.predict
