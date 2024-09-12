@@ -492,7 +492,7 @@ class Rex(BaseEstimator, ClassifierMixin):
             self.iterative_metrics = []
             self.tolerance = 0.0
             for tol in np.arange(0.1, 1.0, 0.05):
-                dag = self.build_dag_from_iterative_adjacency_matrix(
+                dag = self.build_dag_from_iter_adj_matrix(
                     iter_adjacency_matrix, tolerance=tol)
 
                 metric = evaluate_graph(ref_graph, dag)
@@ -507,12 +507,12 @@ class Rex(BaseEstimator, ClassifierMixin):
                     f"{key_metric}: {reference_key_metric:.4f}")
 
         # Now, predict with selected tolerance
-        self.build_dag_from_iterative_adjacency_matrix(
+        self.build_dag_from_iter_adj_matrix(
             iter_adjacency_matrix, tolerance=self.tolerance)
 
         return self.iterative_metrics
 
-    def build_dag_from_iterative_adjacency_matrix(
+    def build_dag_from_iter_adj_matrix(
             self,
             iter_adjacency_matrix: np.ndarray,
             tolerance: float = 0.3) -> dict:
@@ -537,7 +537,6 @@ class Rex(BaseEstimator, ClassifierMixin):
         assert isinstance(iter_adjacency_matrix, np.ndarray), \
             "Adjacency must be a 2D numpy array"
         assert isinstance(tolerance, (int, float)), "Tolerance must be a number"
-        assert iter_adjacency_matrix, "Adjacency is empty"
         assert (tolerance <= 1.0) and (tolerance >= 0.0), \
             "Tolerance must be range between 0.0 and 1.0"
 
