@@ -300,7 +300,8 @@ def graph_union(g1: AnyGraph, g2: AnyGraph) -> AnyGraph:
         if isinstance(g1.nodes[first_node][key], (int, float, np.number)):
             for n in nodes:
                 if n in g1.nodes and n in g2.nodes:
-                    nodes_data[n] = {key: (g1.nodes[n][key] + g2.nodes[n][key]) / 2}
+                    nodes_data[n] = {
+                        key: (g1.nodes[n][key] + g2.nodes[n][key]) / 2}
                 elif n in g1.nodes:
                     nodes_data[n] = {key: g1.nodes[n][key]}
                 elif n in g2.nodes:
@@ -385,29 +386,7 @@ def digraph_from_connected_features(
 
         # Check if we can set it from prior knowledge
         if prior:
-            print(f"Checking edge {u} -> {v}...") if verbose else None
-            idx_u = [i for i, l in enumerate(prior) if u in l][0]
-            idx_v = [i for i, l in enumerate(prior) if v in l][0]
-            both_in_top_list = idx_u == 0 and idx_v == 0
-            u_is_before_v = idx_u - idx_v < 0
-            v_is_before_u = idx_v - idx_u < 0
-            if both_in_top_list:
-                print(
-                    f"Edge {u} -x- {v} removed: both top list") if verbose else None
-                orientation = +1
-                continue
-            elif u_is_before_v:
-                print(
-                    f"Edge {u} -> {v} added: {u} before {v}") if verbose else None
-                dag.add_edge(u, v)
-                continue
-            elif v_is_before_u:
-                print(
-                    f"Edge {v} -> {u} added: {v} before {u}") if verbose else None
-                dag.add_edge(v, u)
-                continue
-            else:
-                pass
+            orientation = correct_edge_from_prior(dag, u, v, prior, verbose)
 
         if orientation == 0:
             print(f"Checking edge {u} -> {v}...") if verbose else None
@@ -439,6 +418,74 @@ def digraph_from_connected_features(
             dag.add_edge(effect, cause)
 
     return dag
+
+
+def correct_edge_from_prior(dag, u, v, prior, verbose):
+    """
+    Correct an edge in the graph according to the prior knowledge.
+    This function corrects the orientation of an edge in a directed acyclic graph
+    (DAG) based on prior knowledge. The prior knowledge is a list of lists of node
+    names, ordered according to a temporal structure. The assumption is that nodes
+    from the first layer of temporal structure cannot receive any incoming edge.
+
+    The function checks the relative positions of the two nodes in the prior
+    knowledge and:
+    - If both nodes are in the top list, it removes the edge, based on the assumption.
+    - If one node is before the other, it adds a new edge in the correct direction.
+    - If the nodes are not in a clear order, it leaves the edge unchanged.
+    - If the edge reflects a backward connection between nodes from different
+      temporal layers, it removes the edge.
+
+    The orientation of the edge, -1 if the edge is reversed, +1 if the edge
+        is removed or kept, and 0 if the edge orientation is not clear.
+
+    Parameters
+    ----------
+    dag : nx.DiGraph
+        The graph to be corrected.
+    u : str
+        The first node of the edge.
+    v : str
+        The second node of the edge.
+    prior : List[List[str]]
+        The prior knowledge, a list of lists of node names, ordered according to
+        a temporal structure.
+    verbose : bool
+        If True, print debug messages.
+
+    Returns
+    -------
+    orientation : int
+        The orientation of the edge, -1 if the edge is reversed, +1 if the edge
+        is removed or kept, and 0 if the edge orientation is not clear.
+    """
+    # Check either 'u' or 'v' are NOT in the prior list. Remember that 'prior' is a
+    # list of lists of node names, ordered according to a temporal structure.
+    if not any([u in p for p in prior]) or not any([v in p for p in prior]):
+        return 0
+
+    print(f"Checking edge {u} -> {v}...") if verbose else None
+    idx_u = [i for i, l in enumerate(prior) if u in l][0]
+    idx_v = [i for i, l in enumerate(prior) if v in l][0]
+    both_in_top_list = idx_u == 0 and idx_v == 0
+    u_is_before_v = idx_u - idx_v < 0
+    v_is_before_u = idx_v - idx_u < 0
+    if both_in_top_list:
+        print(
+            f"Edge {u} -x- {v} removed: both top list") if verbose else None
+        return +1
+    elif u_is_before_v:
+        print(
+            f"Edge {u} -> {v} added: {u} before {v}") if verbose else None
+        dag.add_edge(u, v)
+        return +1
+    elif v_is_before_u:
+        print(
+            f"Edge {v} -> {u} added: {v} before {u}") if verbose else None
+        dag.add_edge(v, u)
+        return -1
+    else:
+        return 0
 
 
 def valid_candidates_from_prior(feature_names, effect, prior):
@@ -563,7 +610,8 @@ def potential_misoriented_edges(
         bwd_gof = 1. - discrepancies[node][neighbor].shap_gof
         orientation = +1 if fwd_gof < bwd_gof else -1
         if orientation == -1:
-            potential_misoriented_edges.append((node, neighbor, fwd_gof - bwd_gof))
+            potential_misoriented_edges.append(
+                (node, neighbor, fwd_gof - bwd_gof))
         if verbose:
             direction = "-->" if fwd_gof < bwd_gof else "<--"
             print(
@@ -966,8 +1014,9 @@ def get_feature_types(X) -> Dict[str, str]:
 def find_crossing_point(
         f1: List[float],  # Values of the first curve (precision, for example)
         f2: List[float],  # Values of the second curve (recall, for example)
-        x_values: List[float]  # X values (thresholds, for example) corresponding
-                               # to the curve evaluations
+        # X values (thresholds, for example) corresponding
+        x_values: List[float]
+    # to the curve evaluations
 ) -> Optional[float]:
     """
     This function finds the exact crossing point between two curves defined by
@@ -1005,14 +1054,15 @@ def find_crossing_point(
     for i in range(1, len(x_values)):
         # Check for a crossing between consecutive points
         if (f1[i-1] < f2[i-1] and f1[i] > f2[i]) or \
-            (f1[i-1] > f2[i-1] and f1[i] < f2[i]):
+                (f1[i-1] > f2[i-1] and f1[i] < f2[i]):
             # Interpolate to find the exact crossing point
             return interpolate_crossing(
                 f1[i-1], f2[i-1], x_values[i-1], x_values[i], f1[i], f2[i])
 
     return None  # No crossing found
 
-def format_time(seconds: float) -> (float, str): # type: ignore
+
+def format_time(seconds: float) -> (float, str):  # type: ignore
     """
     Convert the time in seconds to a more convenient time unit.
 

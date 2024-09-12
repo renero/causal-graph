@@ -152,7 +152,7 @@ class GBTRegressor(GradientBoostingRegressor):
             calframe = inspect.getouterframes(curframe, 2)
             caller_name = calframe[1][3]
             if caller_name == "__call__":
-                caller_name = "ReX"
+                caller_name = "HPO"
         except Exception:  # pylint: disable=broad-except
             caller_name = "unknown"
 

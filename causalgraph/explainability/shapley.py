@@ -374,7 +374,11 @@ class ShapEstimator(BaseEstimator):
             self.all_mean_shap_values[-1] = np.insert(
                 self.all_mean_shap_values[-1], correlated_feature_position, 0.)
 
-    def predict(self, X, root_causes=None, prior: List[List[str]] = None):
+    def predict(
+            self,
+            X,
+            root_causes=None,
+            prior: List[List[str]] = None) -> nx.DiGraph:
         """
         Builds a causal graph from the shap values using a selection mechanism based
         on clustering, knee or abrupt methods.

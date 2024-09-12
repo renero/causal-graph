@@ -655,8 +655,11 @@ def dag(
             figsize=(6, 4), layout="constrained").subplot_mosaic('AAB')
         axis = ax["A"]
         text_axis = ax["B"]
-    else:
+    elif ax is not None and show_metrics is False:
         axis = ax
+    else:
+        raise ValueError(
+            "The 'ax' and 'show_metrics' arguments are mutually exclusive.")
     if save_to_pdf is not None:
         with PdfPages(save_to_pdf) as pdf:
             if reference:

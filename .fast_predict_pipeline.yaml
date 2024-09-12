@@ -11,5 +11,17 @@ step2:
   arguments:
     prior: prior
 step3:
-  attribute: G_rho
-  method: dag_from_discrepancy
+  attribute: G_iter
+  method: iterative_predict
+  arguments:
+    num_iterations: 10
+    sampling_split: 0.2
+    tolerance: 'auto'
+step4:
+  attribute: G_iter_prio
+  method: iterative_predict
+  arguments:
+    num_iterations: 10
+    sampling_split: 0.2
+    prior: prior
+    tolerance: 'auto'

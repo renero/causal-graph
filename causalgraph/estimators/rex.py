@@ -42,10 +42,6 @@ warnings.filterwarnings('ignore')
 # pylint: disable=W0106:expression-not-assigned, R1702:too-many-branches
 
 
-# TODO:
-# - Instead of building a DAG in a single step, build it in several steps, using
-#   different samples.
-
 
 class Rex(BaseEstimator, ClassifierMixin):
     """
@@ -399,13 +395,12 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.predict(test, ref_graph, prior)
         return self
 
-    def iterative_fit(
+    def _build_iterative_adjacency_matrix(
             self,
             X: pd.DataFrame,
             num_iterations: int = DEFAULT_ITERATIVE_TRIALS,
             sampling_split: float = 0.5,
             prior: list = None,
-            dag_names: list = None,
             random_state: int = 1234) -> dict:
         """
         Performs iterative prediction on the given directed acyclic graph (DAG)
@@ -429,131 +424,31 @@ class Rex(BaseEstimator, ClassifierMixin):
         # Assert that 'shaps' exists and has been fit
         check_is_fitted(self, "is_fitted_")
 
-        if dag_names is None:
-            dag_names = ['shap']
-        else:
-            for name in dag_names:
-                if name not in ['shap', 'rho', 'adjusted', 'perm_imp', 'indep', 'final']:
-                    raise ValueError(
-                        "Invalid dag_name. Valid dag_names are 'shap', 'rho', " +
-                        "'adjusted', 'perm_imp', 'indep', and 'final'.")
-
-        # Set adjacency matrices to zero
-        dag = {}
-        self.iter_adjacency_matrices = {}
-        def init_adjacency(n): return np.zeros((n, n))
-        for name in dag_names:
-            self.iter_adjacency_matrices[name] = init_adjacency(
-                self.n_features_in_)
+        iter_adjacency_matrix = np.zeros((self.n_features_in_, self.n_features_in_))
 
         for iter in range(num_iterations):
             data_sample = X.sample(frac=sampling_split,
                                    random_state=iter*random_state)
-            # Shap?
-            # self.hierarchies.fit(data_sample)
             self.shaps.fit(data_sample)
-            dag['shap'] = self.shaps.predict(data_sample, prior=prior)
-            self.iter_adjacency_matrices['shap'] += utils.graph_to_adjacency(
-                dag['shap'], self.feature_names)
-            # Rho?
-            if 'rho' in dag_names:
-                dag['rho'] = self.dag_from_discrepancy(
-                    self.discrepancy_threshold)
-                self.iter_adjacency_matrices['rho'] += utils.graph_to_adjacency(
-                    dag['rho'], self.feature_names)
+            dag = self.shaps.predict(data_sample, prior=prior)
+            iter_adjacency_matrix += utils.graph_to_adjacency(
+                dag, self.feature_names)
 
-            # Adjusted?
-            if 'adjusted' in dag_names:
-                dag['adjusted'] = self.adjust_discrepancy(dag['shap'])
-                self.iter_adjacency_matrices['adjusted'] += utils.graph_to_adjacency(
-                    dag['adjusted'], self.feature_names)
+        iter_adjacency_matrix = iter_adjacency_matrix / num_iterations
 
-            # Perm Importance?
-            if 'perm_imp' in dag_names:
-                self.pi.fit(data_sample)
-                dag['perm_imp'] = self.pi.predict(
-                    data_sample, root_causes=self.root_causes, prior=prior)
-                self.iter_adjacency_matrices['perm_imp'] += utils.graph_to_adjacency(
-                    dag['perm_imp'], self.feature_names)
-
-            # Independence?
-            if 'indep' in dag_names:
-                dag['indep'] = self.indep.fit_predict(data_sample)
-                self.iter_adjacency_matrices['indep'] += utils.graph_to_adjacency(
-                    dag['indep'], self.feature_names)
-
-            # Final?
-            if 'final' in dag_names:
-                dag['final'] = self.shaps.adjust(dag['indep'])
-                self.iter_adjacency_matrices['final'] += utils.graph_to_adjacency(
-                    dag['final'], self.feature_names)
-
-        for name in dag_names:
-            self.iter_adjacency_matrices[name] = \
-                self.iter_adjacency_matrices[name] / num_iterations
-
-        self.is_iterative_fitted_ = True
-
-        return self.iter_adjacency_matrices
+        return iter_adjacency_matrix
 
     def iterative_predict(
-        self,
-        tolerance: float = 0.3,
-        dag_names: list = None):
-        """
-        Performs iterative prediction on the given directed acyclic graph (DAG)
-        and adjacency matrix. Prediction is based on the adjacency matrices previously
-        computed, which are here normalized and filtered, so values below tolerance
-        are set to zero. This way, only those edges present in more than "tolerance"
-        percent of the iterations are kept.
-
-        Parameters:
-            dag (dict): The input DAG.
-            num_iterations (int): The number of iterations to perform. Defaults to 10.
-            tolerance (float): The tolerance value for filtering the adjacency matrix.
-                Defaults to 0.3.
-            dag_names (list): A list of names for the DAG. Defaults to ['shap', 'rho',
-                'adjusted', 'perm_imp', 'indep', 'final'].
-
-        Returns:
-            dict: The predicted DAG.
-        """
-        assert self.is_iterative_fitted_, "Model must be fitted iteratively first"
-        if not isinstance(self.iter_adjacency_matrices, dict):
-            raise TypeError("adjacency must be a dictionary")
-        if not isinstance(tolerance, (int, float)):
-            raise TypeError("tolerance must be a number")
-        if not self.iter_adjacency_matrices:
-            raise ValueError("adjacency is empty")
-        if tolerance < 0:
-            raise ValueError("tolerance must be at least 0")
-        if dag_names is None:
-            dag_names = ['shap']
-        else:
-            for name in dag_names:
-                if name not in ['shap', 'rho', 'adjusted',
-                                'perm_imp', 'indep', 'final']:
-                    raise ValueError(
-                        "Invalid dag_name. Valid dag_names are 'shap', 'rho', " +
-                        "'adjusted', 'perm_imp', 'indep', and 'final'.")
-
-        self.iterative_dags = {}
-        for name in dag_names:
-            if name not in self.iter_adjacency_matrices:
-                raise ValueError(f"adjacency does not contain key {name}")
-            filtered_matrix = self._filter_adjacency_matrix(
-                self.iter_adjacency_matrices[name], tolerance)
-            self.iterative_dags[name] = utils.graph_from_adjacency(
-                filtered_matrix, self.feature_names)
-
-        return self.iterative_dags
-
-    def predict_optimal_dag(
             self,
+            X: pd.DataFrame,
             ref_graph: nx.DiGraph,
+            num_iterations: int = DEFAULT_ITERATIVE_TRIALS,
+            sampling_split: float = 0.2,
+            prior: list = None,
+            random_state: int = 1234,
+            tolerance: Union[float, str] = 'auto',
             key_metric: str = 'f1',
-            direction: str = 'maximize',
-            target_dag: str = 'shap'):
+            direction: str = 'maximize') -> nx.DiGraph:
         """
         Finds the best tolerance value for the iterative predict method by iterating
         over different tolerance values and selecting the one that gives the best
@@ -576,45 +471,82 @@ class Rex(BaseEstimator, ClassifierMixin):
 
         Returns
         -------
-        float
-            The best tolerance reached. The best tolerance is stored in `self.best_tol`
-            The method also keeps track of the metrics for each tolerance in
-            `self.iterative_metrics`.
+        nx.DiGraph : The best DAG found by the iterative predict method.
         """
         if ref_graph is None:
             raise ValueError("ref_graph must be specified")
         if direction != 'maximize' and direction != 'minimize':
             raise ValueError("direction must be 'maximize' or 'minimize'")
 
-        # This lambda expression is used to compare values, depending on the direction
-        _is_better_value = {
-            'maximize': lambda x, y: x >= y,
-            'minimize': lambda x, y: x < y
-        }[direction]
+        iter_adjacency_matrix = self._build_iterative_adjacency_matrix(
+            X, num_iterations, sampling_split, prior, random_state)
 
-        reference_key_metric = -100000.0 if direction == 'maximize' else +100000.0
-        self.iterative_metrics = []
-        self.best_tol = 0.0
-        for tol in np.arange(0.1, 1.0, 0.05):
-            dags_nn = self.iterative_predict(tolerance=tol, dag_names=[target_dag])
-            if target_dag not in dags_nn:
-                raise ValueError(f"Target {target_dag} is UNKNOWN or not yet computed")
+        if tolerance == 'auto':
+            # This lambda expression is used to compare values, depending on the direction
+            _is_better_value = {
+                'maximize': lambda x, y: x >= y,
+                'minimize': lambda x, y: x < y
+            }[direction]
 
-            metric = evaluate_graph(ref_graph, dags_nn[target_dag])
-            self.iterative_metrics.append(metric)
-            value_obtained = getattr(metric, key_metric)
-            if _is_better_value(value_obtained, reference_key_metric):
-                reference_key_metric = value_obtained
-                self.best_tol = tol
+            reference_key_metric = -100000.0 if direction == 'maximize' else +100000.0
+            self.iterative_metrics = []
+            self.tolerance = 0.0
+            for tol in np.arange(0.1, 1.0, 0.05):
+                dag = self.build_dag_from_iterative_adjacency_matrix(
+                    iter_adjacency_matrix, tolerance=tol)
 
-        if self.verbose:
-            print(f"DNN Best tolerance: {self.best_tol:.2f}, "
-                  f"f1: {reference_key_metric:.4f}")
+                metric = evaluate_graph(ref_graph, dag)
+                self.iterative_metrics.append(metric)
+                value_obtained = getattr(metric, key_metric)
+                if _is_better_value(value_obtained, reference_key_metric):
+                    reference_key_metric = value_obtained
+                    self.tolerance = tol
+
+            if self.verbose:
+                print(f"Best tolerance: {self.tolerance:.2f}, "
+                    f"{key_metric}: {reference_key_metric:.4f}")
 
         # Now, predict with selected tolerance
-        self.iterative_predict(tolerance=self.best_tol, dag_names=[target_dag])
+        self.build_dag_from_iterative_adjacency_matrix(
+            iter_adjacency_matrix, tolerance=self.tolerance)
 
         return self.iterative_metrics
+
+    def build_dag_from_iterative_adjacency_matrix(
+            self,
+            iter_adjacency_matrix: np.ndarray,
+            tolerance: float = 0.3) -> dict:
+        """
+        Performs iterative prediction on the given directed acyclic graph (DAG)
+        and adjacency matrix. Prediction is based on the adjacency matrices previously
+        computed, which are here normalized and filtered, so values below tolerance
+        are set to zero. This way, only those edges present in more than "tolerance"
+        percent of the iterations are kept.
+
+        Parameters:
+            dag (dict): The input DAG.
+            num_iterations (int): The number of iterations to perform. Defaults to 10.
+            tolerance (float): The tolerance value for filtering the adjacency matrix.
+                Defaults to 0.3.
+            inplace (bool): Whether to store the predicted DAG in the object.
+                Defaults to True. If False, the predicted DAG is returned.
+
+        Returns:
+            dict: The predicted DAG.
+        """
+        assert isinstance(iter_adjacency_matrix, np.ndarray), \
+            "Adjacency must be a 2D numpy array"
+        assert isinstance(tolerance, (int, float)), "Tolerance must be a number"
+        assert iter_adjacency_matrix, "Adjacency is empty"
+        assert (tolerance <= 1.0) and (tolerance >= 0.0), \
+            "Tolerance must be range between 0.0 and 1.0"
+
+        filtered_matrix = self._filter_adjacency_matrix(
+            iter_adjacency_matrix, tolerance)
+
+        dag = utils.graph_from_adjacency(filtered_matrix, self.feature_names)
+
+        return dag
 
     def custom_pipeline(self, steps):
         """
@@ -1016,7 +948,8 @@ def prior_main(dataset_name,
 
 
 if __name__ == "__main__":
-    custom_main('generated_10vars_linear_0', input_path="/Users/renero/phd/data/RC4/",
+    custom_main('generated_10vars_linear_0',
+                input_path="/Users/renero/phd/data/RC4/",
                 model_type="nn",
                 explainer="gradient",
                 tune_model=False,

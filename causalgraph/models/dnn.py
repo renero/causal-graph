@@ -27,7 +27,7 @@ from sklearn.base import BaseEstimator
 from sklearn.preprocessing import StandardScaler
 from sklearn.utils.validation import check_is_fitted
 from torch.utils.data import DataLoader
-from mlforge.progbar import ProgBar
+from mlforge.progbar import ProgBar   # type: ignore
 
 from causalgraph.common import DEFAULT_HPO_TRIALS
 from causalgraph.explainability.hierarchies import Hierarchies
@@ -175,7 +175,7 @@ class NNRegressor(BaseEstimator):
             calframe = inspect.getouterframes(curframe, 2)
             caller_name = calframe[1][3]
             if caller_name == "__call__":
-                caller_name = "ReX"
+                caller_name = "HPO"
         except Exception:  # pylint: disable=broad-except
             caller_name = "unknown"
 
