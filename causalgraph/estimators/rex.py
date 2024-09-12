@@ -401,7 +401,7 @@ class Rex(BaseEstimator, ClassifierMixin):
             num_iterations: int = DEFAULT_ITERATIVE_TRIALS,
             sampling_split: float = 0.5,
             prior: list = None,
-            random_state: int = 1234) -> dict:
+            random_state: int = 1234) -> np.ndarray:
         """
         Performs iterative prediction on the given directed acyclic graph (DAG)
         and adjacency matrix.
@@ -507,10 +507,8 @@ class Rex(BaseEstimator, ClassifierMixin):
                     f"{key_metric}: {reference_key_metric:.4f}")
 
         # Now, predict with selected tolerance
-        self.build_dag_from_iter_adj_matrix(
+        return self.build_dag_from_iter_adj_matrix(
             iter_adjacency_matrix, tolerance=self.tolerance)
-
-        return self.iterative_metrics
 
     def build_dag_from_iter_adj_matrix(
             self,
