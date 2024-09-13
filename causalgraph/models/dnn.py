@@ -499,7 +499,8 @@ class NNRegressor(BaseEstimator):
             direction='minimize', study_name=study_name, storage=storage,
             load_if_exists=load_if_exists)
         study.optimize(
-            Objective(training_data, test_data, verbose=self.verbose),
+            Objective(
+                training_data, test_data, verbose=self.verbose),
             n_trials=n_trials,
             show_progress_bar=(self.optuna_prog_bar & (
                 not self.silent) & (not self.verbose)),

@@ -381,12 +381,14 @@ class GBTRegressor(GradientBoostingRegressor):
         study = optuna.create_study(
             direction='minimize', study_name=study_name, storage=storage,
             load_if_exists=load_if_exists)
-        study.optimize(Objective(training_data, test_data, verbose=self.verbose,
-                                 silent=self.silent, prog_bar=self.prog_bar),
-                       n_trials=n_trials,
-                       show_progress_bar=(self.optuna_prog_bar & (
-                           not self.silent) & (not self.verbose)),
-                       callbacks=[callback])
+        study.optimize(
+            Objective(
+                training_data, test_data, verbose=self.verbose),
+            n_trials=n_trials,
+            gc_after_trial=True,
+            show_progress_bar=(self.optuna_prog_bar & (
+                not self.silent) & (not self.verbose)),
+            callbacks=[callback])
 
         # Capture the best hyperparameters and the minimum loss
         best_trials = sorted(study.best_trials, key=lambda x: x.values[0])
