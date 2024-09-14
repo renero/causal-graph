@@ -299,15 +299,17 @@ class GBTRegressor(GradientBoostingRegressor):
             dataframes.
             """
 
-            def __init__(self, train_data, test_data, device='cpu', verbose=False,
-                         silent=False, prog_bar=True):
+            def __init__(
+                    self,
+                    train_data,
+                    test_data,
+                    device='cpu',
+                    verbose=False):
                 self.train_data = train_data
                 self.test_data = test_data
                 self.device = device
                 self.random_state = GBTRegressor.random_state
                 self.verbose = verbose
-                self.silent = silent
-                self.prog_bar = prog_bar
 
             def __call__(self, trial):
                 """
@@ -352,9 +354,9 @@ class GBTRegressor(GradientBoostingRegressor):
                     max_leaf_nodes=self.max_leaf_nodes,
                     n_iter_no_change=self.n_iter_no_change,
                     tol=self.tol,
-                    prog_bar=self.prog_bar,
-                    silent=self.silent
-                )
+                    prog_bar=True & (not self.verbose),
+                    silent=True)
+
                 self.models.fit(self.train_data)
 
                 # Now, measure the performance of the model with the test data.
@@ -395,6 +397,11 @@ class GBTRegressor(GradientBoostingRegressor):
         self.best_params = best_trials[0].params
         self.min_tunned_loss = best_trials[0].values[0]
 
+        if self.verbose and not self.silent:
+            print(f"Best params (min loss:{self.min_tunned_loss:.6f}):")
+            for k, v in self.best_params.items():
+                print(f"\t{k:<15s}: {v}")
+
         regressor_args = {
             'learning_rate': self.best_params['learning_rate'],
             'n_estimators': self.best_params['n_estimators'],
@@ -404,7 +411,6 @@ class GBTRegressor(GradientBoostingRegressor):
             'min_weight_fraction_leaf': self.best_params['min_weight_fraction_leaf'],
             'max_depth': self.best_params['max_depth'],
             'max_leaf_nodes': self.best_params['max_leaf_nodes'],
-            # 'max_features': self.best_params['max_features'],
             'min_impurity_decrease': self.best_params['min_impurity_decrease']
         }
 

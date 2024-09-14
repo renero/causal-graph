@@ -402,6 +402,9 @@ class NNRegressor(BaseEstimator):
                 self.verbose = verbose
 
             def __call__(self, trial):
+                """
+                This method is called by Optuna to evaluate the objective function.
+                """
                 self.n_layers = trial.suggest_int('n_layers', 1, 6)
                 self.layers = []
                 for i in range(self.n_layers):
@@ -441,6 +444,7 @@ class NNRegressor(BaseEstimator):
                         shuffle=False)
                     avg_loss, _, _ = self.compute_loss(model, loader)
                     loss.append(avg_loss)
+
                 return np.median(loss)
 
             def compute_loss(

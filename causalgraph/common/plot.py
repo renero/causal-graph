@@ -692,79 +692,77 @@ def dag(
 
 
 def dags(
-        graph: nx.DiGraph,
-        reference: nx.DiGraph = None,
-        names: List[str] = None,
-        figsize: Tuple[int, int] = (10, 5),
-        dpi: int = 75,
-        save_to_pdf: str = None,
-        **kwargs):
+        dags: List[nx.DiGraph],
+        ref_graph: nx.DiGraph,
+        titles: List[str],
+        figsize: Tuple[int, int] = (15, 12),
+        dpi: int = 300) -> None:
     """
-    Compare two graphs using dot.
+    Plots multiple directed acyclic graphs (DAGs) in a grid layout.
 
     Parameters:
-    -----------
-    graph: The DAG to compare.
-    reference: The reference DAG.
-    names: The names of the reference graph and the dag.
-    figsize: The size of the figure.
-    **kwargs: Additional arguments to format the graphs:
-        - "node_size": 500
-        - "node_color": 'white'
-        - "edgecolors": "black"
-        - "font_family": "monospace"
-        - "horizontalalignment": "center"
-        - "verticalalignment": "center_baseline"
-        - "with_labels": True
+    - dags (list): List of DAGs to plot.
+    - ref_graph: Reference graph used for layout.
+    - titles (list): List of titles for each DAG.
+    - figsize (tuple): Figure size (default: (15, 12)).
+    - dpi (int): Dots per inch (default: 300).
+
+    Raises:
+    - ValueError: If there are too many DAGs to plot.
+
+    Returns:
+    - None
     """
-    ncols = 1 if reference is None else 2
-    if names is None:
-        names = ["Prediction", "Ground truth"]
+    assert len(titles) == len(dags), "Number of titles must match number of DAGs"
+    assert len(dags) <=12 and len(dags) > 1, "Number of DAGs must be between 2 and 12"
 
-    # Overwrite formatting_kwargs with kwargs if they are provided
-    formatting_kwargs.update(kwargs)
+    layout = _get_subplot_mosaic_layout(len(dags))
 
-    G = nx.DiGraph()
-    G.add_nodes_from(graph.nodes(data=True))
-    G.add_edges_from(graph.edges())
-    if reference:
-        # Clean up reference graph for inconsistencies along the DOT conversion
-        # and add potential missing nodes to the predicted graph.
-        Gt = cleanup_graph(reference.copy())
-        for missing in set(list(Gt.nodes)) - set(list(G.nodes)):
-            G.add_node(missing)
-        # Gt = _format_graph(Gt, Gt, inv_color="red", wrong_color="black")
-        # G  = _format_graph(G, Gt, inv_color="red", wrong_color="gray")
-        Gt = format_graph(
-            Gt, G, inv_color="lightgreen", wrong_color="lightgreen")
-        G = format_graph(G, Gt, inv_color="orange", wrong_color="red")
+    axs = plt.figure(
+        figsize=figsize, dpi=dpi, layout="constrained").subplot_mosaic(layout)
+
+    ax_labels = list(axs.keys())
+    for i, g in enumerate(dags):
+        ax_ = axs[ax_labels[i]]
+        dag(graph=g, reference=ref_graph, title=titles[i], ax=ax_)
+
+    plt.tight_layout()
+    plt.show()
+
+
+def _get_subplot_mosaic_layout(n: int) -> str:
+    """
+    Get a layout string for a subplot mosaic with n subplots.
+
+    The layout strings are hardcoded for 1 to 11 subplots. For more subplots,
+    a ValueError is raised.
+
+    Parameters:
+    - n (int): The number of subplots.
+
+    Returns:
+    - str: The layout string for the subplot mosaic.
+
+    Raises:
+    - ValueError: If n is larger than 11.
+    """
+    layouts = [
+        "AB",
+        "ABC",
+        "AB;CD",
+        "AABBCC;.DDEE.",
+        "ABC;DEF",
+        "ABC;DEF;.G.",
+        "ABCD;EFGH",
+        "ABC;DEF;GHI",
+        "AABBCCDD;EEFFGGHH;.IIJJ.",
+        "ABCD;EFGH;IJK.",
+        "ABCD;EFGH;IJKL",
+    ]
+    if n <= len(layouts):
+        return layouts[n-2]
     else:
-        G = format_graph(G)
-
-    ref_layout = None
-    setup_plot(dpi=dpi)
-    f, ax = plt.subplots(ncols=ncols, figsize=figsize)
-    ax_graph = ax[1] if reference else ax
-    if save_to_pdf is not None:
-        with PdfPages(save_to_pdf) as pdf:
-            if reference:
-                ref_layout = nx.drawing.nx_agraph.graphviz_layout(
-                    Gt, prog="dot")
-                draw_graph_subplot(Gt, layout=ref_layout, title=None, ax=ax[0],
-                                   **formatting_kwargs)
-            draw_graph_subplot(G, layout=ref_layout, title=None, ax=ax_graph,
-                               **formatting_kwargs)
-            pdf.savefig(f, bbox_inches='tight', pad_inches=0)
-            plt.close()
-    else:
-        if reference:
-            ref_layout = nx.drawing.nx_agraph.graphviz_layout(
-                Gt, prog="dot")
-            draw_graph_subplot(Gt, layout=ref_layout, title=names[1], ax=ax[0],
-                               **formatting_kwargs)
-        draw_graph_subplot(G, layout=ref_layout, title=names[0], ax=ax_graph,
-                           **formatting_kwargs)
-        plt.show()
+        raise ValueError("Too many DAGs to plot")
 
 
 def shap_values(shaps: BaseEstimator, **kwargs):
@@ -931,3 +929,82 @@ def _plot_discrepancy(x, y, s, target_name, parent_name, r, ax):
 
     for ax_idx in range(4):
         _remove_ticks_and_box(ax[ax_idx])
+
+
+def deprecated_dags(
+        graph: nx.DiGraph,
+        reference: nx.DiGraph = None,
+        names: List[str] = None,
+        figsize: Tuple[int, int] = (10, 5),
+        dpi: int = 75,
+        save_to_pdf: str = None,
+        **kwargs):
+    """
+    Compare two graphs using dot.
+
+    Parameters:
+    -----------
+    graph: The DAG to compare.
+    reference: The reference DAG.
+    names: The names of the reference graph and the dag.
+    figsize: The size of the figure.
+    **kwargs: Additional arguments to format the graphs:
+        - "node_size": 500
+        - "node_color": 'white'
+        - "edgecolors": "black"
+        - "font_family": "monospace"
+        - "horizontalalignment": "center"
+        - "verticalalignment": "center_baseline"
+        - "with_labels": True
+    """
+    print("This method is deprecated. Use plot_dags() instead.")
+    return
+
+    ncols = 1 if reference is None else 2
+    if names is None:
+        names = ["Prediction", "Ground truth"]
+
+    # Overwrite formatting_kwargs with kwargs if they are provided
+    formatting_kwargs.update(kwargs)
+
+    G = nx.DiGraph()
+    G.add_nodes_from(graph.nodes(data=True))
+    G.add_edges_from(graph.edges())
+    if reference:
+        # Clean up reference graph for inconsistencies along the DOT conversion
+        # and add potential missing nodes to the predicted graph.
+        Gt = cleanup_graph(reference.copy())
+        for missing in set(list(Gt.nodes)) - set(list(G.nodes)):
+            G.add_node(missing)
+        # Gt = _format_graph(Gt, Gt, inv_color="red", wrong_color="black")
+        # G  = _format_graph(G, Gt, inv_color="red", wrong_color="gray")
+        Gt = format_graph(
+            Gt, G, inv_color="lightgreen", wrong_color="lightgreen")
+        G = format_graph(G, Gt, inv_color="orange", wrong_color="red")
+    else:
+        G = format_graph(G)
+
+    ref_layout = None
+    setup_plot(dpi=dpi)
+    f, ax = plt.subplots(ncols=ncols, figsize=figsize)
+    ax_graph = ax[1] if reference else ax
+    if save_to_pdf is not None:
+        with PdfPages(save_to_pdf) as pdf:
+            if reference:
+                ref_layout = nx.drawing.nx_agraph.graphviz_layout(
+                    Gt, prog="dot")
+                draw_graph_subplot(Gt, layout=ref_layout, title=None, ax=ax[0],
+                                   **formatting_kwargs)
+            draw_graph_subplot(G, layout=ref_layout, title=None, ax=ax_graph,
+                               **formatting_kwargs)
+            pdf.savefig(f, bbox_inches='tight', pad_inches=0)
+            plt.close()
+    else:
+        if reference:
+            ref_layout = nx.drawing.nx_agraph.graphviz_layout(
+                Gt, prog="dot")
+            draw_graph_subplot(Gt, layout=ref_layout, title=names[1], ax=ax[0],
+                               **formatting_kwargs)
+        draw_graph_subplot(G, layout=ref_layout, title=names[0], ax=ax_graph,
+                           **formatting_kwargs)
+        plt.show()

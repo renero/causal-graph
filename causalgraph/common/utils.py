@@ -1113,3 +1113,49 @@ def format_time(seconds: float) -> (float, str):  # type: ignore
         return seconds / 31536000.0, 'y'
     else:
         return seconds / 315360000.0, 'a'
+
+
+def combine_dags(
+    dag1: nx.DiGraph,
+    dag2: nx.DiGraph,
+    discrepancies: pd.DataFrame,
+    prior: Optional[List[List[str]]] = None
+) -> Tuple[nx.DiGraph, nx.DiGraph, nx.DiGraph, nx.DiGraph]:
+    """
+    Combine two directed acyclic graphs (DAGs) into a single DAG.
+
+    Parameters
+    ----------
+    dag1 : nx.DiGraph
+        The first DAG.
+    dag2 : nx.DiGraph
+        The second DAG.
+    discrepancies : pd.DataFrame
+        A DataFrame containing the permutation importances for each edge in the DAGs.
+    prior : Optional[List[List[str]]], optional
+        A list of lists containing the prior knowledge about the edges in the DAGs.
+        The lists define a hierarchy of edges that represent a temporal relation in
+        cause and effect. If a node is in the first list, then it is a root cause.
+        If a node is in the second list, then it is caused by the nodes in the
+        first list or the second list, and so on.
+
+    Returns
+    -------
+    Tuple[nx.DiGraph, nx.DiGraph, nx.DiGraph, nx.DiGraph]
+        A tuple containing four graphs: the union of the two DAGs, the
+        intersection of the two DAGs, the union of the two DAGs after removing
+        cycles, and the intersection of the two DAGs after removing cycles.
+    """
+    # Compute the union of the two DAGs
+    union = graph_union(dag1, dag2)
+
+    # Compute the intersection of the two DAGs
+    inter = graph_intersection(dag1, dag2)
+
+    # Remove cycles from the union and intersection
+    union_cycles_removed = break_cycles_if_present(
+        union, discrepancies, prior)
+    inter_cycles_removed = break_cycles_if_present(
+        inter, discrepancies, prior)
+
+    return union, inter, union_cycles_removed, inter_cycles_removed

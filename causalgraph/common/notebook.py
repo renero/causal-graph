@@ -213,15 +213,15 @@ class BaseExperiment:
 
         self.ref_graph = graph_from_dot_file(dot_filename)
 
-        if self.verbose:
-            print(
-                f"Data for {self.experiment_name}\n"
-                f"  ↳ Train....: {self.data.shape[0]} rows, "
-                f"{self.data.shape[1]} cols\n"
-                f"  ↳ Test.....: {self.test_data.shape[0]} rows, "
-                f"{self.data.shape[1]} cols\n"
-                f"  ↳ CSV.data.: {csv_filename}\n"
-                f"  ↳ Ref.graph: {dot_filename}")
+        # if self.verbose:
+        #     print(
+        #         f"Data for {self.experiment_name}\n"
+        #         f"  ↳ Train....: {self.data.shape[0]} rows, "
+        #         f"{self.data.shape[1]} cols\n"
+        #         f"  ↳ Test.....: {self.test_data.shape[0]} rows, "
+        #         f"{self.data.shape[1]} cols\n"
+        #         f"  ↳ CSV.data.: {csv_filename}\n"
+        #         f"  ↳ Ref.graph: {dot_filename}")
 
     def experiment_exists(self, name):
         """Checks whether the experiment exists in the output path"""
@@ -465,8 +465,16 @@ class Experiment(BaseExperiment):
         setattr(self, 'estimator', exp_object)
 
         if self.verbose:
-            print(f"Loaded '{exp_name}' from '{self.output_path}'")
+            print(f"Loaded '{exp_name}' ({self.model_type.upper()}) "
+                  f"from '{self.output_path}'")
+            fit_time = utils.format_time(self.rex.fit_time)
+            predict_time = utils.format_time(self.rex.predict_time)
+            print(f"This model took {fit_time[0]:.1f} {fit_time[1]} to fit, and "
+                f"{predict_time[0]:.1f} {predict_time[1]} to build predicted DAGs")
 
+        return self
+
+    def create_estimator(self, estimator_name, **kwargs):
         return self
 
     def save(self, exp_name=None, overwrite: bool = False):
