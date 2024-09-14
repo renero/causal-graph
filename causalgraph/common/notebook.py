@@ -362,7 +362,6 @@ class Experiment(BaseExperiment):
         Returns:
             Rex: The fitted experiment data.
         """
-        self.init_fit_time = time.time()
         self.estimator_name = estimator_name
         kwargs['model_type'] = self.model_type
 
@@ -371,12 +370,10 @@ class Experiment(BaseExperiment):
 
         pipeline = kwargs.pop('pipeline') if 'pipeline' in kwargs else None
 
-        estimator_object.fit(self.train_data, self.test_data, pipeline=pipeline)
+        estimator_object.fit(self.train_data, y=self.test_data, pipeline=pipeline)
 
         setattr(self, estimator_name, estimator_object)
         self.is_fitted = True
-        self.end_fit_time = time.time()
-        self.fit_time = self.end_fit_time - self.init_fit_time
 
         return self
 
@@ -390,13 +387,8 @@ class Experiment(BaseExperiment):
         Returns:
             Rex: The fitted experiment data.
         """
-        self.init_predict_time = time.time()
         estimator = getattr(self, self.estimator_name)
-
         estimator.predict(self.train_data, **kwargs)
-
-        self.end_predict_time = time.time()
-        self.predict_time = self.end_predict_time - self.init_predict_time
 
         return self
 
@@ -472,9 +464,6 @@ class Experiment(BaseExperiment):
             print(f"This model took {fit_time[0]:.1f} {fit_time[1]} to fit, and "
                 f"{predict_time[0]:.1f} {predict_time[1]} to build predicted DAGs")
 
-        return self
-
-    def create_estimator(self, estimator_name, **kwargs):
         return self
 
     def save(self, exp_name=None, overwrite: bool = False):

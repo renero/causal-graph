@@ -56,7 +56,7 @@ import inspect
 import numpy as np
 import optuna
 import pandas as pd
-from mlforge.progbar import ProgBar
+from mlforge.progbar import ProgBar  # type: ignore
 from sklearn.ensemble import (GradientBoostingClassifier,
                               GradientBoostingRegressor)
 from sklearn.preprocessing import StandardScaler
@@ -333,7 +333,6 @@ class GBTRegressor(GradientBoostingRegressor):
                 self.max_depth = trial.suggest_int("max_depth", 3, 20)
                 self.max_leaf_nodes = trial.suggest_int(
                     "max_leaf_nodes", 10, 1000)
-                # self.max_features = trial.suggest_categorical("max_features", ["auto", "sqrt", "log2"])
                 self.min_impurity_decrease = trial.suggest_float(
                     "min_impurity_decrease", 0.0, 0.5)
 
@@ -349,7 +348,6 @@ class GBTRegressor(GradientBoostingRegressor):
                     max_depth=self.max_depth,
                     min_impurity_decrease=self.min_impurity_decrease,
                     random_state=self.random_state,
-                    # max_features=self.max_features,
                     verbose=False,
                     max_leaf_nodes=self.max_leaf_nodes,
                     n_iter_no_change=self.n_iter_no_change,
