@@ -278,9 +278,18 @@ class ShapEstimator(BaseEstimator):
                 target_name, model, X_train, X_test)
 
             # Scale the SHAP values
-            scaler = StandardScaler()
-            self.shap_scaled_values[target_name] = scaler.fit_transform(
-                self.shap_values[target_name])
+            #
+            # XXX: Trying to assess the effect of scaling.
+            #
+            # scaler = StandardScaler()
+            # self.shap_scaled_values[target_name] = scaler.fit_transform(
+            #     self.shap_values[target_name])
+            #
+            self.shap_scaled_values[target_name] = self.shap_values[target_name]
+            #
+            # XXX: Look up
+            #
+
 
             # Create the order list of features, in decreasing mean SHAP value
             self.feature_order[target_name] = np.argsort(
