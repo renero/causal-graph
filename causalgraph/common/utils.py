@@ -26,8 +26,6 @@ import pydotplus
 import torch
 
 from causalgraph.independence.edge_orientation import get_edge_orientation
-from typing import List, Optional
-import networkx as nx
 
 AnyGraph = Union[nx.Graph, nx.DiGraph]
 
@@ -1159,3 +1157,4 @@ def combine_dags(
         inter, discrepancies, prior)
 
     return union, inter, union_cycles_removed, inter_cycles_removed
+

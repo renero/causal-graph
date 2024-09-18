@@ -18,14 +18,13 @@ from collections import defaultdict
 from os import path
 
 import matplotlib.pyplot as plt
+import networkx as nx
 import numpy as np
 import pandas as pd
-from rich.progress import Progress
 from sklearn.preprocessing import StandardScaler
 
 from causalgraph.common import plot, utils
-from causalgraph.common.utils import (graph_from_dot_file, load_experiment,
-                                      save_experiment)
+from causalgraph.common import utils
 from causalgraph.estimators.cam import CAM
 from causalgraph.estimators.fci.fci import FCI
 from causalgraph.estimators.ges.ges import GES
@@ -211,7 +210,7 @@ class BaseExperiment:
             frac=self.train_size, random_state=42)
         self.test_data = self.data.drop(self.train_data.index)
 
-        self.ref_graph = graph_from_dot_file(dot_filename)
+        self.ref_graph = utils.graph_from_dot_file(dot_filename)
 
         # if self.verbose:
         #     print(
@@ -312,8 +311,8 @@ class Experiment(BaseExperiment):
         csv_filename: str = None,
         dot_filename: str = None,
         model_type: str = 'nn',
-        input_path="/Users/renero/phd/data/RC3/",
-        output_path="/Users/renero/phd/output/RC3/",
+        input_path="/Users/renero/phd/data/RC4/",
+        output_path="/Users/renero/phd/output/RC4/",
         train_size: float = 0.9,
         random_state: int = 42,
         verbose=False
@@ -330,9 +329,9 @@ class Experiment(BaseExperiment):
             model_type (str, optional): The type of model to use. Defaults to 'nn'.
                 Other options are: 'gbt', 'pc', 'fci', 'ges' and 'lingam'.
             input_path (str, optional): The path to the input data.
-                Defaults to "/Users/renero/phd/data/RC3/".
+                Defaults to "/Users/renero/phd/data/RC4/".
             output_path (str, optional): The path to save the output.
-                Defaults to "/Users/renero/phd/output/RC3/".
+                Defaults to "/Users/renero/phd/output/RC4/".
             train_size (float, optional): The proportion of data to use for training.
                 Defaults to 0.9.
             random_state (int, optional): The random seed for reproducibility.
@@ -430,10 +429,10 @@ class Experiment(BaseExperiment):
             exp_name = self.experiment_name
 
         if self.model_type:
-            exp_object = load_experiment(
+            exp_object = utils.load_experiment(
                 f"{exp_name}_{self.model_type}", self.output_path)
         else:
-            exp_object = load_experiment(exp_name, self.output_path)
+            exp_object = utils.load_experiment(exp_name, self.output_path)
 
         # A priori, I don't know which estimator was used to train the experiment
         # so I have to check the type of the object
@@ -478,7 +477,7 @@ class Experiment(BaseExperiment):
             experiment with the same name. Defaults to False.
         """
         save_as = exp_name if exp_name is not None else self.experiment_name
-        where_to = save_experiment(
+        where_to = utils.save_experiment(
             f"{save_as}_{self.model_type}",
             self.output_path, getattr(self, self.estimator_name),
             overwrite)
@@ -487,149 +486,6 @@ class Experiment(BaseExperiment):
             print(f"Saved '{self.experiment_name}' to '{where_to}'")
 
         return where_to
-
-
-class Experiments(BaseExperiment):
-    """
-    Class representing a collection of experiments.
-
-    Parameters:
-    - input_pattern: str
-        The pattern used to match input files for the experiments.
-    - input_path: str, optional
-        The path to the input files. Default is "/Users/renero/phd/data/RC3/".
-    - output_path: str, optional
-        The path to save the output files. Default is "/Users/renero/phd/output/RC3/".
-    - train_anyway: bool, optional
-        Whether to train the experiment even if it already exists. Default is False.
-    - save_anyway: bool, optional
-        Whether to save the experiment even if it already exists. Default is False.
-    - train_size: float, optional
-        The proportion of the data to use for training. Default is 0.9.
-    - random_state: int, optional
-        The random state for reproducibility. Default is 42.
-    - verbose: bool, optional
-        Whether to print verbose output. Default is True.
-    """
-
-    estimator_name = None
-
-    def __init__(
-            self,
-            input_pattern,
-            input_path="/Users/renero/phd/data/RC3/",
-            output_path="/Users/renero/phd/output/RC3/",
-            train_anyway=False,
-            save_anyway=False,
-            train_size: float = 0.9,
-            random_state: int = 42,
-            verbose=True):
-
-        super().__init__(
-            input_path, output_path, train_anyway, save_anyway, train_size,
-            random_state, verbose)
-        self.input_files = self.list_files(input_pattern)
-        self.experiment_name = None
-
-        if self.verbose:
-            print(
-                f"Found {len(self.input_files)} files matching <{input_pattern}>")
-
-    def load(self, pattern=None) -> dict:
-        """
-        Loads all the experiments matching the input pattern.
-
-        Parameters:
-        - pattern: str, optional
-            The pattern used to match output files for loading experiments.
-            If not provided, the input pattern will be used.
-
-        Returns:
-        - dict
-            A dictionary containing the loaded experiments, where the keys are the
-                experiment names.
-        """
-        if pattern is not None:
-            pickle_files = self.list_files(pattern, where='output')
-        else:
-            pickle_files = self.input_files
-
-        self.experiment = {}
-        with Progress(transient=True) as progress:
-            task = progress.add_task(
-                "Loading experiments...", total=len(pickle_files))
-            for input_filename, pickle_filename in zip(self.input_files, pickle_files):
-                self.experiment_name = path.basename(pickle_filename)
-                self.input_name = path.basename(input_filename)
-                self.decide_what_to_do()
-
-                if self.load_experiment:
-                    self.experiment[self.experiment_name] = load_experiment(
-                        self.experiment_name, self.output_path)
-                    self.experiment[self.experiment_name].ref_graph = \
-                        graph_from_dot_file(
-                            f"{path.join(self.input_path, self.input_name)}.dot")
-                    if self.verbose:
-                        print(f"          ↳ Loaded {self.experiment_name} "
-                              f"({type(self.experiment[self.experiment_name])})")
-                    progress.update(task, advance=1, refresh=True,
-                                    visible=not self.verbose)
-                else:
-                    if self.verbose:
-                        print(
-                            f"No trained experiment for {pickle_filename}...")
-            progress.stop()
-
-        self.is_fitted = True
-        self.names = list(self.experiment.keys())
-        self.experiments = list(self.experiment.values())
-        return self
-
-    def fit(self, estimator="rex", save_as_pattern=None, **kwargs) -> list:
-        """
-        Fits the experiments.
-
-        Parameters:
-        - estimator: str, optional
-            The estimator to use. Default is "rex". Other options are "pc", "lingam",
-            "ges" and "fci".
-        - save_as_pattern: str, optional
-            The pattern used to save the experiments. "*" will be replaced with the
-            experiment name. If not provided, the experiment name will be used.
-
-        Returns:
-        - list
-            A list of the fitted experiments.
-        """
-        self.experiment = {}
-        for filename in self.input_files:
-            self.prepare_experiment_input(filename)
-            if save_as_pattern is None:
-                save_as = self.experiment_name
-            else:
-                save_as = save_as_pattern.replace("*", self.experiment_name)
-
-            if self.experiment_exists(save_as) and not self.train_anyway:
-                print(f"Experiment {save_as} already exists, skipping...")
-                continue
-
-            self.estimator_name = estimator
-            print(f"Training '{estimator}' on {filename}...")
-            # self.experiment[self.experiment_name] = Rex(
-            #     name=self.experiment_name, **kwargs)
-            self.experiment[self.experiment_name] = self.create_estimator(
-                estimator, name=self.experiment_name, **kwargs)
-            self.experiment[self.experiment_name].fit_predict(
-                train=self.train_data, test=self.test_data, ref_graph=self.ref_graph)
-
-            saved_to = save_experiment(
-                save_as, self.output_path, self.experiment[self.experiment_name])
-            print(f"\rSaved to: {saved_to}")
-
-        self.is_fitted = True
-        self.names = list(self.experiment.keys())
-        self.experiments = list(self.experiment.values())
-        return self
 
 
 def get_combined_metrics(subtype: str, where: str = None) -> dict:
@@ -649,7 +505,7 @@ def get_combined_metrics(subtype: str, where: str = None) -> dict:
         A dictionary with the metrics for all the experiments
     """
     if where is None:
-        where = "/Users/renero/phd/output/RC3/"
+        where = "/Users/renero/phd/output/RC4/"
     files = list_files(f"rex_generated_{subtype}_*_nn.pickle", where=where)
 
     metrics = defaultdict(list)
@@ -734,6 +590,51 @@ def get_combined_metrics(subtype: str, where: str = None) -> dict:
         metrics[key] = pd.DataFrame(metrics[key])
 
     return metrics
+
+
+def combined_dag_from_experiment(
+    full_path_filename: str,
+    combined: str,
+    prior: bool = False,
+    iterative: bool = False,
+    verbose: bool = False
+) -> nx.DiGraph:
+
+    raw_dag_names = ['G_shap', 'G_prior', 'G_iter', 'G_iter_prior']
+    combined_dag_names = ['un_G_shap', 'in_G_shap',
+                          'un_G_prior', 'in_G_prior',
+                          'un_G_iter', 'in_G_iter',
+                          'un_G_iter_prior', 'in_G_iter_prior']
+
+    dnn = Experiment(
+        full_path_filename, model_type='nn', verbose=verbose).load()
+    gbt = Experiment(
+        full_path_filename, model_type='gbt', verbose=verbose).load()
+
+    dags = defaultdict(nx.DiGraph)
+    for dag_name in raw_dag_names:
+        un_name = f'un_{dag_name}'
+        in_name = f'in_{dag_name}'
+        dag1 = getattr(dnn.rex, dag_name)
+        dag2 = getattr(gbt.rex, dag_name)
+        if 'prio' not in dag_name:
+            prior = None
+        else:
+            prior = dnn.rex.prior
+        _, _, dags[un_name], dags[in_name] = utils.combine_dags(
+            dag1, dag2, dnn.rex.shaps.shap_discrepancies, prior=prior)
+
+    comb = "un_G" if combined == 'union' else "in_G"
+    prior = "_prior" if prior else ""
+    iter = "_iter" if iterative else ""
+    if not prior and not iterative:
+        comb = comb + "_shap"
+
+    # Build the DAG name, from those in the 'combined_dag_names' list, based
+    # on the values from "comb", "prior", and "iter".
+    dag_name = comb + iter + prior
+
+    return dags[dag_name]
 
 
 def plot_combined_metrics(
