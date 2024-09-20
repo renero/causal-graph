@@ -353,7 +353,12 @@ class Rex(BaseEstimator, ClassifierMixin):
                     'ref_graph': ref_graph, 'predicted_graph': 'G_final'})
             ]
             self.predict_pipeline.from_list(steps)
-        self.predict_pipeline.run()
+
+        n_steps = self.fit_pipeline.len()
+        n_steps += self._steps_from_hpo(self.fit_pipeline)
+        n_steps += (self._steps_from_iterations(self.fit_pipeline))
+
+        self.predict_pipeline.run(n_steps)
         # Check if "G_final" exists in this object (self)
         if 'G_final' in self.__dict__:
             if '\\n' in self.G_final.nodes:
