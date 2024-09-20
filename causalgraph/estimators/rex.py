@@ -42,7 +42,6 @@ warnings.filterwarnings('ignore')
 # pylint: disable=W0106:expression-not-assigned, R1702:too-many-branches
 
 
-
 class Rex(BaseEstimator, ClassifierMixin):
     """
     Regression with Explainability (Rex) is a causal inference discovery that
@@ -176,7 +175,7 @@ class Rex(BaseEstimator, ClassifierMixin):
         self._fit_desc = "Running Causal Discovery pipeline"
         os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
-    def fit(self, X, y=None, pipeline: list|str=None):
+    def fit(self, X, y=None, pipeline: list | str = None):
         """Fit the model according to the given training data.
 
         Parameters
@@ -204,8 +203,9 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.y = copy(y) if y is not None else None
 
         # Create the pipeline for the training stages.
-        self.fit_pipeline = Pipeline(self, description="Fitting models", prog_bar=self.prog_bar,
-                            verbose=self.verbose, silent=self.silent, subtask=True)
+        self.fit_pipeline = Pipeline(
+            self, description="Fitting models", prog_bar=self.prog_bar,
+            verbose=self.verbose, silent=self.silent, subtask=True)
         if pipeline is not None:
             if isinstance(pipeline, list):
                 self.fit_pipeline.from_list(pipeline)
@@ -229,7 +229,7 @@ class Rex(BaseEstimator, ClassifierMixin):
 
         n_steps = self.fit_pipeline.len()
         n_steps += self._steps_from_hpo(self.fit_pipeline)
-        n_steps += ((self._steps_from_iterations(self.fit_pipeline)) * 2)
+        n_steps += (self._steps_from_iterations(self.fit_pipeline))
 
         self.fit_pipeline.run(n_steps)
         self.fit_pipeline.close()
@@ -424,7 +424,8 @@ class Rex(BaseEstimator, ClassifierMixin):
         # Assert that 'shaps' exists and has been fit
         check_is_fitted(self, "is_fitted_")
 
-        iter_adjacency_matrix = np.zeros((self.n_features_in_, self.n_features_in_))
+        iter_adjacency_matrix = np.zeros(
+            (self.n_features_in_, self.n_features_in_))
 
         for iter in range(num_iterations):
             data_sample = X.sample(frac=sampling_split,
@@ -504,7 +505,7 @@ class Rex(BaseEstimator, ClassifierMixin):
 
             if self.verbose:
                 print(f"Best tolerance: {self.tolerance:.2f}, "
-                    f"{key_metric}: {reference_key_metric:.4f}")
+                      f"{key_metric}: {reference_key_metric:.4f}")
 
         # Now, predict with selected tolerance
         return self.build_dag_from_iter_adj_matrix(
@@ -534,7 +535,8 @@ class Rex(BaseEstimator, ClassifierMixin):
         """
         assert isinstance(iter_adjacency_matrix, np.ndarray), \
             "Adjacency must be a 2D numpy array"
-        assert isinstance(tolerance, (int, float)), "Tolerance must be a number"
+        assert isinstance(tolerance, (int, float)
+                          ), "Tolerance must be a number"
         assert (tolerance <= 1.0) and (tolerance >= 0.0), \
             "Tolerance must be range between 0.0 and 1.0"
 
@@ -757,7 +759,8 @@ class Rex(BaseEstimator, ClassifierMixin):
         ref_graph = utils.graph_from_dot_file(os.path.join(
             os.path.expanduser("~/phd/data/RC4"), ref_graph_file))
 
-        root_nodes = [node for node, degree in ref_graph.in_degree() if degree == 0]
+        root_nodes = [node for node,
+                      degree in ref_graph.in_degree() if degree == 0]
         return [root_nodes, [node for node in ref_graph.nodes if node not in root_nodes]]
 
     def _steps_from_hpo(self, fit_steps) -> int:
@@ -798,13 +801,19 @@ class Rex(BaseEstimator, ClassifierMixin):
         -------
         int
         """
-        if fit_steps.contains_method('iterative_fit', exact_match=False):
+        num_iterations = 0
+        num_iterative_steps = fit_steps.contains_method(
+            'iterative_predict', exact_match=False)
+        if num_iterative_steps > 0:
             if fit_steps.contains_argument('num_iterations'):
-                return fit_steps.get_argument_value('num_iterations')
+                all_iterations = fit_steps.all_argument_values(
+                    'num_iterations')
+                if all_iterations != []:
+                    return sum(all_iterations)
             else:
-                return DEFAULT_ITERATIVE_TRIALS
+                num_iterations += DEFAULT_ITERATIVE_TRIALS
 
-        return 0
+        return num_iterations
 
     def _filter_adjacency_matrix(
             self,
@@ -914,7 +923,8 @@ def custom_main(dataset_name,
 
     # prior = get_prior(ref_graph)
     prior = rex.get_prior_from_ref_graph()
-    rex.predict(data, ref_graph, prior=prior, pipeline=".fast_predict_pipeline.yaml")
+    rex.predict(data, ref_graph, prior=prior,
+                pipeline=".fast_predict_pipeline.yaml")
 
     if save:
         where_to = utils.save_experiment(rex.name, output_path, rex)
