@@ -1,6 +1,6 @@
 """
 Main class for the REX estimator.
-(C) J. Renero, 2022, 2023
+(C) J. Renero, 2022, 2023, 2024
 """
 
 import os
@@ -29,6 +29,7 @@ from causalgraph.explainability.shapley import ShapEstimator
 from causalgraph.independence.graph_independence import GraphIndependence
 from causalgraph.metrics.compare_graphs import evaluate_graph
 from causalgraph.models import GBTRegressor, NNRegressor
+from joblib import Parallel, delayed
 
 np.set_printoptions(precision=4, linewidth=120)
 warnings.filterwarnings('ignore')
@@ -406,6 +407,7 @@ class Rex(BaseEstimator, ClassifierMixin):
             num_iterations: int = DEFAULT_ITERATIVE_TRIALS,
             sampling_split: float = 0.5,
             prior: list = None,
+            parallel: bool = True,
             random_state: int = 1234) -> np.ndarray:
         """
         Performs iterative prediction on the given directed acyclic graph (DAG)
@@ -429,20 +431,95 @@ class Rex(BaseEstimator, ClassifierMixin):
         # Assert that 'shaps' exists and has been fit
         check_is_fitted(self, "is_fitted_")
 
+        if self.verbose:
+            print(f"Building iterative adjacency matrix with {num_iterations} "
+                  f"iterations, {sampling_split:.2f} split.")
+
         iter_adjacency_matrix = np.zeros(
             (self.n_features_in_, self.n_features_in_))
 
-        for iter in range(num_iterations):
-            data_sample = X.sample(frac=sampling_split,
-                                   random_state=iter*random_state)
+        def process_iteration(iter):
+            data_sample = X.sample(frac=sampling_split, random_state=iter*random_state)
             self.shaps.fit(data_sample)
             dag = self.shaps.predict(data_sample, prior=prior)
-            iter_adjacency_matrix += utils.graph_to_adjacency(
-                dag, self.feature_names)
+            adjacency_matrix = utils.graph_to_adjacency(dag, self.feature_names)
+            if self.verbose:
+                print("· Iteration", iter+1, "done.")
+            return adjacency_matrix
+
+        if parallel:
+            results = Parallel(n_jobs=-1)(delayed(process_iteration)(iter) \
+                for iter in range(num_iterations))
+        else:
+            results = [process_iteration(iter) for iter in range(num_iterations)]
+
+        for result in results:
+            iter_adjacency_matrix += result
 
         iter_adjacency_matrix = iter_adjacency_matrix / num_iterations
 
         return iter_adjacency_matrix
+
+    def _find_best_tolerance(
+            self,
+            ref_graph,
+            key_metric,
+            direction,
+            iter_adjacency_matrix):
+        """
+        Finds the best tolerance value for the iterative predict method by iterating
+        over different tolerance values and selecting the one that gives the best
+        `key_metric` with respect to the reference graph.
+
+        Parameters
+        ----------
+        ref_graph : nx.DiGraph
+            The reference graph to evaluate the F1 score against.
+        key_metric : str
+            The key metric to evaluate. Defaults to 'f1'.
+            Possible values: 'f1', 'precision', 'recall', 'shd', sid', 'aupr',
+            'Tp', 'Tn', 'Fp', 'Fn'
+        direction : str
+            The direction of the key metric. Defaults to 'maximize'.
+            Possible values: 'maximize' or 'minimize'
+        iter_adjacency_matrix : np.ndarray
+            The adjacency matrix obtained from the iterative prediction.
+
+        Returns
+        -------
+        float : The best tolerance value.
+        """
+        if self.verbose:
+            print("Finding best tolerance value for iterative prediction...")
+
+            # This lambda expression is used to compare values, depending on the direction
+        _is_better_value = {
+            'maximize': lambda x, y: x >= y,
+            'minimize': lambda x, y: x < y
+        }[direction]
+
+        reference_key_metric = -100000.0 if direction == 'maximize' else +100000.0
+        self.iterative_metrics = []
+        best_tolerance = 0.0
+        for tol in np.arange(0.1, 1.0, 0.05):
+            dag = self.build_dag_from_iter_adj_matrix(
+                iter_adjacency_matrix, tolerance=tol)
+
+            metric = evaluate_graph(ref_graph, dag)
+            self.iterative_metrics.append(metric)
+            value_obtained = getattr(metric, key_metric)
+            if _is_better_value(value_obtained, reference_key_metric):
+                reference_key_metric = value_obtained
+                best_tolerance = tol
+                if self.verbose:
+                    print(f"· · Better tolerance found: {best_tolerance:.2f}, "
+                          f"{key_metric}: {reference_key_metric:.4f}")
+
+        if self.verbose:
+            print(f"Best tolerance: {best_tolerance:.2f}, "
+                  f"{key_metric}: {reference_key_metric:.4f}")
+
+        return best_tolerance
 
     def iterative_predict(
             self,
@@ -454,7 +531,8 @@ class Rex(BaseEstimator, ClassifierMixin):
             random_state: int = 1234,
             tolerance: Union[float, str] = 'auto',
             key_metric: str = 'f1',
-            direction: str = 'maximize') -> nx.DiGraph:
+            direction: str = 'maximize',
+            parallel: bool=True) -> nx.DiGraph:
         """
         Finds the best tolerance value for the iterative predict method by iterating
         over different tolerance values and selecting the one that gives the best
@@ -474,6 +552,8 @@ class Rex(BaseEstimator, ClassifierMixin):
         direction : str, optional
             The direction of the key metric. Defaults to 'maximize'.
             Possible values: 'maximize' or 'minimize'
+        parallel: bool, optional
+            Whether to run the iterations in parallel. Defaults to True.
 
         Returns
         -------
@@ -484,33 +564,20 @@ class Rex(BaseEstimator, ClassifierMixin):
         if direction != 'maximize' and direction != 'minimize':
             raise ValueError("direction must be 'maximize' or 'minimize'")
 
+        if self.verbose:
+            print(f"Iterative prediction with {num_iterations} iterations, and "
+                  f"{sampling_split:.2f} sampling split.")
+            m = evaluate_graph(ref_graph, self.G_shap)
+            print(f"Base {key_metric}: {getattr(m, key_metric):.4f}")
+
         iter_adjacency_matrix = self._build_iterative_adjacency_matrix(
-            X, num_iterations, sampling_split, prior, random_state)
+            X, num_iterations, sampling_split, prior, parallel, random_state)
 
         if tolerance == 'auto':
-            # This lambda expression is used to compare values, depending on the direction
-            _is_better_value = {
-                'maximize': lambda x, y: x >= y,
-                'minimize': lambda x, y: x < y
-            }[direction]
-
-            reference_key_metric = -100000.0 if direction == 'maximize' else +100000.0
-            self.iterative_metrics = []
-            self.tolerance = 0.0
-            for tol in np.arange(0.1, 1.0, 0.05):
-                dag = self.build_dag_from_iter_adj_matrix(
-                    iter_adjacency_matrix, tolerance=tol)
-
-                metric = evaluate_graph(ref_graph, dag)
-                self.iterative_metrics.append(metric)
-                value_obtained = getattr(metric, key_metric)
-                if _is_better_value(value_obtained, reference_key_metric):
-                    reference_key_metric = value_obtained
-                    self.tolerance = tol
-
-            if self.verbose:
-                print(f"Best tolerance: {self.tolerance:.2f}, "
-                      f"{key_metric}: {reference_key_metric:.4f}")
+            self.tolerance = self._find_best_tolerance(
+                ref_graph, key_metric, direction, iter_adjacency_matrix)
+        else:
+            self.tolerance = tolerance
 
         # Now, predict with selected tolerance
         return self.build_dag_from_iter_adj_matrix(
@@ -902,68 +969,65 @@ class Rex(BaseEstimator, ClassifierMixin):
 def custom_main(dataset_name,
                 input_path="/Users/renero/phd/data/RC4/",
                 output_path="/Users/renero/phd/output/RC4/",
+                load_model: bool = False,
+                fit_model: bool = True,
+                predict_model: bool = True,
+                iterative_predict: bool = False,
                 scale_data: bool = False,
                 tune_model: bool = False,
-                model_type="nn", explainer="gradient",
+                model_type="nn",
+                explainer="gradient",
                 save=False):
-
-    def get_prior(ref_graph):
-        root_nodes = [n for n, d in ref_graph.in_degree() if d == 0]
-        return [root_nodes, [n for n in ref_graph.nodes if n not in root_nodes]]
+    """
+    Custom main function to run the pipeline with the given dataset.
+    Specially useful for testing and debugging.
+    """
 
     ref_graph = utils.graph_from_dot_file(f"{input_path}{dataset_name}.dot")
     data = pd.read_csv(f"{input_path}{dataset_name}.csv")
     if scale_data:
         scaler = StandardScaler()
         data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)
-    train = data.sample(frac=0.8, random_state=42)
-    test = data.drop(train.index)
 
-    rex = Rex(
-        name=dataset_name, tune_model=tune_model,
-        model_type=model_type, explainer=explainer, hpo_n_trials=1)
+    if load_model:
+        rex: Rex = utils.load_experiment(f"{dataset_name}_{model_type}", output_path)
+    else:
+        rex = Rex(
+            name=dataset_name, tune_model=tune_model,
+            model_type=model_type, explainer=explainer, hpo_n_trials=1)
 
-    # rex.fit_predict(train, test, ref_graph, prior=get_prior(ref_graph))
-    rex.fit(data, pipeline=".fast_fit_pipeline.yaml")
+    # Disable progress bar
+    rex.prog_bar = False
+    rex.verbose = True
+    rex.shaps.prog_bar = False
+    rex.shaps.verbose = True
 
-    # prior = get_prior(ref_graph)
-    prior = rex.get_prior_from_ref_graph()
-    rex.predict(data, ref_graph, prior=prior,
-                pipeline=".fast_predict_pipeline.yaml")
+    if fit_model:
+        rex.fit(data, pipeline=".fast_fit_pipeline.yaml")
+
+    if predict_model:
+        prior = rex.get_prior_from_ref_graph()
+        rex.predict(data, ref_graph, prior=prior,
+                    pipeline=".fast_predict_pipeline.yaml")
+
+    if iterative_predict:
+        prior = rex.get_prior_from_ref_graph()
+        rex.iterative_predict(
+            data, ref_graph, prior=prior, num_iterations=10, parallel=False)
 
     if save:
         where_to = utils.save_experiment(rex.name, output_path, rex)
         print(f"Saved '{rex.name}' to '{where_to}'")
 
 
-def prior_main(dataset_name,
-               input_path="/Users/renero/phd/data/RC3/",
-               output_path="/Users/renero/phd/output/RC4/",
-               model_type="nn"):
-    from causalgraph.common.notebook import Experiment
-
-    experiment_name = f"{dataset_name}_{model_type}"
-    data = pd.read_csv(f"{input_path}{dataset_name}.csv")
-    scaler = StandardScaler()
-    data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)
-    experiment = Experiment(dataset_name, output_path=output_path).load()
-    print(f"Loaded {experiment_name} from {experiment.output_path}")
-
-    def get_prior(ref_graph):
-        root_nodes = [n for n, d in ref_graph.in_degree() if d == 0]
-        return [root_nodes, [n for n in ref_graph.nodes if n not in root_nodes]]
-
-    # train = exp_prior.rex.X
-    experiment.rex.verbose = True
-    experiment.rex.G_shap = experiment.rex.shaps.predict(
-        experiment.rex.X, prior=get_prior(experiment.ref_graph))
-
-
 if __name__ == "__main__":
-    custom_main('generated_10vars_linear_0',
+    custom_main('generated_15vars_linear_0',
                 input_path="/Users/renero/phd/data/RC4/",
                 model_type="nn",
                 explainer="gradient",
+                load_model=True,
+                fit_model=False,
+                predict_model=False,
+                iterative_predict=True,
                 tune_model=False,
                 save=False)
-    # prior_main('rex_generated_gp_add_5')
