@@ -616,6 +616,8 @@ class Rex(BaseEstimator, ClassifierMixin):
             iter_adjacency_matrix, tolerance)
 
         dag = utils.graph_from_adjacency(filtered_matrix, self.feature_names)
+        dag = utils.break_cycles_if_present(
+            dag, self.shaps.shap_discrepancies, self.prior, verbose=self.verbose)
 
         return dag
 

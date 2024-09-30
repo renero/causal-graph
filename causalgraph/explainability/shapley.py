@@ -34,8 +34,7 @@ from sklearn.discriminant_analysis import StandardScaler
 from sklearn.metrics import r2_score
 from sklearn.model_selection import train_test_split
 from sklearn.utils.validation import check_is_fitted
-from mlforge.progbar import ProgBar
-# from tqdm.auto import tqdm
+from mlforge.progbar import ProgBar  # type: ignore
 
 from causalgraph.common import *
 from causalgraph.common import utils
@@ -214,7 +213,7 @@ class ShapEstimator(BaseEstimator):
         self.feature_names = list(self.models.regressor.keys())
         self.shap_explainer = {}
         self.shap_values = {}
-        self.shap_scaled_values = {}
+        # self.shap_scaled_values = {}
         self.shap_mean_values = {}
         self.feature_order = {}
         self.all_mean_shap_values = []
@@ -274,33 +273,28 @@ class ShapEstimator(BaseEstimator):
             X_test = self.X_test.drop(target_name, axis=1).values
 
             # Run the selected SHAP explainer
-            self._run_selected_shap_explainer(
+            self.shap_values[target_name] = self._run_selected_shap_explainer(
                 target_name, model, X_train, X_test)
 
-            # Scale the SHAP values
-            #
-            # XXX: Trying to assess the effect of scaling.
-            #
-            # scaler = StandardScaler()
-            # self.shap_scaled_values[target_name] = scaler.fit_transform(
-            #     self.shap_values[target_name])
-            #
-            self.shap_scaled_values[target_name] = self.shap_values[target_name]
-            #
-            # XXX: Look up
-            #
-
+            # self.shap_scaled_values[target_name] = self.shap_values[target_name]
 
             # Create the order list of features, in decreasing mean SHAP value
             self.feature_order[target_name] = np.argsort(
-                np.sum(np.abs(self.shap_scaled_values[target_name]), axis=0))
+                np.sum(np.abs(self.shap_values[target_name]), axis=0))
             self.shap_mean_values[target_name] = np.abs(
-                self.shap_scaled_values[target_name]).mean(0)
+                self.shap_values[target_name]).mean(0)
             self.all_mean_shap_values.append(
                 self.shap_mean_values[target_name])
             if self.verbose:
                 print(f"  Feature order for '{target_name}' "
                       f"{self.feature_order[target_name]}")
+                print(f"  Target({target_name}) -> ", end="")
+                srcs = [src for src in self.feature_names if src != target_name]
+                for i in range(len(self.shap_mean_values[target_name])):
+                    print(
+                        f"{srcs[i]}:{self.shap_mean_values[target_name][i]:.3f};", end="")
+                print()
+
 
             # Add zeroes to positions of correlated features
             if self.correlation_th is not None:
@@ -351,30 +345,32 @@ class ShapEstimator(BaseEstimator):
 
         Returns
         -------
-        shap.Explainer
-            The SHAP explainer.
+        shap_values : np.ndarray
+            The SHAP values for the given target.
         """
         if self.explainer == "kernel":
             self.shap_explainer[target_name] = shap.KernelExplainer(
                 model.predict, X_train)
-            self.shap_values[target_name] = self.shap_explainer[target_name].\
+            shap_values = self.shap_explainer[target_name].\
                 shap_values(X_test)[0]
         elif self.explainer == "gradient":
             X_train_tensor = torch.from_numpy(X_train).float()
             X_test_tensor = torch.from_numpy(X_test).float()
             self.shap_explainer[target_name] = shap.GradientExplainer(
                 model.to(self.device), X_train_tensor.to(self.device))
-            self.shap_values[target_name] = self.shap_explainer[target_name](
+            shap_values = self.shap_explainer[target_name](
                 X_test_tensor.to(self.device)).values
         elif self.explainer == "explainer":
             self.shap_explainer[target_name] = shap.Explainer(
                 model.predict, X_train)
             explanation = self.shap_explainer[target_name](X_test)
-            self.shap_values[target_name] = explanation.values
+            shap_values = explanation.values
         else:
             raise ValueError(
                 f"Unknown explainer: {self.explainer}. "
                 f"Please select one of: kernel, gradient, explainer.")
+
+        return shap_values
 
     def _add_zeroes(self, target, correlated_features):
         features = [f for f in self.feature_names if f != target]
@@ -391,6 +387,23 @@ class ShapEstimator(BaseEstimator):
         """
         Builds a causal graph from the shap values using a selection mechanism based
         on clustering, knee or abrupt methods.
+
+        Parameters
+        ----------
+        X : pd.DataFrame
+            The input data. Consists of all the features in a pandas DataFrame.
+        root_causes : List[str], optional
+            The root causes of the graph. If None, all features are considered as
+            root causes, by default None.
+        prior : List[List[str]], optional
+            The prior knowledge about the connections between the features. If None,
+            all features are considered as valid candidates for the connections, by
+            default None.
+
+        Returns
+        -------
+        nx.DiGraph
+            The causal graph.
         """
         if self.verbose:
             print("-----\nshap.predict()")
@@ -445,7 +458,7 @@ class ShapEstimator(BaseEstimator):
 
             # Select the features that are connected to the target
             self.connections[target] = select_features(
-                values=self.shap_scaled_values[target],
+                values=self.shap_values[target],
                 feature_names=feature_names_wo_target,
                 min_impact=self.min_impact,
                 exhaustive=self.exhaustive,
@@ -454,21 +467,21 @@ class ShapEstimator(BaseEstimator):
             pbar.update_subtask(
                 pbar_name, target_idx + 3) if pbar else None
 
-        G_shap = utils.digraph_from_connected_features(
+        dag = utils.digraph_from_connected_features(
             X, self.feature_names, self.models, self.connections, root_causes, prior,
             reciprocity=self.reciprocity, anm_iterations=self.iters,
             verbose=self.verbose)
         pbar.update_subtask(pbar_name, len(
             self.feature_names) + 3) if pbar else None
 
-        G_shap = utils.break_cycles_if_present(
-            G_shap, self.shap_discrepancies, self.prior, verbose=self.verbose)
+        dag = utils.break_cycles_if_present(
+            dag, self.shap_discrepancies, self.prior, verbose=self.verbose)
         pbar.update_subtask(pbar_name, len(
             self.feature_names) + 4) if pbar else None
 
         pbar.remove(pbar_name) if pbar else None
 
-        return G_shap
+        return dag
 
     def adjust(
             self,
@@ -530,7 +543,7 @@ class ShapEstimator(BaseEstimator):
                 # Take the data that is needed at this iteration
                 parent_data = X_features[parent_name].values
                 parent_pos = feature_names.index(parent_name)
-                shap_data = self.shap_scaled_values[target_name][:, parent_pos]
+                shap_data = self.shap_values[target_name][:, parent_pos]
 
                 # Form three vectors to compute the discrepancy
                 x = parent_data.reshape(-1, 1)
@@ -988,7 +1001,7 @@ def custom_main(exp_name,
     rex.shaps.predict(test, rex.root_causes)
 
 
-def shachs_main():
+def sachs_main():
     experiment_name = "sachs_long"
     path = "/Users/renero/phd/data/RC3/"
     output_path = "/Users/renero/phd/output/RC3/"

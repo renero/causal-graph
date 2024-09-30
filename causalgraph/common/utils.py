@@ -793,15 +793,19 @@ def graph_from_adjacency_file(file: Union[Path, str], th=0.0) -> Tuple[
     return G, df
 
 
-def graph_to_adjacency(graph: AnyGraph,
-                       node_names: Optional[List[str]] = None,
-                       weight_label: str = "weight") -> np.ndarray:
+def graph_to_adjacency(
+        graph: AnyGraph,
+        labels: List[str],
+        weight_label: str = "weight") -> np.ndarray:
     """
     A method to generate the adjacency matrix of the graph. Labels are
     sorted for better readability.
 
     Args:
         graph: (Union[Graph, DiGraph]) the graph to be converted.
+        node_names: (List[str]) the list of node names to be used. If None, the
+            node names are extracted from the graph. The names must be already
+            sorted in the same order as the adjacency matrix.
         weight_label: the label used to identify the weights.
 
     Return:
@@ -809,16 +813,19 @@ def graph_to_adjacency(graph: AnyGraph,
             the graph.
     """
     symbol_map = {"o": 1, ">": 2, "-": 3}
-    labels = sorted(list(graph.nodes))  # [node for node in self]
-    # Double check if all nodes are in the graph
-    if node_names is not None:
-        for n in list(node_names):
-            if n not in set(labels):
-                labels.append(n)
-        labels = sorted(labels)
+    # labels = list(graph.nodes)
+
+    # # Double check if all nodes are in the graph
+    # if node_names is not None:
+    #     for n in list(node_names):
+    #         if n not in set(labels):
+    #             labels.append(n)
+    #     labels = sorted(labels)
+
     # Fix for the case where an empty node is parsed from the .dot file
     if '\\n' in labels:
         labels.remove('\\n')
+
     mat = np.zeros((len(labels), (len(labels))))
     for x in labels:
         for y in labels:

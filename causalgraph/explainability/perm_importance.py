@@ -599,5 +599,5 @@ if __name__ == "__main__":
         rex.models, n_repeats=10, prog_bar=False, verbose=True)
     pi.fit(data)
     pi.predict(data, rex.root_causes)
-    pi.plot(fig_size=(7, 5))
+    pi.plot(figsize=(7, 5))
     plt.show()

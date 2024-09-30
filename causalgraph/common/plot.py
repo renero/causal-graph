@@ -154,7 +154,7 @@ def subplots(
         fig: Figure
             The figure containing the subplots.
     """
-    fig_size = kwargs.pop("fig_size", (8, 6))
+    figsize = kwargs.pop("figsize", (8, 6))
     title = kwargs.pop("title", None)
     num_cols = kwargs.pop("num_cols", 4)
     setup_plot(**kwargs)
@@ -183,7 +183,7 @@ def subplots(
         return ax[i][j]
 
     plt.rcParams.update({'font.size': 8})
-    fig, ax = plt.subplots(num_rows, num_cols, figsize=fig_size)
+    fig, ax = plt.subplots(num_rows, num_cols, figsize=figsize)
     for i in range(num_rows):
         for j in range(num_cols):
             index = i * num_cols + j
