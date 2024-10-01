@@ -442,14 +442,16 @@ class Rex(BaseEstimator, ClassifierMixin):
             data_sample = X.sample(frac=sampling_split, random_state=iter*random_state)
 
             # Disable progress_bar in parallel execution
-            pb_state = self.shaps.prog_bar
-            self.shaps.prog_bar = False
+            if parallel:
+                pb_state = self.shaps.prog_bar
+                self.shaps.prog_bar = False
 
             self.shaps.fit(data_sample)
             dag = self.shaps.predict(data_sample, prior=prior)
 
             # Restate progress_bar to original state
-            self.shaps.prog_bar = pb_state
+            if parallel:
+                self.shaps.prog_bar = pb_state
 
             adjacency_matrix = utils.graph_to_adjacency(dag, self.feature_names)
             if self.verbose:

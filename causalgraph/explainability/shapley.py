@@ -216,7 +216,7 @@ class ShapEstimator(BaseEstimator):
         # self.shap_scaled_values = {}
         self.shap_mean_values = {}
         self.feature_order = {}
-        self.all_mean_shap_values = []
+        self.all_mean_shap_values = np.empty((0, ), dtype=np.float16)
 
         # Who is calling me?
         try:
@@ -283,8 +283,9 @@ class ShapEstimator(BaseEstimator):
                 np.sum(np.abs(self.shap_values[target_name]), axis=0))
             self.shap_mean_values[target_name] = np.abs(
                 self.shap_values[target_name]).mean(0)
-            self.all_mean_shap_values.append(
-                self.shap_mean_values[target_name])
+            self.all_mean_shap_values = np.concatenate(
+                (self.all_mean_shap_values,
+                 self.shap_mean_values[target_name]))
             if self.verbose:
                 print(f"  Feature order for '{target_name}' "
                       f"{self.feature_order[target_name]}")
@@ -295,7 +296,6 @@ class ShapEstimator(BaseEstimator):
                         f"{srcs[i]}:{self.shap_mean_values[target_name][i]:.3f};", end="")
                 print()
 
-
             # Add zeroes to positions of correlated features
             if self.correlation_th is not None:
                 self._add_zeroes(
@@ -304,8 +304,7 @@ class ShapEstimator(BaseEstimator):
             pbar.update_subtask(pbar_name, target_idx + 1) if pbar else None
 
         pbar.remove(pbar_name) if pbar else None
-        self.all_mean_shap_values = np.array(
-            self.all_mean_shap_values).flatten()
+        self.all_mean_shap_values = self.all_mean_shap_values.flatten()
         self._compute_scaled_shap_threshold()
 
         # Leave X_train and X_test as they originally were
@@ -454,7 +453,8 @@ class ShapEstimator(BaseEstimator):
             print(
                 f"Selecting features for target {target}...") if self.verbose else None
 
-            feature_names_wo_target = [f for f in self.feature_names if f != target]
+            feature_names_wo_target = [
+                f for f in self.feature_names if f != target]
 
             # Select the features that are connected to the target
             self.connections[target] = select_features(
@@ -684,7 +684,7 @@ class ShapEstimator(BaseEstimator):
                         # the target and feature nodes, reverse the edge back to
                         # its original direction and log the decision as discarded.
                         if len(cycles) > 0 and \
-                            self._nodes_in_cycles(cycles, feature, target):
+                                self._nodes_in_cycles(cycles, feature, target):
                             new_graph.remove_edge(target, feature)
                             edges_reversed.remove((feature, target))
                             new_graph.add_edge(feature, target)
@@ -938,7 +938,7 @@ class ShapEstimator(BaseEstimator):
         fig = ax.figure if fig is None else fig
         return fig
 
-    def _plot_discrepancies(self, target_name: str, threshold:float=10.0, **kwargs):
+    def _plot_discrepancies(self, target_name: str, threshold: float = 10.0, **kwargs):
         """
         Plot the discrepancies between the target variable and each feature.
 
