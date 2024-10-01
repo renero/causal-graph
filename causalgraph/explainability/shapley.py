@@ -363,7 +363,7 @@ class ShapEstimator(BaseEstimator):
         elif self.explainer == "explainer":
             self.shap_explainer[target_name] = shap.Explainer(
                 model.predict, X_train)
-            explanation = self.shap_explainer[target_name](X_test)
+            explanation = self.shap_explainer[target_name](X_test, silent=True)
             shap_values = explanation.values
         else:
             raise ValueError(

@@ -121,6 +121,11 @@ synth_data_labels = ['Linear', 'Polynomial',
 metric_columns = ['method', 'data_type', 'f1', 'precision',
                   'recall', 'aupr', 'Tp', 'Tn', 'Fp', 'Fn', 'shd', 'sid',
                   'n_edges', 'ref_n_edges', 'diff_edges', 'name']
+RAW_DAG_NAMES = ['G_shap', 'G_prior', 'G_iter', 'G_iter_prior']
+COMBINED_DAG_NAMES = ['un_G_shap', 'in_G_shap',
+                      'un_G_prior', 'in_G_prior',
+                      'un_G_iter', 'in_G_iter',
+                      'un_G_iter_prior', 'in_G_iter_prior']
 
 
 def list_files(input_pattern: str, where: str) -> list:
@@ -369,7 +374,8 @@ class Experiment(BaseExperiment):
 
         pipeline = kwargs.pop('pipeline') if 'pipeline' in kwargs else None
 
-        estimator_object.fit(self.train_data, y=self.test_data, pipeline=pipeline)
+        estimator_object.fit(
+            self.train_data, y=self.test_data, pipeline=pipeline)
 
         setattr(self, estimator_name, estimator_object)
         self.is_fitted = True
@@ -460,8 +466,8 @@ class Experiment(BaseExperiment):
                   f"from '{self.output_path}'")
             fit_time = utils.format_time(self.rex.fit_time)
             predict_time = utils.format_time(self.rex.predict_time)
-            print(f"This model took {fit_time[0]:.1f} {fit_time[1]} to fit, and "
-                f"{predict_time[0]:.1f} {predict_time[1]} to build predicted DAGs")
+            print(f"This model took {fit_time[0]:.1f}{fit_time[1]}. to fit, and "
+                  f"{predict_time[0]:.1f}{predict_time[1]}. to build predicted DAGs")
 
         return self
 
@@ -600,19 +606,13 @@ def combined_dag_from_experiment(
     verbose: bool = False
 ) -> nx.DiGraph:
 
-    raw_dag_names = ['G_shap', 'G_prior', 'G_iter', 'G_iter_prior']
-    combined_dag_names = ['un_G_shap', 'in_G_shap',
-                          'un_G_prior', 'in_G_prior',
-                          'un_G_iter', 'in_G_iter',
-                          'un_G_iter_prior', 'in_G_iter_prior']
-
     dnn = Experiment(
         full_path_filename, model_type='nn', verbose=verbose).load()
     gbt = Experiment(
         full_path_filename, model_type='gbt', verbose=verbose).load()
 
     dags = defaultdict(nx.DiGraph)
-    for dag_name in raw_dag_names:
+    for dag_name in RAW_DAG_NAMES:
         un_name = f'un_{dag_name}'
         in_name = f'in_{dag_name}'
         dag1 = getattr(dnn.rex, dag_name)

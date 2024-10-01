@@ -448,7 +448,7 @@ class Rex(BaseEstimator, ClassifierMixin):
             return adjacency_matrix
 
         if parallel:
-            results = Parallel(n_jobs=-1)(delayed(process_iteration)(iter) \
+            results = Parallel(n_jobs=-1, prefer="threads")(delayed(process_iteration)(iter)
                 for iter in range(num_iterations))
         else:
             results = [process_iteration(iter) for iter in range(num_iterations)]
@@ -816,7 +816,7 @@ class Rex(BaseEstimator, ClassifierMixin):
 
         return self.G_rho
 
-    def get_prior_from_ref_graph(self) -> List[List[str]]:
+    def get_prior_from_ref_graph(self, input_path) -> List[List[str]]:
         """
         Get the prior from a reference graph.
 
@@ -831,7 +831,7 @@ class Rex(BaseEstimator, ClassifierMixin):
         ref_graph_file = self.name.replace(f"_{self.model_type}", "")
         ref_graph_file = f"{ref_graph_file}.dot"
         ref_graph = utils.graph_from_dot_file(os.path.join(
-            os.path.expanduser("~/phd/data/RC4"), ref_graph_file))
+            input_path, ref_graph_file))
 
         root_nodes = [node for node,
                       degree in ref_graph.in_degree() if degree == 0]
@@ -1008,12 +1008,12 @@ def custom_main(dataset_name,
         rex.fit(data, pipeline=".fast_fit_pipeline.yaml")
 
     if predict_model:
-        prior = rex.get_prior_from_ref_graph()
+        prior = rex.get_prior_from_ref_graph(input_path)
         rex.predict(data, ref_graph, prior=prior,
                     pipeline=".fast_predict_pipeline.yaml")
 
     if iterative_predict:
-        prior = rex.get_prior_from_ref_graph()
+        prior = rex.get_prior_from_ref_graph(input_path)
         rex.iterative_predict(
             data, ref_graph, prior=prior, num_iterations=10, parallel=False)
 
