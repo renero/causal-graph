@@ -774,20 +774,33 @@ def graph_from_adjacency(
     return G
 
 
-def graph_from_adjacency_file(file: Union[Path, str], th=0.0) -> Tuple[
-        nx.DiGraph, pd.DataFrame]:
+def graph_from_adjacency_file(
+        file: Union[Path, str],
+        labels=None,
+        th=0.0,
+        sep=",",
+        header:bool=True
+) -> Tuple[nx.DiGraph, pd.DataFrame]:
     """
     Read Adjacency matrix from a file and return a Graph
 
     Args:
         file: (str) the full path of the file to read
+        labels: (List[str]) the list of node names to be used. If None, the
+            node names are extracted from the adj file. The names must be already
+            sorted in the same order as the adjacency matrix.
         th: (float) weight threshold to be considered a valid edge.
+        sep: (str) the separator used in the file
+        header: (bool) whether the file has a header. If True, then 'infer' is used
+            to read the header.
     Returns:
         DiGraph, DataFrame
     """
-    df = pd.read_csv(file, dtype="str")
+    header_infer = "infer" if header else None
+    df = pd.read_csv(file, dtype="str", delimiter=sep, header=header_infer)
     df = df.astype("float64")
-    labels = list(df)
+    if labels is None:
+        labels = list(df.columns)
     G = graph_from_adjacency(df.values, node_labels=labels, th=th)
 
     return G, df
@@ -1164,4 +1177,3 @@ def combine_dags(
         inter, discrepancies, prior)
 
     return union, inter, union_cycles_removed, inter_cycles_removed
-

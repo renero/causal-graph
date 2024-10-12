@@ -105,7 +105,13 @@ method_labels = {
     'pc': r'$\textrm{PC}$',
     'fci': r'$\textrm{FCI}$',
     'ges': r'$\textrm{GES}$',
-    'lingam': r'$\textrm{LiNGAM}$'
+    'lingam': r'$\textrm{LiNGAM}$',
+    'G_pc': r'$\textrm{PC}$',
+    'G_fci': r'$\textrm{FCI}$',
+    'G_ges': r'$\textrm{GES}$',
+    'G_lingam': r'$\textrm{LiNGAM}$',
+    'G_cam': r'$\textrm{CAM}$',
+    'un_G_iter': r'$\textrm{R\textsc{e}X}$'
 }
 estimators = {
     'rex': Rex,
@@ -752,12 +758,16 @@ def plot_score_by_subtype(
     Optional parameters:
     - figsize (tuple, optional): The size of the figure. Default is (2, 1).
     - dpi (int, optional): The resolution of the figure in dots per inch. Default is 300.
+    - method_column (str, optional): The name of the column in the metrics dataframe
+        that contains the method name. Default is 'method'.
 
     Returns:
     None
     """
     figsize_ = kwargs.get('figsize', (9, 5))
     dpi_ = kwargs.get('dpi', 300)
+    method_column = kwargs.get('method_column', 'method')
+
     if methods is None:
         methods = ['rex_intersection', 'rex_union',
                    'pc', 'fci', 'ges', 'lingam']
@@ -773,7 +783,7 @@ def plot_score_by_subtype(
             sub_df = metrics
         else:
             sub_df = metrics[metrics['data_type'] == subtype]
-        metric_values = [sub_df[sub_df['method'] == m][score_name]
+        metric_values = [sub_df[sub_df[method_column] == m][score_name]
                          for m in methods]
         ax.boxplot(metric_values)
         ax.set_xticklabels(labels=x_labels, fontsize=6)
@@ -854,6 +864,7 @@ def plot_scores_by_method(
     """
     figsize_ = kwargs.get('figsize', (9, 5))
     dpi_ = kwargs.get('dpi', 300)
+    method_column = kwargs.get('method_column', 'method')
     if methods is None:
         methods = ['rex_mlp', 'rex_gbt', 'rex_intersection', 'rex_union']
 
@@ -864,7 +875,7 @@ def plot_scores_by_method(
     ax_labels = list(axs.keys())
     for i, metric in enumerate(what):
         ax = axs[ax_labels[i]]
-        metric_values = [metrics[metrics['method'] == m][metric]
+        metric_values = [metrics[metrics[method_column] == m][metric]
                          for m in methods]
 
         ax.boxplot(metric_values)
@@ -919,6 +930,8 @@ def plot_score_by_method(metrics, metric, methods, **kwargs):
         - title: The title of the plot. Default is None.
         - pdf_filename: The filename to save the plot to. If None, the plot
             will be displayed on screen, otherwise it will be saved to the
+        - method_column: The name of the column containing the method names.
+            Default is 'method'.
 
     Returns:
     None
@@ -929,13 +942,14 @@ def plot_score_by_method(metrics, metric, methods, **kwargs):
     dpi_ = kwargs.get('dpi', 300)
     title_ = kwargs.get('title', None)
     pdf_filename = kwargs.get('pdf_filename', None)
+    method_column = kwargs.get('method_column', 'method')
 
     if methods is None:
         methods = ['rex_mlp', 'rex_gbt', 'rex_intersection', 'rex_union']
 
     _, ax = plt.subplots(1, 1, figsize=figsize_, dpi=dpi_)
 
-    metric_values = [metrics[metrics['method'] == m][metric]
+    metric_values = [metrics[metrics[method_column] == m][metric]
                      for m in methods]
 
     plt.boxplot(metric_values)
