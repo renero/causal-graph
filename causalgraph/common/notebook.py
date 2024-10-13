@@ -106,6 +106,7 @@ method_labels = {
     'fci': r'$\textrm{FCI}$',
     'ges': r'$\textrm{GES}$',
     'lingam': r'$\textrm{LiNGAM}$',
+    'cam': r'$\textrm{CAM}$',
     'G_pc': r'$\textrm{PC}$',
     'G_fci': r'$\textrm{FCI}$',
     'G_ges': r'$\textrm{GES}$',
@@ -769,15 +770,14 @@ def plot_score_by_subtype(
     method_column = kwargs.get('method_column', 'method')
 
     if methods is None:
-        methods = ['rex_intersection', 'rex_union',
-                   'pc', 'fci', 'ges', 'lingam']
+        methods = ['pc', 'fci', 'ges', 'lingam', 'cam', 'un_G_iter']
     x_labels = [method_labels[m] for m in methods]
     axs = plt.figure(layout="constrained", figsize=figsize_, dpi=dpi_).\
-        subplot_mosaic('AABBCC;DDEEFF')
+        subplot_mosaic('AABBCC;.EEFF.')
 
     # Loop through all the subtypes
     ax_labels = list(axs.keys())
-    for i, subtype in enumerate(synth_data_types + ['all']):
+    for i, subtype in enumerate(synth_data_types):  # + ['all']):
         ax = axs[ax_labels[i]]
         if subtype == 'all':
             sub_df = metrics
@@ -809,17 +809,15 @@ def plot_score_by_subtype(
 
         # Set the title to the score name, in Latex math mode
         if subtype == 'all':
-            ax.set_title(  # rf'$\textrm{{{score_titles[score_name]}}} '
-                # rf'\textrm{{ for }} '
+            ax.set_title(
                 r'$\textrm{{all data}}$',
                 fontsize=10)  # , y=-0.25)
         else:
-            ax.set_title(  # rf'$\textrm{{{score_titles[score_name]}}} '
-                # rf'\textrm{{ for }} '
-                rf'$\texttt{{{subtype}}} \textrm{{ data}}$',
+            ax.set_title(
+                rf'{synth_data_labels[synth_data_types.index(subtype)]} data',
                 fontsize=10)  # , y=-0.25)
 
-    plt.suptitle(score_titles[score_name])
+    plt.suptitle(f"{score_titles[score_name]} score")
     if pdf_filename is not None:
         plt.savefig(pdf_filename, bbox_inches='tight')
         plt.close()
