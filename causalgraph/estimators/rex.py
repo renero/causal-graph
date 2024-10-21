@@ -543,7 +543,7 @@ class Rex(BaseEstimator, ClassifierMixin):
             tolerance: Union[float, str] = 'auto',
             key_metric: str = 'f1',
             direction: str = 'maximize',
-            parallel: bool=True) -> nx.DiGraph:
+            parallel: bool=False) -> nx.DiGraph:
         """
         Finds the best tolerance value for the iterative predict method by iterating
         over different tolerance values and selecting the one that gives the best

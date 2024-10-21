@@ -157,6 +157,7 @@ def subplots(
     figsize = kwargs.pop("figsize", (8, 6))
     title = kwargs.pop("title", None)
     num_cols = kwargs.pop("num_cols", 4)
+    pdf_filename = kwargs.pop("pdf_filename", None)
     setup_plot(**kwargs)
     num_rows = len(plot_args) // num_cols
     if len(plot_args) % num_cols != 0:
@@ -195,8 +196,14 @@ def subplots(
 
     if title is not None:
         fig.suptitle(title)
-    plt.tight_layout()
-    plt.show()
+    
+    if pdf_filename is not None:
+        plt.tight_layout(rect=[0, 0.0, 1, 0.97])
+        plt.savefig(pdf_filename, bbox_inches='tight')
+        plt.close()
+    else:
+        plt.tight_layout()
+        plt.show()
 
 
 def format_graph(

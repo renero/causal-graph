@@ -107,11 +107,13 @@ method_labels = {
     'ges': r'$\textrm{GES}$',
     'lingam': r'$\textrm{LiNGAM}$',
     'cam': r'$\textrm{CAM}$',
+    'notears': r'$\textrm{NOTEARS}$',
     'G_pc': r'$\textrm{PC}$',
     'G_fci': r'$\textrm{FCI}$',
     'G_ges': r'$\textrm{GES}$',
     'G_lingam': r'$\textrm{LiNGAM}$',
     'G_cam': r'$\textrm{CAM}$',
+    'G_notears': r'$\textrm{NOTEARS}$',
     'un_G_iter': r'$\textrm{R\textsc{e}X}$'
 }
 estimators = {
@@ -770,7 +772,7 @@ def plot_score_by_subtype(
     method_column = kwargs.get('method_column', 'method')
 
     if methods is None:
-        methods = ['pc', 'fci', 'ges', 'lingam', 'cam', 'un_G_iter']
+        methods = ['pc', 'fci', 'ges', 'lingam', 'cam', 'notears', 'un_G_iter']
     x_labels = [method_labels[m] for m in methods]
     axs = plt.figure(layout="constrained", figsize=figsize_, dpi=dpi_).\
         subplot_mosaic('AABBCC;.EEFF.')
@@ -878,7 +880,7 @@ def plot_scores_by_method(
 
         ax.boxplot(metric_values)
         ax.set_xticklabels(labels=[method_labels[key]
-                                   for key in methods], fontsize=7)
+                                   for key in methods], fontsize=6)
         ax.grid(axis='y', linestyle='--', linewidth=0.5, which='both')
 
         # check if any value is above 1
