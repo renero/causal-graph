@@ -1029,6 +1029,29 @@ def get_feature_types(X) -> Dict[str, str]:
     return feature_types
 
 
+def cast_categoricals_to_int(X: pd.DataFrame) -> pd.DataFrame:
+    """
+    Cast all categorical features in the dataframe to integer values.
+
+    Parameters
+    ----------
+    X: pd.DataFrame
+        The dataframe to cast.
+
+    Returns
+    -------
+    pd.DataFrame
+        The dataframe with all categorical features cast to integer values.
+    """
+    X = X.copy()
+    for feature in X.columns:
+        feature_dtype = _classify_variable(X[feature].values)
+        if feature_dtype == "multiclass" or feature_dtype == "binary":
+            X[feature] = X[feature].astype(np.int16)
+
+    return X
+
+
 def find_crossing_point(
         f1: List[float],  # Values of the first curve (precision, for example)
         f2: List[float],  # Values of the second curve (recall, for example)

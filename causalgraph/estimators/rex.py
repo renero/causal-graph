@@ -535,7 +535,7 @@ class Rex(BaseEstimator, ClassifierMixin):
     def iterative_predict(
             self,
             X: pd.DataFrame,
-            ref_graph: nx.DiGraph,
+            ref_graph: nx.DiGraph=None,
             num_iterations: int = DEFAULT_ITERATIVE_TRIALS,
             sampling_split: float = 0.2,
             prior: list = None,
@@ -570,8 +570,8 @@ class Rex(BaseEstimator, ClassifierMixin):
         -------
         nx.DiGraph : The best DAG found by the iterative predict method.
         """
-        if ref_graph is None:
-            raise ValueError("ref_graph must be specified")
+        if ref_graph is None and tolerance == 'auto':
+            raise ValueError("ref_graph must be specified when tolerance set to 'auto'")
         if direction != 'maximize' and direction != 'minimize':
             raise ValueError("direction must be 'maximize' or 'minimize'")
 

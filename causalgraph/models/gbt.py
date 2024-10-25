@@ -84,7 +84,7 @@ class GBTRegressor(GradientBoostingRegressor):
             init=None,
             random_state=42,
             max_features=None,
-            alpha=0.9,
+            # alpha=0.9,
             max_leaf_nodes=None,
             warm_start=False,
             validation_fraction=0.1,
@@ -110,7 +110,7 @@ class GBTRegressor(GradientBoostingRegressor):
         self.init = init
         self.random_state = random_state
         self.max_features = max_features
-        self.alpha = alpha
+        # self.alpha = alpha
         self.max_leaf_nodes = max_leaf_nodes
         self.warm_start = warm_start
         self.validation_fraction = validation_fraction
@@ -137,6 +137,7 @@ class GBTRegressor(GradientBoostingRegressor):
         self.n_features_in_ = X.shape[1]
         self.feature_names = utils.get_feature_names(X)
         self.feature_types = utils.get_feature_types(X)
+        X = utils.cast_categoricals_to_int(X)
         self.regressor = dict()
 
         if self.correlation_th:
@@ -195,7 +196,7 @@ class GBTRegressor(GradientBoostingRegressor):
                 init=self.init,
                 random_state=self.random_state,
                 max_features=self.max_features,
-                alpha=self.alpha,
+                # alpha=self.alpha,
                 verbose=False,
                 max_leaf_nodes=self.max_leaf_nodes,
                 warm_start=self.warm_start,
@@ -204,11 +205,13 @@ class GBTRegressor(GradientBoostingRegressor):
                 tol=self.tol,
                 ccp_alpha=self.ccp_alpha
             )
+
             self.regressor[target_name].fit(
                 X.drop(target_name, axis=1), X[target_name])
-            pbar.update_subtask(pbar_name, target_idx+1)
 
-        pbar.remove(pbar_name)
+            pbar.update_subtask(pbar_name, target_idx+1) if pbar else None
+
+        pbar.remove(pbar_name) if pbar else None
         self.is_fitted_ = True
         return self
 
@@ -252,13 +255,14 @@ class GBTRegressor(GradientBoostingRegressor):
             X_original = X.copy()
 
         scores = list()
+        X_eval = utils.cast_categoricals_to_int(X)
         for target_name in self.feature_names:
             if self.correlation_th is not None:
-                X = X_original.drop(
+                X_eval = X_original.drop(
                     self.correlated_features[target_name], axis=1)
 
             R2 = self.regressor[target_name].score(
-                X.drop(target_name, axis=1), X[target_name])
+                X_eval.drop(target_name, axis=1), X_eval[target_name])
 
             # Append 1.0 if R2 is negative, or 1.0 - R2 otherwise since we're
             # in the minimization mode of the error function.
@@ -336,8 +340,6 @@ class GBTRegressor(GradientBoostingRegressor):
                 self.min_impurity_decrease = trial.suggest_float(
                     "min_impurity_decrease", 0.0, 0.5)
 
-                # Extract feature_names from the train_data dataframe
-
                 self.models = GBTRegressor(
                     learning_rate=self.learning_rate,
                     n_estimators=self.n_estimators,
@@ -359,10 +361,11 @@ class GBTRegressor(GradientBoostingRegressor):
 
                 # Now, measure the performance of the model with the test data.
                 loss = []
+                X_test = utils.cast_categoricals_to_int(self.test_data)
                 for target_name in list(self.train_data.columns):
                     R2 = self.models.regressor[target_name].score(
-                        self.test_data.drop(target_name, axis=1),
-                        self.test_data[target_name])
+                        X_test.drop(target_name, axis=1),
+                        X_test[target_name])
                     # Append 1.0 if R2 is negative, or 1.0 - R2 otherwise since we're
                     # in the minimization mode of the error function.
                     loss.append(1.0) if R2 < 0.0 else loss.append(1.0 - R2)
