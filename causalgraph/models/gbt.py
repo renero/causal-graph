@@ -53,12 +53,14 @@ Example:
 
 
 import inspect
+
 import numpy as np
-import optuna
+import optuna  # type: ignore
 import pandas as pd
 from mlforge.progbar import ProgBar  # type: ignore
 from sklearn.ensemble import (GradientBoostingClassifier,
                               GradientBoostingRegressor)
+from sklearn.metrics import f1_score
 from sklearn.preprocessing import StandardScaler
 
 from causalgraph.common import DEFAULT_HPO_TRIALS, utils
@@ -363,12 +365,26 @@ class GBTRegressor(GradientBoostingRegressor):
                 loss = []
                 X_test = utils.cast_categoricals_to_int(self.test_data)
                 for target_name in list(self.train_data.columns):
-                    R2 = self.models.regressor[target_name].score(
-                        X_test.drop(target_name, axis=1),
-                        X_test[target_name])
+                    model = self.models.regressor[target_name]
+                    # For regressors, this is R2, for classifiers this is accuracy
+                    if model.__class__.__name__ == "GradientBoostingClassifier":
+                        # Get the F1 score of the model
+                        goodness_of_fit = f1_score(
+                            X_test[target_name],
+                            model.predict(X_test.drop(target_name, axis=1)))
+                    elif model.__class__.__name__ == "GradientBoostingRegressor":
+                        goodness_of_fit = model.score(
+                            X_test.drop(target_name, axis=1), X_test[target_name])
+                    else:
+                        raise ValueError(
+                            f"Model {model.__class__.__name__} is not supported."
+                            f"Only GradientBoostingClassifier and"
+                            f"GradientBoostingRegressor are supported.")
+
                     # Append 1.0 if R2 is negative, or 1.0 - R2 otherwise since we're
                     # in the minimization mode of the error function.
-                    loss.append(1.0) if R2 < 0.0 else loss.append(1.0 - R2)
+                    loss.append(1.0) if goodness_of_fit < 0.0 else loss.append(
+                        1.0 - goodness_of_fit)
 
                 return np.median(loss)
 

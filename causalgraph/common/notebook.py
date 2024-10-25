@@ -179,6 +179,7 @@ class BaseExperiment:
             output_path: str,
             train_anyway: bool = False,
             save_anyway: bool = False,
+            scale: bool = False,
             train_size: float = 0.9,
             random_state: int = 42,
             verbose: bool = False):
@@ -187,6 +188,7 @@ class BaseExperiment:
         self.output_path = output_path
         self.train_anyway = train_anyway
         self.save_anyway = save_anyway
+        self.scale = scale
         self.train_size = train_size
         self.random_state = random_state
         self.verbose = verbose
@@ -217,12 +219,17 @@ class BaseExperiment:
 
         self.data = pd.read_csv(csv_filename)
         self.data = self.data.apply(pd.to_numeric, downcast='float')
-        scaler = StandardScaler()
-        self.data = pd.DataFrame(
-            scaler.fit_transform(self.data), columns=self.data.columns)
-        self.train_data = self.data.sample(
-            frac=self.train_size, random_state=42)
-        self.test_data = self.data.drop(self.train_data.index)
+        if self.scale:
+            scaler = StandardScaler()
+            self.data = pd.DataFrame(
+                scaler.fit_transform(self.data), columns=self.data.columns)
+            self.train_data = self.data.sample(
+                frac=self.train_size, random_state=self.random_state)
+            self.test_data = self.data.drop(self.train_data.index)
+        else:
+            self.train_data = self.data.sample(
+                frac=self.train_size, random_state=self.random_state)
+            self.test_data = self.data.drop(self.train_data.index)
 
         self.ref_graph = utils.graph_from_dot_file(dot_filename)
 
