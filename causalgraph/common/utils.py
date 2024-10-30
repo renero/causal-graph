@@ -702,7 +702,8 @@ def break_cycles_if_present(
             if len(test_cycles) == len(cycles):
                 if verbose:
                     print(
-                        f"Breaking cycle {cycle} by changing orientation of edge {min_edge}")
+                        f"Breaking cycle {cycle} by changing orientation of "
+                        f"edge {min_edge}")
                 new_dag.remove_edge(*min_edge)
                 new_dag.add_edge(*potential_misoriented[0][1::-1])
                 continue
@@ -1087,7 +1088,8 @@ def find_crossing_point(
             f1_next: float,  # Value of f1 at the next x value
             f2_next: float  # Value of f2 at the next x value
     ) -> float:
-        # Linear interpolation formula to find the exact crossing point between two points
+        # Linear interpolation formula to find the exact crossing point between
+        # two points
         return x_prev + (x_next - x_prev) * abs(f1_prev - f2_prev) / \
             (abs(f1_prev - f1_next) + abs(f2_prev - f2_next))
 
