@@ -859,7 +859,7 @@ def graph_to_adjacency(
     return mat
 
 
-def graph_to_adjacency_file(graph: AnyGraph, output_file: Union[Path, str]):
+def graph_to_adjacency_file(graph: AnyGraph, output_file: Union[Path, str], labels):
     """
     A method to write the adjacency matrix of the graph to a file. If graph has
     weights, these are the values stored in the adjacency matrix.
@@ -868,8 +868,7 @@ def graph_to_adjacency_file(graph: AnyGraph, output_file: Union[Path, str]):
         graph: (Union[Graph, DiGraph] the graph to be saved
         output_file: (str) The full path where graph is to be saved
     """
-    mat = graph_to_adjacency(graph)
-    labels = sorted(list(graph.nodes))
+    mat = graph_to_adjacency(graph, labels)
     with open(output_file, "w", encoding="utf-8") as f:
         f.write(",".join([f"{label}" for label in labels]))
         f.write("\n")

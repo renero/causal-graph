@@ -106,7 +106,7 @@ class FCI(GraphLearner):
         self.base_skeleton = kwargs.get("base_skeleton", None)
         self.base_sepset = kwargs.get("base_sepset", None)
         self.log = kwargs.get("logger", None)
-        self.prog_bar = kwargs.get("progbar", True)
+        self.prog_bar = kwargs.get("prog_bar", False)
         self.silent = kwargs.get("silent", False)
 
         super().__init__(logger=self.log,
@@ -234,14 +234,13 @@ class FCI(GraphLearner):
         # pbar = tqdm(
         #     pag,
         #     **tqdm_params("Learn Skeleton", self.prog_bar, silent=self.silent))
-        pbar = ProgBar().start_subtask(len(pag))
+        pbar = ProgBar().start_subtask(len(pag)) if self.prog_bar else None
 
         for lx, x in enumerate(pag):
-            # pbar.refresh()
             neighbors = get_neighbors(x, pag)
             self.debug.neighbors(x, lx, neighbors, pag)
             if len(neighbors) == 0:
-                pbar.update_subtask(1)
+                pbar.update_subtask(1) if self.prog_bar else None
                 continue
             for ny, y in enumerate(neighbors):
                 tup = self.find_colliders(x, y, pag, ny, dseps, sepSet,
@@ -249,7 +248,9 @@ class FCI(GraphLearner):
                 if tup:
                     self.update_actions(pag_actions, tup)
             self.debug.stack(pag_actions)
-            pbar.update_subtask(1)
+            pbar.update_subtask(1) if self.prog_bar else None
+
+        pbar.finish_subtask() if self.prog_bar else None
 
         return pag, sepSet
 
@@ -351,8 +352,8 @@ class FCI(GraphLearner):
 
 
 def main(dataset_name,
-         input_path="/Users/renero/phd/data/RC3/",
-         output_path="/Users/renero/phd/output/RC3/",
+         input_path="/Users/renero/phd/data/sachs/",
+         output_path="/Users/renero/phd/output/RC4/sachs/compared/",
          save=False,
          **kwargs):
     """
@@ -386,5 +387,5 @@ def main(dataset_name,
 
 # Create a call to FCI with a sample dataset.
 if __name__ == "__main__":
-    main("short_linear_1", njobs=1)
+    main("sachs", njobs=1)
     # main("rex_generated_linear_1", njobs=1)

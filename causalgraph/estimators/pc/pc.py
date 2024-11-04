@@ -7,12 +7,13 @@
 
 import logging
 from itertools import chain, combinations, permutations
+import os
 
 import networkx as nx
 import pandas as pd
 from joblib import Parallel, delayed
 from sklearn.preprocessing import StandardScaler
-from mlforge.progbar import ProgBar
+from mlforge.progbar import ProgBar  #type: ignore
 
 from causalgraph.common import utils
 from causalgraph.estimators.pc.ci_tests import chi_square, pearsonr
@@ -270,7 +271,10 @@ class PC(StructureEstimator):
 
         # pbar = tqdm(
         #     total=self.max_cond_vars, **tqdm_params("PC algorithm", self.prog_bar))
-        pbar = ProgBar().start_subtask(self.max_cond_vars)
+        if self.prog_bar and not self.verbose:
+            pbar = ProgBar().start_subtask("PC", self.max_cond_vars)
+        else:
+            pbar = None
 
         # Step 1: Initialize a fully connected undirected graph
         graph = nx.complete_graph(n=self.variables, create_using=nx.Graph)
@@ -491,11 +495,11 @@ class PC(StructureEstimator):
         return PDAG(directed_ebunch=directed_edges, undirected_ebunch=undirected_edges)
 
 
-def main(dataset_name,
-         input_path="/Users/renero/phd/data/RC3/",
-         output_path="/Users/renero/phd/output/RC3/",
-         save=False):
-
+def main(dataset_name, input_path=None, output_path=None, save=False):
+    if input_path is None:
+        input_path=os.path.expanduser("~/phd/data/sachs/")
+    if output_path is None:
+        output_path=os.path.expanduser("~/phd/output/RC4/sachs/compared/")
     ref_graph = utils.graph_from_dot_file(f"{input_path}{dataset_name}.dot")
     data = pd.read_csv(f"{input_path}{dataset_name}.csv")
     scaler = StandardScaler()
@@ -511,10 +515,14 @@ def main(dataset_name,
         print(edge)
     print(pc.metrics)
 
+    utils.graph_to_adjacency_file(
+        pc.dag, f"{output_path}{dataset_name}_PC.adj", list(data.columns))
+    print(f"DAG saved to {output_path}{dataset_name}_PC.adj")
+
     # if save:
     #     where_to = utils.save_experiment(rex.name, output_path, rex)
     #     print(f"Saved '{rex.name}' to '{where_to}'")
 
 
 if __name__ == "__main__":
-    main("rex_generated_linear_1")
+    main("sachs_long")

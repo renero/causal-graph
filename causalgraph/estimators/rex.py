@@ -844,6 +844,10 @@ class Rex(BaseEstimator, ClassifierMixin):
         ref_graph = utils.graph_from_dot_file(os.path.join(
             input_path, ref_graph_file))
 
+        if ref_graph is None:
+            print(f"WARNING: The reference graph '{ref_graph_file}' was not found.")
+            return None
+
         root_nodes = [node for node,
                       degree in ref_graph.in_degree() if degree == 0]
         return [root_nodes, [node for node in ref_graph.nodes if node not in root_nodes]]
