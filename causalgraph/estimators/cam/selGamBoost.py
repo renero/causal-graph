@@ -1,24 +1,24 @@
 """
-This Python version of `selGamBoost` follows the structure and logic of the original 
+This Python version of `selGamBoost` follows the structure and logic of the original
 R function. Here are some key points about the translation:
 
-1. We import `numpy` for array operations and assume that `train_GAMboost` is 
+1. We import `numpy` for array operations and assume that `train_GAMboost` is
 imported from a separate file.
 2. The function signature remains similar, with default values for `pars` and `output`.
 3. R's matrix indexing is replaced with NumPy array indexing.
 4. The `cat` function for output is replaced with Python's `print` function.
-5. List comprehensions and NumPy functions are used to replace some R-specific 
+5. List comprehensions and NumPy functions are used to replace some R-specific
     operations.
-6. The `xselect()` method is assumed to exist in the model returned by `train_GAMboost`. 
+6. The `xselect()` method is assumed to exist in the model returned by `train_GAMboost`.
 You may need to adjust this based on the actual implementation.
 7. The boolean indexing and selection logic is adapted to work with NumPy arrays.
 
-Note that this translation assumes that the `train_GAMboost` function in Python returns 
-an object with similar properties to its R counterpart. You may need to adjust the 
+Note that this translation assumes that the `train_GAMboost` function in Python returns
+an object with similar properties to its R counterpart. You may need to adjust the
 code further based on the exact implementation of `train_GAMboost` in Python.
 """
 import numpy as np
-from train_GAMboost import train_GAMboost
+from causalgraph.estimators.cam.train_GAMboost import train_GAMboost
 
 
 def selGamBoost(X, pars=None, output=False, k=None):

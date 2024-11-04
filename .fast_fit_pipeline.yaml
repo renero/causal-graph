@@ -1,0 +1,19 @@
+step1:
+  attribute: models
+  method: model_type
+step2:
+  method: models.tune_fit
+  arguments:
+    hpo_n_trials: 1
+step3:
+  method: models.score
+step4:
+  attribute: root_causes
+  method: compute_regression_quality
+step5:
+  attribute: shaps
+  class: ShapEstimator
+  arguments:
+    models: models
+step6:
+  method: shaps.fit

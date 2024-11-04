@@ -1,5 +1,6 @@
 import networkx as nx
 import pandas as pd
+import numpy as np
 import pytest
 import torch
 
@@ -175,7 +176,7 @@ def test_identical_undirected_graphs():
 
 def test_break_cycle_if_present_no_cycles():
     """
-    Test function to check if the break_cycle_if_present function works correctly 
+    Test function to check if the break_cycle_if_present function works correctly
     when there are no cycles in the DAG.
     """
     # Create a DAG with no cycles
@@ -200,7 +201,7 @@ def test_break_cycle_if_present_no_cycles():
 
 def test_break_cycle_if_present_one_cycle():
     """
-    Test function to check if the `break_cycle_if_present` function correctly 
+    Test function to check if the `break_cycle_if_present` function correctly
     breaks a cycle in a DAG with one cycle.
     """
     # Create a DAG with one cycle
@@ -237,11 +238,11 @@ def test_break_cycle_if_present_one_cycle():
 
 def test_break_cycle_if_present_multiple_cycles():
     """
-    Test function to check if the `break_cycle_if_present` function can break cycles 
+    Test function to check if the `break_cycle_if_present` function can break cycles
     in a DAG with multiple cycles.
 
-    The function creates a DAG with multiple cycles and a knowledge DataFrame with 
-    some permutation importances. It then calls the `break_cycle_if_present` 
+    The function creates a DAG with multiple cycles and a knowledge DataFrame with
+    some permutation importances. It then calls the `break_cycle_if_present`
     function and checks if the result is a DAG with no cycles.
     """
     # Create a DAG with multiple cycles
@@ -278,3 +279,39 @@ def test_break_cycle_if_present_multiple_cycles():
 
     # Check if the result is a DAG with no cycles
     assert nx.is_directed_acyclic_graph(result)
+
+
+class TestCastCategoricalsToInt():
+
+    def test_cast_multiclass(self):
+        df = pd.DataFrame({
+            'A': pd.Categorical(['a', 'b', 'c']),
+            'B': pd.Categorical(['x', 'y', 'z']),
+        })
+        result = utils.cast_categoricals_to_int(df)
+        expected = pd.DataFrame({
+            'A': np.array([0, 1, 2], dtype=np.int16),
+            'B': np.array([0, 1, 2], dtype=np.int16),
+        })
+        pd.testing.assert_frame_equal(result, expected)
+
+    def test_cast_binary(self):
+        df = pd.DataFrame({
+            'A': pd.Categorical(['yes', 'no']),
+            'B': pd.Categorical(['true', 'false']),
+        })
+        result = utils.cast_categoricals_to_int(df)
+        expected = pd.DataFrame({
+            'A': np.array([0, 1], dtype=np.int16),
+            'B': np.array([0, 1], dtype=np.int16),
+        })
+        pd.testing.assert_frame_equal(result, expected)
+
+    def test_no_categorical(self):
+        df = pd.DataFrame({
+            'A': [1.0, 2.0, 3.0],
+            'B': [4.0, 5.0, 6.0],
+        })
+        result = utils.cast_categoricals_to_int(df)
+        expected = df.copy()
+        pd.testing.assert_frame_equal(result, expected)

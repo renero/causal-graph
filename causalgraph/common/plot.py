@@ -154,9 +154,10 @@ def subplots(
         fig: Figure
             The figure containing the subplots.
     """
-    fig_size = kwargs.pop("fig_size", (8, 6))
+    figsize = kwargs.pop("figsize", (8, 6))
     title = kwargs.pop("title", None)
     num_cols = kwargs.pop("num_cols", 4)
+    pdf_filename = kwargs.pop("pdf_filename", None)
     setup_plot(**kwargs)
     num_rows = len(plot_args) // num_cols
     if len(plot_args) % num_cols != 0:
@@ -183,7 +184,7 @@ def subplots(
         return ax[i][j]
 
     plt.rcParams.update({'font.size': 8})
-    fig, ax = plt.subplots(num_rows, num_cols, figsize=fig_size)
+    fig, ax = plt.subplots(num_rows, num_cols, figsize=figsize)
     for i in range(num_rows):
         for j in range(num_cols):
             index = i * num_cols + j
@@ -195,8 +196,14 @@ def subplots(
 
     if title is not None:
         fig.suptitle(title)
-    plt.tight_layout()
-    plt.show()
+    
+    if pdf_filename is not None:
+        plt.tight_layout(rect=[0, 0.0, 1, 0.97])
+        plt.savefig(pdf_filename, bbox_inches='tight')
+        plt.close()
+    else:
+        plt.tight_layout()
+        plt.show()
 
 
 def format_graph(
@@ -655,8 +662,11 @@ def dag(
             figsize=(6, 4), layout="constrained").subplot_mosaic('AAB')
         axis = ax["A"]
         text_axis = ax["B"]
-    else:
+    elif ax is not None and show_metrics is False:
         axis = ax
+    else:
+        raise ValueError(
+            "The 'ax' and 'show_metrics' arguments are mutually exclusive.")
     if save_to_pdf is not None:
         with PdfPages(save_to_pdf) as pdf:
             if reference:
@@ -689,6 +699,262 @@ def dag(
 
 
 def dags(
+        dags: List[nx.DiGraph],
+        ref_graph: nx.DiGraph,
+        titles: List[str],
+        figsize: Tuple[int, int] = (15, 12),
+        dpi: int = 300) -> None:
+    """
+    Plots multiple directed acyclic graphs (DAGs) in a grid layout.
+
+    Parameters:
+    - dags (list): List of DAGs to plot.
+    - ref_graph: Reference graph used for layout.
+    - titles (list): List of titles for each DAG.
+    - figsize (tuple): Figure size (default: (15, 12)).
+    - dpi (int): Dots per inch (default: 300).
+
+    Raises:
+    - ValueError: If there are too many DAGs to plot.
+
+    Returns:
+    - None
+    """
+    assert len(titles) == len(dags), "Number of titles must match number of DAGs"
+    assert len(dags) <=12 and len(dags) > 1, "Number of DAGs must be between 2 and 12"
+
+    layout = _get_subplot_mosaic_layout(len(dags))
+
+    axs = plt.figure(
+        figsize=figsize, dpi=dpi, layout="constrained").subplot_mosaic(layout)
+
+    ax_labels = list(axs.keys())
+    for i, g in enumerate(dags):
+        ax_ = axs[ax_labels[i]]
+        dag(graph=g, reference=ref_graph, title=titles[i], ax=ax_)
+
+    plt.tight_layout()
+    plt.show()
+
+
+def _get_subplot_mosaic_layout(n: int) -> str:
+    """
+    Get a layout string for a subplot mosaic with n subplots.
+
+    The layout strings are hardcoded for 1 to 11 subplots. For more subplots,
+    a ValueError is raised.
+
+    Parameters:
+    - n (int): The number of subplots.
+
+    Returns:
+    - str: The layout string for the subplot mosaic.
+
+    Raises:
+    - ValueError: If n is larger than 11.
+    """
+    layouts = [
+        "AB",
+        "ABC",
+        "AB;CD",
+        "AABBCC;.DDEE.",
+        "ABC;DEF",
+        "ABC;DEF;.G.",
+        "ABCD;EFGH",
+        "ABC;DEF;GHI",
+        "AABBCCDD;EEFFGGHH;.IIJJ.",
+        "ABCD;EFGH;IJK.",
+        "ABCD;EFGH;IJKL",
+    ]
+    if n <= len(layouts):
+        return layouts[n-2]
+    else:
+        raise ValueError("Too many DAGs to plot")
+
+
+def shap_values(shaps: BaseEstimator, **kwargs):
+    assert shaps.is_fitted_, "Model not fitted yet"
+    plot_args = list(shaps.feature_names)
+    return subplots(shaps._plot_shap_summary, *plot_args, **kwargs)
+
+
+def shap_discrepancies(
+        shaps: BaseEstimator,
+        target_name: str,
+        threshold: float = +100.0,
+        regression_line:bool=False,
+        reduced: bool = False,
+        **kwargs):
+    """
+    Plot the discrepancies of the SHAP values.
+
+    Parameters:
+    -----------
+        shaps: BaseEstimator
+            The SHAP values to plot.
+        target_name: str
+            The name of the target variable.
+        threshold: float, default=+100.0
+            The threshold for the discrepancies. Only discrepancies below this
+            threshold will be displayed. Typical values are in (0.0, 5.0), but those
+            significant are in the values close to 0.0.
+        regression_line: bool, default=False
+            If True, include the regression line in the plot.
+        Optional arguments:
+        - figsize: Tuple[int, int], default=(10, 16)
+            The size of the figure.
+        - pdf_filename: str, default=None
+            The name of the PDF file to save the plot to.
+        - dpi: int, default=75
+            The DPI of the plot.
+
+    """
+    assert shaps.is_fitted_, "Model not fitted yet"
+    # shaps._plot_discrepancies(target_name, threshold, **kwargs)
+
+    mpl.rcParams['figure.dpi'] = kwargs.get('dpi', 75)
+    pdf_filename = kwargs.get('pdf_filename', None)
+    feature_names = [
+        f for f in shaps.feature_names if (
+            (f != target_name) and
+            ((1. - shaps.shap_discrepancies[target_name][f].shap_gof) < threshold)
+        )
+    ]
+    # If no features are found, gracefully return
+    if not feature_names:
+        print(f"No features with discrepancy index below {threshold} found "
+              f"for target {target_name}.")
+        return
+
+    # Set the height of the figure to 18 unless there're less than 9 features,
+    # in which case, the height is 18/(9 - len(feature_names)).
+    if len(feature_names) < 9:
+        height = 2*len(feature_names)
+    else:
+        height = 16
+    figsize_ = kwargs.get('figsize', (10, height))
+
+    # The reduced version only plots the scatter and the discrepancies
+    nr_axes = 1 if reduced else 4
+    fig, ax = plt.subplots(len(feature_names), nr_axes, figsize=figsize_)
+
+    # If the number of features is 1, I must keep ax indexable, so I put it
+    # in a list.
+    if len(feature_names) == 1:
+        ax = [ax]
+
+    for i, parent_name in enumerate(feature_names):
+        r = shaps.shap_discrepancies[target_name][parent_name]
+        x = shaps.X_test[parent_name].values.reshape(-1, 1)
+        y = shaps.X_test[target_name].values.reshape(-1, 1)
+        parent_pos = feature_names.index(parent_name)
+        s = shaps.shap_scaled_values[target_name][:,
+                                                  parent_pos].reshape(-1, 1)
+        _plot_discrepancy(
+            x, y, s, target_name, parent_name, r, ax[i], regression_line, reduced)
+
+    plt.suptitle(f"Discrepancies for {target_name}")
+
+    if pdf_filename is not None:
+        plt.tight_layout(rect=[0, 0.0, 1, 0.97])
+        plt.savefig(pdf_filename, bbox_inches='tight')
+        plt.close()
+    else:
+        plt.tight_layout(rect=[0, 0.0, 1, 0.97])
+        fig.show()
+
+
+def _plot_discrepancy(x, y, s, target_name, parent_name, r, ax, regression_line, reduced=False):
+    """
+    Plot the discrepancy between target and SHAP values.
+
+    Args:
+        x (array-like): The x-axis values.
+        y (array-like): The target values.
+        s (array-like): The SHAP values.
+        target_name (str): The name of the target variable.
+        parent_name (str): The name of the parent variable.
+        r (object): The result object containing model parameters and statistics.
+        ax (array-like): The array of subplots.
+        regression_line (bool): If True, include the regression line in the plot.
+        reduced (bool): If True, plot the reduced version of the SHAP values.
+
+    Returns:
+        None
+    """
+    def _remove_ticks_and_box(ax):
+        ax.set_xticks([])
+        ax.set_xticklabels([])
+        ax.set_yticks([])
+        ax.set_yticklabels([])
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        # ax.spines['left'].set_visible(False)
+
+    b0_s, b1_s = r.shap_model.params[0], r.shap_model.params[1]
+    b0_y, b1_y = r.parent_model.params[0], r.parent_model.params[1]
+
+    mpl.rc('text', usetex=True)
+    mpl.rc('text.latex', preamble=r'\usepackage{amsmath}')
+
+    # If the number of axes is 1, it is not indexable, so I change the only one
+    ax_0 = ax if reduced else ax[0]
+
+    # Represent scatter plots
+    ax_0.scatter(x, s, alpha=0.5, marker='+')
+    ax_0.scatter(x, y, alpha=0.5, marker='.')
+    if regression_line:
+        ax_0.plot(x, b1_s * x + b0_s, color='blue', linewidth=.5)
+        ax_0.plot(x, b1_y * x + b0_y, color='red', linewidth=.5)
+    ax_0.set_title(
+        fr'$ X_j\, \textrm{{vs.}}\, [X_i | \phi_j] $, '
+        fr'\quad $\delta_j^{{(i)}}\!: {1 - r.shap_gof:.2f}$',
+        fontsize=10)
+    ax_0.set_xlabel(f'${parent_name}$')
+    ax_0.set_ylabel(
+        fr'$ \mathrm{{{target_name}}} / \phi_{{{parent_name}}} $')
+
+    # Represent target vs. SHAP values
+    if not reduced:
+        ax[1].scatter(s, y, alpha=0.3, marker='.', color='tab:green')
+        ax[1].set_title(
+            rf'$\delta_j^{{(i)}}: {1 - r.shap_gof:.2f}$', fontsize=10)
+        ax[1].set_xlabel(fr'$ \phi_{{{parent_name}}} $')
+        ax[1].set_ylabel(fr'$ \mathrm{{{target_name}}} $')
+
+        # Represent distributions
+        pd.DataFrame(s).plot(kind='density', ax=ax[1], label="shap")
+        pd.DataFrame(y).plot(kind='density', ax=ax[1], label="parent")
+        ax[2].legend().set_visible(False)
+        ax[2].set_ylabel('')
+        ax[2].set_xlabel(
+            fr'$ \mathrm{{{target_name}}} /  \phi_{{{parent_name}}} $')
+        ax[2].set_title(rf'$\mathrm{{KS}}({r.ks_pvalue:.2g})$', fontsize=10)
+
+        # Represent fitted vs. residuals
+        s_resid = r.shap_model.get_influence().resid_studentized_internal
+        y_resid = r.parent_model.get_influence().resid_studentized_internal
+        scaler = StandardScaler()
+        s_fitted_scaled = scaler.fit_transform(
+            r.shap_model.fittedvalues.reshape(-1, 1))
+        y_fitted_scaled = scaler.fit_transform(
+            r.parent_model.fittedvalues.reshape(-1, 1))
+        ax[3].scatter(s_fitted_scaled, s_resid, alpha=0.5, marker='+')
+        ax[3].scatter(y_fitted_scaled, y_resid, alpha=0.5,
+                        marker='.', color='tab:orange')
+        ax[3].set_title(r'$\mathrm{Residuals}$', fontsize=10)
+        ax[3].set_xlabel(
+            rf'$ \mathrm{{{target_name}}} /  \phi_{{{parent_name}}} $')
+        ax[3].set_ylabel(rf'$ \epsilon_{{{target_name}}} / \epsilon_\phi $')
+
+    if not reduced:
+        for ax_idx in range(4):
+            _remove_ticks_and_box(ax[ax_idx])
+    else:
+        _remove_ticks_and_box(ax_0)
+
+
+def deprecated_dags(
         graph: nx.DiGraph,
         reference: nx.DiGraph = None,
         names: List[str] = None,
@@ -714,6 +980,9 @@ def dags(
         - "verticalalignment": "center_baseline"
         - "with_labels": True
     """
+    print("This method is deprecated. Use plot_dags() instead.")
+    return
+
     ncols = 1 if reference is None else 2
     if names is None:
         names = ["Prediction", "Ground truth"]
@@ -762,169 +1031,3 @@ def dags(
         draw_graph_subplot(G, layout=ref_layout, title=names[0], ax=ax_graph,
                            **formatting_kwargs)
         plt.show()
-
-
-def shap_values(shaps: BaseEstimator, **kwargs):
-    assert shaps.is_fitted_, "Model not fitted yet"
-    plot_args = list(shaps.feature_names)
-    return subplots(shaps._plot_shap_summary, *plot_args, **kwargs)
-
-
-def shap_discrepancies(
-        shaps: BaseEstimator,
-        target_name: str,
-        threshold: float = +100.0,
-        **kwargs):
-    """
-    Plot the discrepancies of the SHAP values.
-
-    Parameters:
-    -----------
-        shaps: BaseEstimator
-            The SHAP values to plot.
-        target_name: str
-            The name of the target variable.
-        threshold: float, default=+100.0
-            The threshold for the discrepancies. Only discrepancies below this
-            threshold will be displayed. Typical values are in (0.0, 5.0), but those
-            significant are in the values close to 0.0.
-        Optional arguments:
-        - figsize: Tuple[int, int], default=(10, 16)
-            The size of the figure.
-        - pdf_filename: str, default=None
-            The name of the PDF file to save the plot to.
-        - dpi: int, default=75
-            The DPI of the plot.
-
-    """
-    assert shaps.is_fitted_, "Model not fitted yet"
-    # shaps._plot_discrepancies(target_name, threshold, **kwargs)
-    mpl.rcParams['figure.dpi'] = kwargs.get('dpi', 75)
-    pdf_filename = kwargs.get('pdf_filename', None)
-    feature_names = [
-        f for f in shaps.feature_names if (
-            (f != target_name) and
-            ((1. - shaps.shap_discrepancies[target_name][f].shap_gof) < threshold)
-        )
-    ]
-    # If no features are found, gracefully return
-    if not feature_names:
-        print(f"No features with discrepancy index below {threshold} found "
-              f"for target {target_name}.")
-        return
-
-    # Set the height of the figure to 18 unless there're less than 9 features,
-    # in which case, the height is 18/(9 - len(feature_names)).
-    if len(feature_names) < 9:
-        height = 2*len(feature_names)
-    else:
-        height = 16
-    figsize_ = kwargs.get('figsize', (10, height))
-    fig, ax = plt.subplots(len(feature_names), 4, figsize=figsize_)
-
-    # If the number of features is 1, I must keep ax indexable, so I put it
-    # in a list.
-    if len(feature_names) == 1:
-        ax = [ax]
-
-    for i, parent_name in enumerate(feature_names):
-        r = shaps.shap_discrepancies[target_name][parent_name]
-        x = shaps.X_test[parent_name].values.reshape(-1, 1)
-        y = shaps.X_test[target_name].values.reshape(-1, 1)
-        parent_pos = feature_names.index(parent_name)
-        s = shaps.shap_scaled_values[target_name][:,
-                                                  parent_pos].reshape(-1, 1)
-        _plot_discrepancy(x, y, s, target_name, parent_name, r, ax[i])
-
-    plt.suptitle(f"Discrepancies for {target_name}")
-
-    if pdf_filename is not None:
-        plt.tight_layout(rect=[0, 0.0, 1, 0.97])
-        plt.savefig(pdf_filename, bbox_inches='tight')
-        plt.close()
-    else:
-        plt.tight_layout(rect=[0, 0.0, 1, 0.97])
-        fig.show()
-
-
-def _plot_discrepancy(x, y, s, target_name, parent_name, r, ax):
-    """
-    Plot the discrepancy between target and SHAP values.
-
-    Args:
-        x (array-like): The x-axis values.
-        y (array-like): The target values.
-        s (array-like): The SHAP values.
-        target_name (str): The name of the target variable.
-        parent_name (str): The name of the parent variable.
-        r (object): The result object containing model parameters and statistics.
-        ax (array-like): The array of subplots.
-
-    Returns:
-        None
-    """
-    def _remove_ticks_and_box(ax):
-        ax.set_xticks([])
-        ax.set_xticklabels([])
-        ax.set_yticks([])
-        ax.set_yticklabels([])
-        ax.spines['top'].set_visible(False)
-        ax.spines['right'].set_visible(False)
-        ax.spines['left'].set_visible(False)
-
-    b0_s, b1_s = r.shap_model.params[0], r.shap_model.params[1]
-    b0_y, b1_y = r.parent_model.params[0], r.parent_model.params[1]
-
-    mpl.rc('text', usetex=True)
-    mpl.rc('text.latex', preamble=r'\usepackage{amsmath}')
-    # mpl.rcParams["mathtext.fontset"] = "cm"
-
-    # Represent scatter plots
-    ax[0].scatter(x, s, alpha=0.5, marker='+')
-    ax[0].scatter(x, y, alpha=0.5, marker='.')
-    ax[0].plot(x, b1_s * x + b0_s, color='blue', linewidth=.5)
-    ax[0].plot(x, b1_y * x + b0_y, color='red', linewidth=.5)
-    ax[0].set_title(
-        r'$ [X_i | \phi_j]\ \textrm{vs}\ X_j $',
-        fontsize=10)
-    # ax[0].set_title(
-    #     f'$m_s$:{math.atan(b1_s)*K:.1f}°; $m_y$:{math.atan(b1_y)*K:.1f}°',
-    #     fontsize=10)
-    ax[0].set_xlabel(f'${parent_name}$')
-    ax[0].set_ylabel(
-        fr'$ \mathrm{{{target_name}}} / \phi_{{{parent_name}}} $')
-
-    # Represent distributions
-    pd.DataFrame(s).plot(kind='density', ax=ax[1], label="shap")
-    pd.DataFrame(y).plot(kind='density', ax=ax[1], label="parent")
-    ax[1].legend().set_visible(False)
-    ax[1].set_ylabel('')
-    ax[1].set_xlabel(
-        fr'$ \mathrm{{{target_name}}} /  \phi_{{{parent_name}}} $')
-    ax[1].set_title(rf'$\mathrm{{KS}}({r.ks_pvalue:.2g})$', fontsize=10)
-
-    # Represent fitted vs. residuals
-    s_resid = r.shap_model.get_influence().resid_studentized_internal
-    y_resid = r.parent_model.get_influence().resid_studentized_internal
-    scaler = StandardScaler()
-    s_fitted_scaled = scaler.fit_transform(
-        r.shap_model.fittedvalues.reshape(-1, 1))
-    y_fitted_scaled = scaler.fit_transform(
-        r.parent_model.fittedvalues.reshape(-1, 1))
-    ax[2].scatter(s_fitted_scaled, s_resid, alpha=0.5, marker='+')
-    ax[2].scatter(y_fitted_scaled, y_resid, alpha=0.5,
-                    marker='.', color='tab:orange')
-    ax[2].set_title(r'$\mathrm{Residuals}$', fontsize=10)
-    ax[2].set_xlabel(
-        rf'$ \mathrm{{{target_name}}} /  \phi_{{{parent_name}}} $')
-    ax[2].set_ylabel(rf'$ \epsilon_{{{target_name}}} / \epsilon_\phi $')
-
-    # Represent target vs. SHAP values
-    ax[3].scatter(s, y, alpha=0.3, marker='.', color='tab:green')
-    ax[3].set_title(
-        rf'$\Delta \rho: {1 - r.shap_gof:.2f}$', fontsize=10)
-    ax[3].set_xlabel(fr'$ \phi_{{{parent_name}}} $')
-    ax[3].set_ylabel(fr'$ \mathrm{{{target_name}}} $')
-
-    for ax_idx in range(4):
-        _remove_ticks_and_box(ax[ax_idx])

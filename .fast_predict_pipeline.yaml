@@ -1,0 +1,27 @@
+# Predict pipeline WITHOUT reference graph.
+step0:
+  attribute: G_shap
+  method: shaps.predict
+step1:
+  attribute: prior
+  method: get_prior_from_ref_graph
+step2:
+  attribute: G_prior
+  method: shaps.predict
+  arguments:
+    prior: prior
+step3:
+  attribute: G_iter
+  method: iterative_predict
+  arguments:
+    num_iterations: 10
+    sampling_split: 0.2
+    tolerance: 'auto'
+step4:
+  attribute: G_iter_prio
+  method: iterative_predict
+  arguments:
+    num_iterations: 10
+    sampling_split: 0.2
+    prior: prior
+    tolerance: 'auto'

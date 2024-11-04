@@ -1057,8 +1057,8 @@ class GES(object):
 
 
 def main(dataset_name,
-         input_path="/Users/renero/phd/data/RC3/",
-         output_path="/Users/renero/phd/output/RC3/",
+         input_path="/Users/renero/phd/data/sachs/",
+         output_path="/Users/renero/phd/output/RC4/sachs/compared",
          save=False):
 
     ref_graph = graph_from_dot_file(f"{input_path}{dataset_name}.dot")
@@ -1081,4 +1081,4 @@ def main(dataset_name,
 
 
 if __name__ == "__main__":
-    main("rex_generated_linear_1")
+    main("sachs_long")

@@ -146,7 +146,7 @@ class GraphLearner():
         # pbar = tqdm(
         #     self.labels,
         #     **tqdm_params("Base Skeleton", self.prog_bar, silent=self.silent))
-        pbar = ProgBar().start_subtask(len(self.labels))
+        pbar = ProgBar().start_subtask(len(self.labels)) if self.prog_bar else None
 
         while condlen != 0:
             # condlen controls the amount of potential dependencies to explore
@@ -156,11 +156,11 @@ class GraphLearner():
             condlen = 0
             self.oo(f"> Iterating over labels: {','.join(self.labels)}")
             for lx, x in enumerate(self.labels):
-                pbar.refresh()
+                pbar.refresh() if self.prog_bar else None
                 self.oo(f" + x = {x}; {lx + 1}/{len(self.all_labels_but(x))}")
                 condlen, actions = self.check_independence(
                     x, graph, condlen, condsize, sepset, actions)
-                pbar.update_subtask(1)
+                pbar.update_subtask(1) if self.prog_bar else None
             condsize += 1
 
         self.debug.stack(actions)

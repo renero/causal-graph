@@ -21,7 +21,8 @@ Make sure to have the `compute_score_mat_parallel` function defined in a file na
 from multiprocessing import Pool
 
 import numpy as np
-from computeScoreMatParallel import computeScoreMatParallel
+
+from causalgraph.estimators.cam.computeScoreMatParallel import computeScoreMatParallel
 
 
 def updateScoreMat(

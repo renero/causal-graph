@@ -6,7 +6,6 @@ source of random noise.
 (C) 2022,2023,2024, J. Renero
 """
 
-
 # pylint: disable=E1101:no-member, W0201:attribute-defined-outside-init, W0511:fixme
 # pylint: disable=C0103:invalid-name
 # pylint: disable=C0116:missing-function-docstring
@@ -15,9 +14,10 @@ source of random noise.
 # pylint: disable=W0106:expression-not-assigned, R1702:too-many-branches
 # pylint: disable=W0102:dangerous-default-value
 
+import inspect
 import types
 import warnings
-from typing import List, Tuple, Union
+from typing import Dict, List, Tuple, Union, Any
 
 import numpy as np
 import optuna
@@ -27,9 +27,9 @@ from sklearn.base import BaseEstimator
 from sklearn.preprocessing import StandardScaler
 from sklearn.utils.validation import check_is_fitted
 from torch.utils.data import DataLoader
-from mlforge.progbar import ProgBar
+from mlforge.progbar import ProgBar   # type: ignore
 
-from causalgraph.common import GRAY, GREEN, RESET
+from causalgraph.common import DEFAULT_HPO_TRIALS
 from causalgraph.explainability.hierarchies import Hierarchies
 from causalgraph.models._columnar import ColumnsDataset
 from causalgraph.models._models import MLPModel
@@ -87,7 +87,8 @@ class NNRegressor(BaseEstimator):
             random_state: int = 1234,
             verbose: bool = False,
             prog_bar: bool = True,
-            silent: bool = False):
+            silent: bool = False,
+            optuna_prog_bar: bool = False):
         """
         Train DFF networks for all variables in data. Each network will be trained to
         predict one of the variables in the data, using the rest as predictors plus one
@@ -138,9 +139,13 @@ class NNRegressor(BaseEstimator):
         self.verbose = verbose
         self.prog_bar = prog_bar
         self.silent = silent
+        self.optuna_prog_bar = optuna_prog_bar
 
         self.regressor = None
         self._fit_desc = "Training NNs"
+
+        if self.verbose:
+            self.prog_bar = False
 
     def fit(self, X):
         """A reference implementation of a fitting function.
@@ -164,6 +169,16 @@ class NNRegressor(BaseEstimator):
         self.feature_types = utils.get_feature_types(X)
         self.regressor = {}
 
+        # Who is calling me?
+        try:
+            curframe = inspect.currentframe()
+            calframe = inspect.getouterframes(curframe, 2)
+            caller_name = calframe[1][3]
+            if caller_name == "__call__":
+                caller_name = "HPO"
+        except Exception:  # pylint: disable=broad-except
+            caller_name = "unknown"
+
         if self.correlation_th:
             self.corr_matrix = Hierarchies.compute_correlation_matrix(X)
             self.correlated_features = Hierarchies.compute_correlated_features(
@@ -171,7 +186,11 @@ class NNRegressor(BaseEstimator):
                 verbose=self.verbose)
             X_original = X.copy()
 
-        pbar = ProgBar().start_subtask("DNN_fit", len(self.feature_names))
+        if self.prog_bar and not self.verbose:
+            pbar_name = f"({caller_name}) DNN_fit"
+            pbar = ProgBar().start_subtask(pbar_name, len(self.feature_names))
+        else:
+            pbar = None
 
         for target_idx, target_name in enumerate(self.feature_names):
             # if correlation_th is not None then, remove features that are highly
@@ -212,9 +231,9 @@ class NNRegressor(BaseEstimator):
                 prog_bar=self.prog_bar)
             self.regressor[target_name].train()
 
-            pbar.update_subtask("DNN_fit", target_idx+1)
+            pbar.update_subtask(pbar_name, target_idx+1) if pbar else None
 
-        pbar.remove("DNN_fit")
+        pbar.remove(pbar_name) if pbar else None
         self.is_fitted_ = True
         return self
 
@@ -261,7 +280,6 @@ class NNRegressor(BaseEstimator):
                 y_hat = model.forward(tensor_X)
                 preds = np.append(preds, y_hat.detach().numpy().flatten())
             prediction[target] = preds
-
 
         # Concatenate the numpy array for all the batchs
         np_preds = prediction.values
@@ -341,7 +359,7 @@ class NNRegressor(BaseEstimator):
             min_loss: float = 0.05,
             storage: str = 'sqlite:///rex_tuning.db',
             load_if_exists: bool = True,
-            n_trials: int = 20):
+            n_trials: int = DEFAULT_HPO_TRIALS) -> Dict[str, Any]:
         """
         Tune the hyperparameters of the model using Optuna.
         """
@@ -364,7 +382,12 @@ class NNRegressor(BaseEstimator):
             dataframes.
             """
 
-            def __init__(self, train_data, test_data, device='cpu'):
+            def __init__(
+                    self,
+                    train_data,
+                    test_data,
+                    device='cpu',
+                    verbose=False):
                 self.train_data = train_data
                 self.test_data = test_data
                 self.device = device
@@ -376,8 +399,12 @@ class NNRegressor(BaseEstimator):
                 self.batch_size = None
                 self.num_epochs = None
                 self.models = None
+                self.verbose = verbose
 
             def __call__(self, trial):
+                """
+                This method is called by Optuna to evaluate the objective function.
+                """
                 self.n_layers = trial.suggest_int('n_layers', 1, 6)
                 self.layers = []
                 for i in range(self.n_layers):
@@ -401,8 +428,8 @@ class NNRegressor(BaseEstimator):
                     loss_fn='mse',
                     device=self.device,
                     random_state=42,
-                    verbose=False,
-                    prog_bar=True,
+                    verbose=self.verbose,
+                    prog_bar=True & (not self.verbose),
                     silent=True)
 
                 self.models.fit(self.train_data)
@@ -417,6 +444,7 @@ class NNRegressor(BaseEstimator):
                         shuffle=False)
                     avg_loss, _, _ = self.compute_loss(model, loader)
                     loss.append(avg_loss)
+
                 return np.median(loss)
 
             def compute_loss(
@@ -475,8 +503,13 @@ class NNRegressor(BaseEstimator):
             direction='minimize', study_name=study_name, storage=storage,
             load_if_exists=load_if_exists)
         study.optimize(
-            Objective(training_data, test_data), n_trials=n_trials,
-            show_progress_bar=(self.prog_bar & (not self.silent)), callbacks=[callback])
+            Objective(
+                training_data, test_data, verbose=self.verbose),
+            n_trials=n_trials,
+            show_progress_bar=(self.optuna_prog_bar & (
+                not self.silent) & (not self.verbose)),
+            callbacks=[callback]
+        )
 
         # Capture the best parameters and the minimum loss.
         best_trials = sorted(study.best_trials, key=lambda x: x.values[0])
@@ -506,7 +539,7 @@ class NNRegressor(BaseEstimator):
             hpo_min_loss: float = 0.05,
             hpo_storage: str = 'sqlite:///rex_tuning.db',
             hpo_load_if_exists: bool = True,
-            hpo_n_trials: int = 20):
+            hpo_n_trials: int = DEFAULT_HPO_TRIALS):
         """
         Tune the hyperparameters of the model using Optuna, and the fit the model
         with the best parameters.

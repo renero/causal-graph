@@ -82,14 +82,9 @@ def orientEdges(skeleton, sepSet, log, verbose, debug, data_file, output_path,
         if verbose:
             print("Applying rules...")
 
-        # pbar = tqdm(
-        #     total=len(three_tuples),
-        #     **tqdm_params("App.Rules", prog_bar, silent=silent))
-        pbar = ProgBar().start_subtask(len(three_tuples))
+        pbar = ProgBar().start_subtask("Colliders", len(three_tuples)) if prog_bar else None
 
-        pbar.reset()
-        for i, j, k in three_tuples:
-            pbar.refresh()
+        for idx, (i, j, k) in enumerate(three_tuples):
             changed_pag = rules.rule1(pag, i, j, k)
             changed_pag |= rules.rule2(pag, i, j, k)
             for node in (node for node in pag if node not in [i, j, k]):
@@ -100,8 +95,9 @@ def orientEdges(skeleton, sepSet, log, verbose, debug, data_file, output_path,
                 changed_pag |= rules.rule8(pag, i, j, k)
                 changed_pag |= rules.rule9(pag, i, j, k, node)
                 changed_pag |= rules.rule10(pag, i, j, k, node)
-            pbar.update_subtask(1)
+            pbar.update_subtask("Colliders", idx+1) if prog_bar else None
 
+    pbar.remove("Colliders") if prog_bar else None
     if save_intermediate:
         save_graph(pag, "adjmat_FCI_ruled", data_file, output_path, log)
     return pag

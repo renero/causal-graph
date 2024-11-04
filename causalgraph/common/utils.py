@@ -26,8 +26,6 @@ import pydotplus
 import torch
 
 from causalgraph.independence.edge_orientation import get_edge_orientation
-from typing import List, Optional
-import networkx as nx
 
 AnyGraph = Union[nx.Graph, nx.DiGraph]
 
@@ -300,7 +298,8 @@ def graph_union(g1: AnyGraph, g2: AnyGraph) -> AnyGraph:
         if isinstance(g1.nodes[first_node][key], (int, float, np.number)):
             for n in nodes:
                 if n in g1.nodes and n in g2.nodes:
-                    nodes_data[n] = {key: (g1.nodes[n][key] + g2.nodes[n][key]) / 2}
+                    nodes_data[n] = {
+                        key: (g1.nodes[n][key] + g2.nodes[n][key]) / 2}
                 elif n in g1.nodes:
                     nodes_data[n] = {key: g1.nodes[n][key]}
                 elif n in g2.nodes:
@@ -385,29 +384,7 @@ def digraph_from_connected_features(
 
         # Check if we can set it from prior knowledge
         if prior:
-            print(f"Checking edge {u} -> {v}...") if verbose else None
-            idx_u = [i for i, l in enumerate(prior) if u in l][0]
-            idx_v = [i for i, l in enumerate(prior) if v in l][0]
-            both_in_top_list = idx_u == 0 and idx_v == 0
-            u_is_before_v = idx_u - idx_v < 0
-            v_is_before_u = idx_v - idx_u < 0
-            if both_in_top_list:
-                print(
-                    f"Edge {u} -x- {v} removed: both top list") if verbose else None
-                orientation = +1
-                continue
-            elif u_is_before_v:
-                print(
-                    f"Edge {u} -> {v} added: {u} before {v}") if verbose else None
-                dag.add_edge(u, v)
-                continue
-            elif v_is_before_u:
-                print(
-                    f"Edge {v} -> {u} added: {v} before {u}") if verbose else None
-                dag.add_edge(v, u)
-                continue
-            else:
-                pass
+            orientation = correct_edge_from_prior(dag, u, v, prior, verbose)
 
         if orientation == 0:
             print(f"Checking edge {u} -> {v}...") if verbose else None
@@ -439,6 +416,74 @@ def digraph_from_connected_features(
             dag.add_edge(effect, cause)
 
     return dag
+
+
+def correct_edge_from_prior(dag, u, v, prior, verbose):
+    """
+    Correct an edge in the graph according to the prior knowledge.
+    This function corrects the orientation of an edge in a directed acyclic graph
+    (DAG) based on prior knowledge. The prior knowledge is a list of lists of node
+    names, ordered according to a temporal structure. The assumption is that nodes
+    from the first layer of temporal structure cannot receive any incoming edge.
+
+    The function checks the relative positions of the two nodes in the prior
+    knowledge and:
+    - If both nodes are in the top list, it removes the edge, based on the assumption.
+    - If one node is before the other, it adds a new edge in the correct direction.
+    - If the nodes are not in a clear order, it leaves the edge unchanged.
+    - If the edge reflects a backward connection between nodes from different
+      temporal layers, it removes the edge.
+
+    The orientation of the edge, -1 if the edge is reversed, +1 if the edge
+        is removed or kept, and 0 if the edge orientation is not clear.
+
+    Parameters
+    ----------
+    dag : nx.DiGraph
+        The graph to be corrected.
+    u : str
+        The first node of the edge.
+    v : str
+        The second node of the edge.
+    prior : List[List[str]]
+        The prior knowledge, a list of lists of node names, ordered according to
+        a temporal structure.
+    verbose : bool
+        If True, print debug messages.
+
+    Returns
+    -------
+    orientation : int
+        The orientation of the edge, -1 if the edge is reversed, +1 if the edge
+        is removed or kept, and 0 if the edge orientation is not clear.
+    """
+    # Check either 'u' or 'v' are NOT in the prior list. Remember that 'prior' is a
+    # list of lists of node names, ordered according to a temporal structure.
+    if not any([u in p for p in prior]) or not any([v in p for p in prior]):
+        return 0
+
+    print(f"Checking edge {u} -> {v}...") if verbose else None
+    idx_u = [i for i, l in enumerate(prior) if u in l][0]
+    idx_v = [i for i, l in enumerate(prior) if v in l][0]
+    both_in_top_list = idx_u == 0 and idx_v == 0
+    u_is_before_v = idx_u - idx_v < 0
+    v_is_before_u = idx_v - idx_u < 0
+    if both_in_top_list:
+        print(
+            f"Edge {u} -x- {v} removed: both top list") if verbose else None
+        return +1
+    elif u_is_before_v:
+        print(
+            f"Edge {u} -> {v} added: {u} before {v}") if verbose else None
+        dag.add_edge(u, v)
+        return +1
+    elif v_is_before_u:
+        print(
+            f"Edge {v} -> {u} added: {v} before {u}") if verbose else None
+        dag.add_edge(v, u)
+        return -1
+    else:
+        return 0
 
 
 def valid_candidates_from_prior(feature_names, effect, prior):
@@ -563,7 +608,8 @@ def potential_misoriented_edges(
         bwd_gof = 1. - discrepancies[node][neighbor].shap_gof
         orientation = +1 if fwd_gof < bwd_gof else -1
         if orientation == -1:
-            potential_misoriented_edges.append((node, neighbor, fwd_gof - bwd_gof))
+            potential_misoriented_edges.append(
+                (node, neighbor, fwd_gof - bwd_gof))
         if verbose:
             direction = "-->" if fwd_gof < bwd_gof else "<--"
             print(
@@ -656,7 +702,8 @@ def break_cycles_if_present(
             if len(test_cycles) == len(cycles):
                 if verbose:
                     print(
-                        f"Breaking cycle {cycle} by changing orientation of edge {min_edge}")
+                        f"Breaking cycle {cycle} by changing orientation of "
+                        f"edge {min_edge}")
                 new_dag.remove_edge(*min_edge)
                 new_dag.add_edge(*potential_misoriented[0][1::-1])
                 continue
@@ -728,34 +775,51 @@ def graph_from_adjacency(
     return G
 
 
-def graph_from_adjacency_file(file: Union[Path, str], th=0.0) -> Tuple[
-        nx.DiGraph, pd.DataFrame]:
+def graph_from_adjacency_file(
+        file: Union[Path, str],
+        labels=None,
+        th=0.0,
+        sep=",",
+        header:bool=True
+) -> Tuple[nx.DiGraph, pd.DataFrame]:
     """
     Read Adjacency matrix from a file and return a Graph
 
     Args:
         file: (str) the full path of the file to read
+        labels: (List[str]) the list of node names to be used. If None, the
+            node names are extracted from the adj file. The names must be already
+            sorted in the same order as the adjacency matrix.
         th: (float) weight threshold to be considered a valid edge.
+        sep: (str) the separator used in the file
+        header: (bool) whether the file has a header. If True, then 'infer' is used
+            to read the header.
     Returns:
         DiGraph, DataFrame
     """
-    df = pd.read_csv(file, dtype="str")
+    header_infer = "infer" if header else None
+    df = pd.read_csv(file, dtype="str", delimiter=sep, header=header_infer)
     df = df.astype("float64")
-    labels = list(df)
+    if labels is None:
+        labels = list(df.columns)
     G = graph_from_adjacency(df.values, node_labels=labels, th=th)
 
     return G, df
 
 
-def graph_to_adjacency(graph: AnyGraph,
-                       node_names: Optional[List[str]] = None,
-                       weight_label: str = "weight") -> np.ndarray:
+def graph_to_adjacency(
+        graph: AnyGraph,
+        labels: List[str],
+        weight_label: str = "weight") -> np.ndarray:
     """
     A method to generate the adjacency matrix of the graph. Labels are
     sorted for better readability.
 
     Args:
         graph: (Union[Graph, DiGraph]) the graph to be converted.
+        node_names: (List[str]) the list of node names to be used. If None, the
+            node names are extracted from the graph. The names must be already
+            sorted in the same order as the adjacency matrix.
         weight_label: the label used to identify the weights.
 
     Return:
@@ -763,16 +827,19 @@ def graph_to_adjacency(graph: AnyGraph,
             the graph.
     """
     symbol_map = {"o": 1, ">": 2, "-": 3}
-    labels = sorted(list(graph.nodes))  # [node for node in self]
-    # Double check if all nodes are in the graph
-    if node_names is not None:
-        for n in list(node_names):
-            if n not in set(labels):
-                labels.append(n)
-        labels = sorted(labels)
+    # labels = list(graph.nodes)
+
+    # # Double check if all nodes are in the graph
+    # if node_names is not None:
+    #     for n in list(node_names):
+    #         if n not in set(labels):
+    #             labels.append(n)
+    #     labels = sorted(labels)
+
     # Fix for the case where an empty node is parsed from the .dot file
     if '\\n' in labels:
         labels.remove('\\n')
+
     mat = np.zeros((len(labels), (len(labels))))
     for x in labels:
         for y in labels:
@@ -792,7 +859,7 @@ def graph_to_adjacency(graph: AnyGraph,
     return mat
 
 
-def graph_to_adjacency_file(graph: AnyGraph, output_file: Union[Path, str]):
+def graph_to_adjacency_file(graph: AnyGraph, output_file: Union[Path, str], labels):
     """
     A method to write the adjacency matrix of the graph to a file. If graph has
     weights, these are the values stored in the adjacency matrix.
@@ -801,8 +868,7 @@ def graph_to_adjacency_file(graph: AnyGraph, output_file: Union[Path, str]):
         graph: (Union[Graph, DiGraph] the graph to be saved
         output_file: (str) The full path where graph is to be saved
     """
-    mat = graph_to_adjacency(graph)
-    labels = sorted(list(graph.nodes))
+    mat = graph_to_adjacency(graph, labels)
     with open(output_file, "w", encoding="utf-8") as f:
         f.write(",".join([f"{label}" for label in labels]))
         f.write("\n")
@@ -961,3 +1027,177 @@ def get_feature_types(X) -> Dict[str, str]:
             feature_types[feature_names[i]] = _classify_variable(feature)
 
     return feature_types
+
+
+def cast_categoricals_to_int(X: pd.DataFrame) -> pd.DataFrame:
+    """
+    Cast all categorical features in the dataframe to integer values.
+
+    Parameters
+    ----------
+    X: pd.DataFrame
+        The dataframe to cast.
+
+    Returns
+    -------
+    pd.DataFrame
+        The dataframe with all categorical features cast to integer values.
+    """
+    X = X.copy()
+    for feature in X.columns:
+        feature_dtype = _classify_variable(X[feature].values)
+        if feature_dtype == "multiclass" or feature_dtype == "binary":
+            X[feature] = X[feature].astype(np.int16)
+
+    return X
+
+
+def find_crossing_point(
+        f1: List[float],  # Values of the first curve (precision, for example)
+        f2: List[float],  # Values of the second curve (recall, for example)
+        # X values (thresholds, for example) corresponding
+        x_values: List[float]
+    # to the curve evaluations
+) -> Optional[float]:
+    """
+    This function finds the exact crossing point between two curves defined by
+    f1 and f2 over x_values. It interpolates between points to provide a more
+    accurate crossing point.
+
+    Parameters:
+    -----------
+    f1: List[float]
+        Values of the first curve (precision, for example).
+    f2: List[float]
+        Values of the second curve (recall, for example).
+    x_values: List[float]
+        X values (thresholds, for example) corresponding to the curve evaluations.
+
+    Returns:
+    --------
+    Optional[float]
+        The x value where the first crossing occurs between the two curves.
+        If no crossing is found, returns None.
+    """
+    def interpolate_crossing(
+            f1_prev: float,  # Value of f1 at the previous x value
+            f2_prev: float,  # Value of f2 at the previous x value
+            x_prev: float,  # Previous x value
+            x_next: float,  # Next x value
+            f1_next: float,  # Value of f1 at the next x value
+            f2_next: float  # Value of f2 at the next x value
+    ) -> float:
+        # Linear interpolation formula to find the exact crossing point between
+        # two points
+        return x_prev + (x_next - x_prev) * abs(f1_prev - f2_prev) / \
+            (abs(f1_prev - f1_next) + abs(f2_prev - f2_next))
+
+    # Loop through the x values and find where the first crossing occurs
+    for i in range(1, len(x_values)):
+        # Check for a crossing between consecutive points
+        if (f1[i-1] < f2[i-1] and f1[i] > f2[i]) or \
+                (f1[i-1] > f2[i-1] and f1[i] < f2[i]):
+            # Interpolate to find the exact crossing point
+            return interpolate_crossing(
+                f1[i-1], f2[i-1], x_values[i-1], x_values[i], f1[i], f2[i])
+
+    return None  # No crossing found
+
+
+def format_time(seconds: float) -> (float, str):  # type: ignore
+    """
+    Convert the time in seconds to a more convenient time unit.
+
+    Parameters
+    ----------
+    seconds : float
+        The time in seconds.
+
+    Returns
+    -------
+    (float, str)
+        The time in the most appropriate unit and the unit string.
+
+    Examples
+    --------
+    >>> format_time(1.0)
+    (1.0, 's')
+    >>> format_time(60.0)
+    (1.0, 'm')
+    >>> format_time(3600.0)
+    (1.0, 'h')
+    >>> format_time(86400.0)
+    (1.0, 'd')
+    >>> format_time(604800.0)
+    (1.0, 'w')
+    >>> format_time(2592000.0)
+    (1.0, 'm')
+    >>> format_time(31536000.0)
+    (1.0, 'y')
+    >>> format_time(315360000.0)
+    (1.0, 'a')
+    """
+    if seconds < 0:
+        raise ValueError("time cannot be negative")
+    if seconds < 60.0:
+        return seconds, 's'
+    elif seconds < 3600.0:
+        return seconds / 60.0, 'm'
+    elif seconds < 86400.0:
+        return seconds / 3600.0, 'h'
+    elif seconds < 604800.0:
+        return seconds / 86400.0, 'd'
+    elif seconds < 2592000.0:
+        return seconds / 604800.0, 'w'
+    elif seconds < 31536000.0:
+        return seconds / 2592000.0, 'm'
+    elif seconds < 315360000.0:
+        return seconds / 31536000.0, 'y'
+    else:
+        return seconds / 315360000.0, 'a'
+
+
+def combine_dags(
+    dag1: nx.DiGraph,
+    dag2: nx.DiGraph,
+    discrepancies: pd.DataFrame,
+    prior: Optional[List[List[str]]] = None
+) -> Tuple[nx.DiGraph, nx.DiGraph, nx.DiGraph, nx.DiGraph]:
+    """
+    Combine two directed acyclic graphs (DAGs) into a single DAG.
+
+    Parameters
+    ----------
+    dag1 : nx.DiGraph
+        The first DAG.
+    dag2 : nx.DiGraph
+        The second DAG.
+    discrepancies : pd.DataFrame
+        A DataFrame containing the permutation importances for each edge in the DAGs.
+    prior : Optional[List[List[str]]], optional
+        A list of lists containing the prior knowledge about the edges in the DAGs.
+        The lists define a hierarchy of edges that represent a temporal relation in
+        cause and effect. If a node is in the first list, then it is a root cause.
+        If a node is in the second list, then it is caused by the nodes in the
+        first list or the second list, and so on.
+
+    Returns
+    -------
+    Tuple[nx.DiGraph, nx.DiGraph, nx.DiGraph, nx.DiGraph]
+        A tuple containing four graphs: the union of the two DAGs, the
+        intersection of the two DAGs, the union of the two DAGs after removing
+        cycles, and the intersection of the two DAGs after removing cycles.
+    """
+    # Compute the union of the two DAGs
+    union = graph_union(dag1, dag2)
+
+    # Compute the intersection of the two DAGs
+    inter = graph_intersection(dag1, dag2)
+
+    # Remove cycles from the union and intersection
+    union_cycles_removed = break_cycles_if_present(
+        union, discrepancies, prior)
+    inter_cycles_removed = break_cycles_if_present(
+        inter, discrepancies, prior)
+
+    return union, inter, union_cycles_removed, inter_cycles_removed
