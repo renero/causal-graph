@@ -989,7 +989,6 @@ def custom_main(dataset_name,
                 load_model: bool = False,
                 fit_model: bool = True,
                 predict_model: bool = True,
-                iterative_predict: bool = False,
                 scale_data: bool = False,
                 tune_model: bool = False,
                 model_type="nn",
@@ -1020,11 +1019,6 @@ def custom_main(dataset_name,
         prior = rex.get_prior_from_ref_graph(input_path)
         rex.predict(data, ref_graph, prior=prior,
                     pipeline=".fast_predict_pipeline.yaml")
-
-    # if iterative_predict:
-    #     prior = rex.get_prior_from_ref_graph(input_path)
-    #     rex.iterative_predict(
-    #         data, ref_graph, prior=prior, num_iterations=10, parallel=False)
 
     if save:
         where_to = utils.save_experiment(rex.name, output_path, rex)

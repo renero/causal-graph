@@ -1124,10 +1124,21 @@ def plot_all_dags(what, include_others=True, **kwargs):
 
 
 if __name__ == "__main__":
-    # experiments = Experiments("rex_generated_linear_*.csv", verbose=False)
-    # experiments.load("rex_generated_linear_*_gbt.pickle")
-    # main_metrics = experiments.metrics()
-    # print(main_metrics)
+    np.set_printoptions(precision=4, linewidth=150)
+    warnings.filterwarnings('ignore')
 
-    e = Experiment('rex_generated_linear_1')\
-        .load(exp_name="rex_generated_linear_1_nn")
+    input_path = os.path.expanduser("~/phd/data/")
+    output_path = os.path.expanduser("~/phd/output/")
+
+    exp = Experiment(
+        "toy_dataset",
+        os.path.join(input_path, "toy_dataset.csv"),
+        os.path.join(output_path, "toy_dataset.dot"),
+        model_type="pc",
+        input_path=input_path,
+        output_path=output_path)
+
+    exp = exp.fit_predict(
+        'pc', variant="stable",
+        ci_test="pearsonr", max_cond_vars=5, prog_bar=True)
+    print(exp.pc.dag.edges())

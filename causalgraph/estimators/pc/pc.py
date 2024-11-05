@@ -74,7 +74,7 @@ class PC(StructureEstimator):
         self.return_type = kwargs.get("return_type", "dag")
         self.significance_level = kwargs.get("significance_level", 0.01)
         self.n_jobs = kwargs.get("n_jobs", -1)
-        self.prog_bar = kwargs.get("prog_bar", False)
+        self.prog_bar = kwargs.get("prog_bar", True)
 
     def fit(self, X, **kwargs):
         """
@@ -269,10 +269,9 @@ class PC(StructureEstimator):
                 f"or a function. Got: {ci_test_fn}"
             )
 
-        # pbar = tqdm(
-        #     total=self.max_cond_vars, **tqdm_params("PC algorithm", self.prog_bar))
-        if self.prog_bar and not self.verbose:
-            pbar = ProgBar().start_subtask("PC", self.max_cond_vars)
+        if self.prog_bar:
+            # pbar = ProgBar().start_subtask("PC", self.max_cond_vars)
+            pbar = ProgBar("PC", self.max_cond_vars)
         else:
             pbar = None
 
@@ -386,13 +385,15 @@ class PC(StructureEstimator):
             lim_neighbors += 1
 
             if self.prog_bar and SHOW_PROGRESS:
-                pbar.update_subtask(1)
+                pbar.update_subtask("PC", 1)
                 # pbar.set_description(
                 #     f"PC: Working for n conditional variables: {lim_neighbors}"
                 # )
 
         # if self.prog_bar and SHOW_PROGRESS:
         #     pbar.close()
+        pbar.remove("PC")
+
         return graph, separating_sets
 
     @staticmethod
