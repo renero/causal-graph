@@ -123,7 +123,7 @@ estimators = {
     'lingam': LiNGAM,
     'ges': GES
 }
-method_names = ['pc', 'fci', 'ges', 'lingam']
+method_names = ['pc', 'fci', 'ges', 'lingam', 'cam', 'notears']
 synth_data_types = ['linear', 'polynomial', 'gp_add', 'gp_mix', 'sigmoid_add']
 synth_data_labels = ['Linear', 'Polynomial',
                      'Gaussian(add)', 'Gaussian(mix)', 'Sigmoid(add)']
@@ -1131,14 +1131,14 @@ if __name__ == "__main__":
     output_path = os.path.expanduser("~/phd/output/")
 
     exp = Experiment(
-        "toy_dataset",
-        os.path.join(input_path, "toy_dataset.csv"),
-        os.path.join(output_path, "toy_dataset.dot"),
-        model_type="pc",
+        "mid_dataset",
+        os.path.join(input_path,  "mid_dataset.csv"),
+        os.path.join(output_path, "mid_dataset.dot"),
+        # model_type="nn",
         input_path=input_path,
         output_path=output_path)
 
-    exp = exp.fit_predict(
-        'pc', variant="stable",
-        ci_test="pearsonr", max_cond_vars=5, prog_bar=True)
-    print(exp.pc.dag.edges())
+    method_name = "fci"
+    exp = exp.fit_predict(method_name)
+    method = getattr(exp, method_name)
+    print(method.dag.edges())

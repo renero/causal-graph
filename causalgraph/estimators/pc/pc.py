@@ -269,11 +269,7 @@ class PC(StructureEstimator):
                 f"or a function. Got: {ci_test_fn}"
             )
 
-        if self.prog_bar:
-            # pbar = ProgBar().start_subtask("PC", self.max_cond_vars)
-            pbar = ProgBar("PC", self.max_cond_vars)
-        else:
-            pbar = None
+        pbar = ProgBar("PC", self.max_cond_vars) if self.prog_bar else None
 
         # Step 1: Initialize a fully connected undirected graph
         graph = nx.complete_graph(n=self.variables, create_using=nx.Graph)
@@ -386,13 +382,8 @@ class PC(StructureEstimator):
 
             if self.prog_bar and SHOW_PROGRESS:
                 pbar.update_subtask("PC", 1)
-                # pbar.set_description(
-                #     f"PC: Working for n conditional variables: {lim_neighbors}"
-                # )
 
-        # if self.prog_bar and SHOW_PROGRESS:
-        #     pbar.close()
-        pbar.remove("PC")
+        pbar.remove("PC") if self.prog_bar else None
 
         return graph, separating_sets
 
