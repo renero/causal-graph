@@ -213,7 +213,6 @@ class ShapEstimator(BaseEstimator):
         self.feature_names = list(self.models.regressor.keys())
         self.shap_explainer = {}
         self.shap_values = {}
-        # self.shap_scaled_values = {}
         self.shap_mean_values = {}
         self.feature_order = {}
         self.all_mean_shap_values = np.empty((0, ), dtype=np.float16)
