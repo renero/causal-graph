@@ -35,11 +35,9 @@ def computeScoreMatParallel(
     # them "parents_to_check")
     parents_to_check = row_parents[i, :]
     if verbose:
-        print(f". . parents_to_check: {parents_to_check.flatten()}")
+        print(f"parents_to_check: {parents_to_check.flatten()}")
 
     if verbose:
-        # print(
-        #     f"\r Compute score entry for regressing {node2} on {parents_to_check}                  \r")
         print(
             f". Compute score entry for regressing {node2} on {parents_to_check}")
 
@@ -48,10 +46,15 @@ def computeScoreMatParallel(
     else:
         X2 = X
 
+    parents_to_check = parents_to_check.astype(int)
     if node2 not in parents_to_check and \
-            np.prod(sel_mat[parents_to_check, node2]) is True:
+            np.prod(sel_mat[parents_to_check, node2]) == 1:
         if verbose:
             print(". . node2 not in parentsToCheck AND all parents are selected")
+            print(
+                f". . . '{node2}' not in parents_to_check ({parents_to_check}) OR\n"
+                f". . . selMat[parentsToCheck, node2] = "
+                f"{sel_mat[parents_to_check, node2]}")
         if score_name == "SEMSEV":
             raise ValueError("This score does not work. It does not decouple.")
         elif score_name == "SEMIND":
@@ -70,7 +73,11 @@ def computeScoreMatParallel(
         else:
             raise ValueError("I do not know this score function.")
     else:
-        print("NOT matching") if verbose else None
+        print(". . NOT matching\n"
+              f". . . '{node2}' not in? parents_to_check ({parents_to_check}) "
+              f"{node2 not in parents_to_check} OR\n"
+              f". . . selMat[parentsToCheck, node2] = "
+              f"{sel_mat[parents_to_check, node2]}") if verbose else None
         score = -np.inf
 
     return score

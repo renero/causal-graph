@@ -25,7 +25,7 @@ from sklearn.preprocessing import StandardScaler
 
 from causalgraph.common import plot, utils
 from causalgraph.common import utils
-from causalgraph.estimators.cam import CAM
+from causalgraph.estimators.cam.cam import CAM
 from causalgraph.estimators.fci.fci import FCI
 from causalgraph.estimators.ges.ges import GES
 from causalgraph.estimators.lingam.lingam import DirectLiNGAM as LiNGAM
@@ -121,7 +121,9 @@ estimators = {
     'fci': FCI,
     'pc': PC,
     'lingam': LiNGAM,
-    'ges': GES
+    'ges': GES,
+    'cam': CAM,
+    # 'notears': NOTEARS
 }
 method_names = ['pc', 'fci', 'ges', 'lingam', 'cam', 'notears']
 synth_data_types = ['linear', 'polynomial', 'gp_add', 'gp_mix', 'sigmoid_add']
@@ -1129,16 +1131,27 @@ if __name__ == "__main__":
 
     input_path = os.path.expanduser("~/phd/data/")
     output_path = os.path.expanduser("~/phd/output/")
-
     exp = Experiment(
-        "mid_dataset",
-        os.path.join(input_path,  "mid_dataset.csv"),
-        os.path.join(output_path, "mid_dataset.dot"),
+        experiment_name="toy_dataset",
+        csv_filename=os.path.join(input_path,  "toy_dataset.csv"),
+        dot_filename=os.path.join(input_path, "toy_dataset.dot"),
         # model_type="nn",
         input_path=input_path,
         output_path=output_path)
 
-    method_name = "fci"
-    exp = exp.fit_predict(method_name)
+    extra_args = {
+        'pc': {},
+        'ges': {},
+        'lingam': {},
+        'fci': {},
+        'cam': {
+            'pruning': True,
+            'pruneMethodPars': {"cutOffPVal": 0.05, "numBasisFcts": 10}
+        }
+    }
+
+    method_name = "cam"
+    exp = exp.fit_predict(method_name, **extra_args[method_name])
     method = getattr(exp, method_name)
     print(method.dag.edges())
+    print(method.metrics)
