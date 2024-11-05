@@ -30,6 +30,7 @@ from causalgraph.estimators.fci.fci import FCI
 from causalgraph.estimators.ges.ges import GES
 from causalgraph.estimators.lingam.lingam import DirectLiNGAM as LiNGAM
 from causalgraph.estimators.pc.pc import PC
+from causalgraph.estimators.notears.notears import NOTEARS
 from causalgraph.estimators.rex import Rex
 from causalgraph.metrics.compare_graphs import evaluate_graph
 
@@ -123,7 +124,7 @@ estimators = {
     'lingam': LiNGAM,
     'ges': GES,
     'cam': CAM,
-    # 'notears': NOTEARS
+    'notears': NOTEARS
 }
 method_names = ['pc', 'fci', 'ges', 'lingam', 'cam', 'notears']
 synth_data_types = ['linear', 'polynomial', 'gp_add', 'gp_mix', 'sigmoid_add']
@@ -1147,10 +1148,11 @@ if __name__ == "__main__":
         'cam': {
             'pruning': True,
             'pruneMethodPars': {"cutOffPVal": 0.05, "numBasisFcts": 10}
-        }
+        },
+        'notears': {}
     }
 
-    method_name = "cam"
+    method_name = "notears"
     exp = exp.fit_predict(method_name, **extra_args[method_name])
     method = getattr(exp, method_name)
     print(method.dag.edges())

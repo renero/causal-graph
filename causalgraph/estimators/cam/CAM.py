@@ -1,4 +1,18 @@
 """
+
+(C) Original Code from R implementation of the Causal Additive Model (CAM)
+
+@article{buhlmann2014cam,
+  title={CAM: Causal additive models, high-dimensional order search and penalized regression},
+  author={B{\"u}hlmann, Peter and Peters, Jonas and Ernest, Jan},
+  journal={The Annals of Statistics},
+  volume={42},
+  number={6},
+  pages={2526--2556},
+  year={2014},
+  publisher={Institute of Mathematical Statistics}
+}
+
 - **Imports**: Imported necessary modules and functions. Assumed that
 `computeScoreMat`, `updateScoreMat`, `pruning`, `selGamBoost`, and `selGam`
 are defined in separate Python files in the same directory.
