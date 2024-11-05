@@ -7,13 +7,13 @@ step2:
     hpo_n_trials: 1
 step3:
   method: models.score
-step4:
-  attribute: root_causes
-  method: compute_regression_quality
-step5:
-  attribute: shaps
-  class: ShapEstimator
-  arguments:
-    models: models
-step6:
-  method: shaps.fit
+# step4:
+#   attribute: root_causes
+#   method: compute_regression_quality
+# step5:
+#   attribute: shaps
+#   class: ShapEstimator
+#   arguments:
+#     models: models
+# step6:
+#   method: shaps.fit

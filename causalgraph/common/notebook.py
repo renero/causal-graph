@@ -25,11 +25,12 @@ from sklearn.preprocessing import StandardScaler
 
 from causalgraph.common import plot, utils
 from causalgraph.common import utils
-from causalgraph.estimators.cam import CAM
+from causalgraph.estimators.cam.cam import CAM
 from causalgraph.estimators.fci.fci import FCI
 from causalgraph.estimators.ges.ges import GES
 from causalgraph.estimators.lingam.lingam import DirectLiNGAM as LiNGAM
 from causalgraph.estimators.pc.pc import PC
+from causalgraph.estimators.notears.notears import NOTEARS
 from causalgraph.estimators.rex import Rex
 from causalgraph.metrics.compare_graphs import evaluate_graph
 
@@ -121,9 +122,11 @@ estimators = {
     'fci': FCI,
     'pc': PC,
     'lingam': LiNGAM,
-    'ges': GES
+    'ges': GES,
+    'cam': CAM,
+    'notears': NOTEARS
 }
-method_names = ['pc', 'fci', 'ges', 'lingam']
+method_names = ['pc', 'fci', 'ges', 'lingam', 'cam', 'notears']
 synth_data_types = ['linear', 'polynomial', 'gp_add', 'gp_mix', 'sigmoid_add']
 synth_data_labels = ['Linear', 'Polynomial',
                      'Gaussian(add)', 'Gaussian(mix)', 'Sigmoid(add)']
@@ -1124,10 +1127,33 @@ def plot_all_dags(what, include_others=True, **kwargs):
 
 
 if __name__ == "__main__":
-    # experiments = Experiments("rex_generated_linear_*.csv", verbose=False)
-    # experiments.load("rex_generated_linear_*_gbt.pickle")
-    # main_metrics = experiments.metrics()
-    # print(main_metrics)
+    np.set_printoptions(precision=4, linewidth=150)
+    warnings.filterwarnings('ignore')
 
-    e = Experiment('rex_generated_linear_1')\
-        .load(exp_name="rex_generated_linear_1_nn")
+    input_path = os.path.expanduser("~/phd/data/")
+    output_path = os.path.expanduser("~/phd/output/")
+    exp = Experiment(
+        experiment_name="toy_dataset",
+        csv_filename=os.path.join(input_path,  "toy_dataset.csv"),
+        dot_filename=os.path.join(input_path, "toy_dataset.dot"),
+        # model_type="nn",
+        input_path=input_path,
+        output_path=output_path)
+
+    extra_args = {
+        'pc': {},
+        'ges': {},
+        'lingam': {},
+        'fci': {},
+        'cam': {
+            'pruning': True,
+            'pruneMethodPars': {"cutOffPVal": 0.05, "numBasisFcts": 10}
+        },
+        'notears': {}
+    }
+
+    method_name = "notears"
+    exp = exp.fit_predict(method_name, **extra_args[method_name])
+    method = getattr(exp, method_name)
+    print(method.dag.edges())
+    print(method.metrics)

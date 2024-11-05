@@ -4,23 +4,23 @@ Main class for the REX estimator.
 """
 
 import os
-import warnings
 import time
+import warnings
 from collections import defaultdict
-from copy import deepcopy, copy
+from copy import copy, deepcopy
 from typing import List, Tuple, Union
 
 import networkx as nx
 import numpy as np
 import pandas as pd
+from joblib import Parallel, delayed
 from mlforge.mlforge import Pipeline  # type: ignore
-from mlforge.progbar import ProgBar   # type: ignore
-from rich.progress import Progress
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.preprocessing import StandardScaler
 from sklearn.utils.validation import check_is_fitted, check_random_state
 
-from causalgraph.common import utils, DEFAULT_ITERATIVE_TRIALS, DEFAULT_HPO_TRIALS
+from causalgraph.common import (DEFAULT_HPO_TRIALS, DEFAULT_ITERATIVE_TRIALS,
+                                utils)
 from causalgraph.estimators.knowledge import Knowledge
 from causalgraph.explainability.hierarchies import Hierarchies
 from causalgraph.explainability.perm_importance import PermutationImportance
@@ -29,7 +29,6 @@ from causalgraph.explainability.shapley import ShapEstimator
 from causalgraph.independence.graph_independence import GraphIndependence
 from causalgraph.metrics.compare_graphs import evaluate_graph
 from causalgraph.models import GBTRegressor, NNRegressor
-from joblib import Parallel, delayed
 
 np.set_printoptions(precision=4, linewidth=120)
 warnings.filterwarnings('ignore')
@@ -229,8 +228,7 @@ class Rex(BaseEstimator, ClassifierMixin):
             pipeline.from_list(steps)
 
         n_steps = self.fit_pipeline.len()
-        n_steps += self._steps_from_hpo(self.fit_pipeline)
-        n_steps += (self._steps_from_iterations(self.fit_pipeline))
+        n_steps += (self._steps_from_hpo(self.fit_pipeline) * 2) - 1
 
         self.fit_pipeline.run(n_steps)
         self.fit_pipeline.close()
@@ -314,10 +312,12 @@ class Rex(BaseEstimator, ClassifierMixin):
             subtask=True)
 
         # Overwrite values for prog_bar and verbosity with current pipeline
-        #  values, in case predict is called from a loaded experiment
-        self.shaps.prog_bar = self.prog_bar
-        self.shaps.verbose = self.verbose
+        # values, in case predict is called from a loaded experiment
+        if hasattr(self, "shaps"):
+            self.shaps.prog_bar = self.prog_bar
+            self.shaps.verbose = self.verbose
 
+        # Load a pipeline if specified, or create the default one.
         if pipeline is not None:
             if isinstance(pipeline, list):
                 self.predict_pipeline.from_list(pipeline)
@@ -355,9 +355,9 @@ class Rex(BaseEstimator, ClassifierMixin):
             ]
             self.predict_pipeline.from_list(steps)
 
-        n_steps = self.fit_pipeline.len()
-        n_steps += self._steps_from_hpo(self.fit_pipeline)
-        n_steps += (self._steps_from_iterations(self.fit_pipeline))
+        n_steps = self.predict_pipeline.len()
+        n_steps += self._steps_from_hpo(self.predict_pipeline)
+        n_steps += (self._steps_from_iterations(self.predict_pipeline))*2
 
         self.predict_pipeline.run(n_steps)
         # Check if "G_final" exists in this object (self)
@@ -867,7 +867,7 @@ class Rex(BaseEstimator, ClassifierMixin):
         """
         if fit_steps.contains_method('tune_fit', exact_match=False):
             if 'hpo_n_trials' in self.kwargs:
-                return self.kwargs['hpo_n_trials'] - 1
+                return self.kwargs['hpo_n_trials']
             else:
                 if fit_steps.contains_argument('hpo_n_trials'):
                     return fit_steps.get_argument_value('hpo_n_trials')
@@ -989,7 +989,6 @@ def custom_main(dataset_name,
                 load_model: bool = False,
                 fit_model: bool = True,
                 predict_model: bool = True,
-                iterative_predict: bool = False,
                 scale_data: bool = False,
                 tune_model: bool = False,
                 model_type="nn",
@@ -1013,12 +1012,6 @@ def custom_main(dataset_name,
             name=dataset_name, tune_model=tune_model,
             model_type=model_type, explainer=explainer, hpo_n_trials=1)
 
-    # Disable progress bar
-    rex.prog_bar = False
-    rex.verbose = True
-    rex.shaps.prog_bar = False
-    rex.shaps.verbose = True
-
     if fit_model:
         rex.fit(data, pipeline=".fast_fit_pipeline.yaml")
 
@@ -1027,24 +1020,19 @@ def custom_main(dataset_name,
         rex.predict(data, ref_graph, prior=prior,
                     pipeline=".fast_predict_pipeline.yaml")
 
-    if iterative_predict:
-        prior = rex.get_prior_from_ref_graph(input_path)
-        rex.iterative_predict(
-            data, ref_graph, prior=prior, num_iterations=10, parallel=False)
-
     if save:
         where_to = utils.save_experiment(rex.name, output_path, rex)
         print(f"Saved '{rex.name}' to '{where_to}'")
 
 
 if __name__ == "__main__":
-    custom_main('generated_15vars_linear_0',
-                input_path="/Users/renero/phd/data/RC4/",
+    custom_main('toy_dataset',
+                input_path="/Users/renero/phd/data/",
                 model_type="nn",
                 explainer="gradient",
-                load_model=True,
-                fit_model=False,
-                predict_model=False,
-                iterative_predict=True,
-                tune_model=False,
+                load_model=False,
+                fit_model=True,
+                predict_model=True,
+                scale_data=False,
+                tune_model=True,
                 save=False)
