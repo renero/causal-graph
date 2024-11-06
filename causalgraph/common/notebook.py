@@ -1123,7 +1123,8 @@ if __name__ == "__main__":
     warnings.filterwarnings('ignore')
     extra_args = {
         'rex': {
-            'prog_bar': False,
+            'prog_bar': True,
+            'verbose': False,
             'hpo_n_trials': 1,
             'bootstrap_trials': 10
         },

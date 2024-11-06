@@ -142,6 +142,12 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.prior = None
         self.hpo_study_name = kwargs.get(
             'hpo_study_name', f"{self.name}_{model_type}")
+
+        self.prog_bar = prog_bar
+        self.verbose = verbose
+        self.silent = silent
+        self.random_state = random_state
+
         self.model_type = NNRegressor if model_type == "nn" else GBTRegressor
         self.explainer = explainer
         self._check_model_and_explainer(model_type, explainer)
@@ -165,10 +171,6 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.mean_pi_percentile = mean_pi_percentile
         self.mean_pi_threshold = 0.0
         self.discrepancy_threshold = discrepancy_threshold
-        self.prog_bar = prog_bar
-        self.verbose = verbose
-        self.silent = silent
-        self.random_state = random_state
 
         self.is_fitted_ = False
         self.is_iterative_fitted_ = False
@@ -330,7 +332,7 @@ class Rex(BaseEstimator, ClassifierMixin):
         else:
             steps = [
                 ('shaps', ShapEstimator, {'models': 'models'}),
-                ('G_final', 'iterative_predict', {
+                ('G_final', 'bootstrap', {
                     'num_iterations': self.bootstrap_trials,
                     'sampling_split': self.bootstrap_sampling_split,
                     'tolerance': self.bootstrap_tolerance
@@ -524,7 +526,7 @@ class Rex(BaseEstimator, ClassifierMixin):
 
         return best_tolerance
 
-    def iterative_predict(
+    def bootstrap(
             self,
             X: pd.DataFrame,
             ref_graph: nx.DiGraph = None,
@@ -574,8 +576,6 @@ class Rex(BaseEstimator, ClassifierMixin):
         if self.verbose:
             print(f"Iterative prediction with {num_iterations} iterations, and "
                   f"{sampling_split:.2f} sampling split.")
-            m = evaluate_graph(ref_graph, self.G_shap)
-            print(f"Base {key_metric}: {getattr(m, key_metric):.4f}")
 
         iter_adjacency_matrix = self._build_iterative_adjacency_matrix(
             X, num_iterations, sampling_split, prior, parallel, random_state)
@@ -905,7 +905,7 @@ class Rex(BaseEstimator, ClassifierMixin):
         """
         num_iterations = 0
         num_iterative_steps = fit_steps.contains_method(
-            'iterative_predict', exact_match=False)
+            'bootstrap', exact_match=False)
         if num_iterative_steps > 0:
             if fit_steps.contains_argument('num_iterations'):
                 all_iterations = fit_steps.all_argument_values(
@@ -913,7 +913,7 @@ class Rex(BaseEstimator, ClassifierMixin):
                 if all_iterations != []:
                     return sum(all_iterations)
             else:
-                num_iterations += DEFAULT_ITERATIVE_TRIALS
+                num_iterations += DEFAULT_BOOTSTRAP_TRIALS
 
         return num_iterations
 
@@ -945,14 +945,16 @@ class Rex(BaseEstimator, ClassifierMixin):
     def _check_model_and_explainer(self, model_type, explainer):
         """ Check that the explainer is supported for the model type. """
         if (model_type == "nn" and explainer != "gradient"):
-            print(
-                f"WARNING: SHAP '{explainer}' not supported for model '{model_type}'. "
-                f"Using 'gradient' instead.")
+            if self.verbose:
+                print(
+                    f"WARNING: SHAP '{explainer}' not supported for model "
+                    f"'{model_type}'. Using 'gradient' instead.")
             self.explainer = "gradient"
         if (model_type == "gbt" and explainer != "explainer"):
-            print(
-                f"WARNING: SHAP '{explainer}' not supported for model '{model_type}'. "
-                f"Using 'explainer' instead.")
+            if self.verbose:
+                print(
+                    f"WARNING: SHAP '{explainer}' not supported for model "
+                    f"'{model_type}'. Using 'explainer' instead.")
             self.explainer = "explainer"
 
     def _more_tags(self):
