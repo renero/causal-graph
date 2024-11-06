@@ -236,16 +236,6 @@ class BaseExperiment:
 
         self.ref_graph = utils.graph_from_dot_file(dot_filename)
 
-        # if self.verbose:
-        #     print(
-        #         f"Data for {self.experiment_name}\n"
-        #         f"  ↳ Train....: {self.data.shape[0]} rows, "
-        #         f"{self.data.shape[1]} cols\n"
-        #         f"  ↳ Test.....: {self.test_data.shape[0]} rows, "
-        #         f"{self.data.shape[1]} cols\n"
-        #         f"  ↳ CSV.data.: {csv_filename}\n"
-        #         f"  ↳ Ref.graph: {dot_filename}")
-
     def experiment_exists(self, name):
         """Checks whether the experiment exists in the output path"""
         return os.path.exists(
@@ -313,6 +303,11 @@ class BaseExperiment:
         if estimator_class is None:
             print(f"Estimator '{estimator_name}' not found.")
             return None
+
+        # Special case: when estimator is ReX, model_type needs also to be passed to
+        # the constructor
+        if estimator_name == 'rex':
+            kwargs['model_type'] = self.model_type
 
         return estimator_class(name=name, **kwargs)
 
@@ -426,9 +421,6 @@ class Experiment(BaseExperiment):
         Returns:
             Rex: The fitted experiment data.
         """
-
-        # self.rex = Rex(name=self.experiment_name, **kwargs)
-        # self.rex.fit_predict(self.train_data, self.test_data, self.ref_graph)
         self.estimator_name = estimator
         estimator_object = self.create_estimator(
             estimator, name=self.experiment_name, **kwargs)
@@ -1129,18 +1121,12 @@ def plot_all_dags(what, include_others=True, **kwargs):
 if __name__ == "__main__":
     np.set_printoptions(precision=4, linewidth=150)
     warnings.filterwarnings('ignore')
-
-    input_path = os.path.expanduser("~/phd/data/")
-    output_path = os.path.expanduser("~/phd/output/")
-    exp = Experiment(
-        experiment_name="toy_dataset",
-        csv_filename=os.path.join(input_path,  "toy_dataset.csv"),
-        dot_filename=os.path.join(input_path, "toy_dataset.dot"),
-        # model_type="nn",
-        input_path=input_path,
-        output_path=output_path)
-
     extra_args = {
+        'rex': {
+            'prog_bar': False,
+            'hpo_n_trials': 1,
+            'bootstrap_trials': 10
+        },
         'pc': {},
         'ges': {},
         'lingam': {},
@@ -1152,7 +1138,19 @@ if __name__ == "__main__":
         'notears': {}
     }
 
-    method_name = "notears"
+    input_path = os.path.expanduser("~/phd/data/")
+    output_path = os.path.expanduser("~/phd/output/")
+
+    method_name = "rex"
+
+    exp = Experiment(
+        experiment_name="toy_dataset",
+        csv_filename=os.path.join(input_path,  "toy_dataset.csv"),
+        dot_filename=os.path.join(input_path, "toy_dataset.dot"),
+        model_type="gbt",
+        input_path=input_path,
+        output_path=output_path)
+
     exp = exp.fit_predict(method_name, **extra_args[method_name])
     method = getattr(exp, method_name)
     print(method.dag.edges())

@@ -3,6 +3,13 @@ Main class for the REX estimator.
 (C) J. Renero, 2022, 2023, 2024
 """
 
+# pylint: disable=E1101:no-member, W0201:attribute-defined-outside-init, W0511:fixme
+# pylint: disable=C0103:invalid-name, W0221:arguments-differ
+# pylint: disable=C0116:missing-function-docstring
+# pylint: disable=R0913:too-many-arguments
+# pylint: disable=R0914:too-many-locals, R0915:too-many-statements
+# pylint: disable=W0106:expression-not-assigned, R1702:too-many-branches
+
 import os
 import time
 import warnings
@@ -14,13 +21,15 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
-from mlforge.mlforge import Pipeline  # type: ignore
+from mlforge.mlforge import Pipeline                                     # type: ignore
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.preprocessing import StandardScaler
 from sklearn.utils.validation import check_is_fitted, check_random_state
 
-from causalgraph.common import (DEFAULT_HPO_TRIALS, DEFAULT_ITERATIVE_TRIALS,
-                                utils)
+from causalgraph.common import (
+    utils, DEFAULT_HPO_TRIALS, DEFAULT_BOOTSTRAP_TRIALS,
+    DEFAULT_BOOTSTRAP_TOLERANCE, DEFAULT_BOOTSTRAP_SAMPLING_SPLIT
+)
 from causalgraph.estimators.knowledge import Knowledge
 from causalgraph.explainability.hierarchies import Hierarchies
 from causalgraph.explainability.perm_importance import PermutationImportance
@@ -32,14 +41,6 @@ from causalgraph.models import GBTRegressor, NNRegressor
 
 np.set_printoptions(precision=4, linewidth=120)
 warnings.filterwarnings('ignore')
-
-
-# pylint: disable=E1101:no-member, W0201:attribute-defined-outside-init, W0511:fixme
-# pylint: disable=C0103:invalid-name, W0221:arguments-differ
-# pylint: disable=C0116:missing-function-docstring
-# pylint: disable=R0913:too-many-arguments
-# pylint: disable=R0914:too-many-locals, R0915:too-many-statements
-# pylint: disable=W0106:expression-not-assigned, R1702:too-many-branches
 
 
 class Rex(BaseEstimator, ClassifierMixin):
@@ -87,6 +88,10 @@ class Rex(BaseEstimator, ClassifierMixin):
             condsize: int = 0,
             mean_pi_percentile: float = 0.8,
             discrepancy_threshold: float = 0.99,
+            hpo_n_trials: int = DEFAULT_HPO_TRIALS,
+            bootstrap_trials: int = DEFAULT_BOOTSTRAP_TRIALS,
+            bootstrap_sampling_split='auto',
+            bootstrap_tolerance: float = 'auto',
             verbose: bool = False,
             prog_bar=True,
             silent: bool = False,
@@ -149,6 +154,12 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.corr_method = corr_method
         self.corr_alpha = corr_alpha
         self.corr_clusters = corr_clusters
+
+        self.hpo_n_trials = hpo_n_trials
+        self.bootstrap_trials = bootstrap_trials
+        self.bootstrap_sampling_split = bootstrap_sampling_split
+        self.bootstrap_tolerance = bootstrap_tolerance
+
         self.condlen = condlen
         self.condsize = condsize
         self.mean_pi_percentile = mean_pi_percentile
@@ -212,20 +223,13 @@ class Rex(BaseEstimator, ClassifierMixin):
             elif isinstance(pipeline, str):
                 self.fit_pipeline.from_config(pipeline)
         else:
+            # This is the final set of steps in default mode.
             steps = [
-                ('hierarchies', Hierarchies),
-                ('hierarchies.fit'),
                 ('models', self.model_type),
-                (self.fit_step),
-                ('models.score', {'X': X}),
-                ('root_causes', 'compute_regression_quality'),
-                ('shaps', ShapEstimator, {'models': 'models'}),
-                ('shaps.fit'),
-                ('pi', PermutationImportance, {
-                    'models': 'models', 'discrepancies': 'shaps.shap_discrepancies'}),
-                ('pi.fit'),
+                ('models.tune_fit', {'hpo_n_trials': self.hpo_n_trials}),
+                ('models.score', {})
             ]
-            pipeline.from_list(steps)
+            self.fit_pipeline.from_list(steps)
 
         n_steps = self.fit_pipeline.len()
         n_steps += (self._steps_from_hpo(self.fit_pipeline) * 2) - 1
@@ -325,32 +329,13 @@ class Rex(BaseEstimator, ClassifierMixin):
                 self.predict_pipeline.from_config(pipeline)
         else:
             steps = [
-                # DAGs construction
-                ('G_shap', 'shaps.predict', {
-                    'root_causes': 'root_causes', 'prior': prior}),
-                ('G_rho', 'dag_from_discrepancy', {
-                    'discrepancy_upper_threshold': self.discrepancy_threshold,
-                    "verbose": False}),
-                ('G_adj', 'adjust_discrepancy', {'dag': 'G_shap'}),
-                ('G_pi', 'pi.predict', {
-                    'root_causes': 'root_causes', 'prior': prior}),
-                ('indep', GraphIndependence, {'base_graph': 'G_shap'}),
-                ('G_indep', 'indep.fit_predict'),
-                ('G_final', 'shaps.adjust', {'graph': 'G_indep'}),
-
-                # Knowledge Summarization
-                ('summarize_knowledge', {'ref_graph': ref_graph}),
-
-                # Metrics Generation, here
-                ('metrics_shap', 'score', {
-                    'ref_graph': ref_graph, 'predicted_graph': 'G_shap'}),
-                ('metrics_rho', 'score', {
-                    'ref_graph': ref_graph, 'predicted_graph': 'G_rho'}),
-                ('metrics_adj', 'score', {
-                    'ref_graph': ref_graph, 'predicted_graph': 'G_adj'}),
-                ('metrics_indep', 'score', {
-                    'ref_graph': ref_graph, 'predicted_graph': 'G_indep'}),
-                ('metrics_final', 'score', {
+                ('shaps', ShapEstimator, {'models': 'models'}),
+                ('G_final', 'iterative_predict', {
+                    'num_iterations': self.bootstrap_trials,
+                    'sampling_split': self.bootstrap_sampling_split,
+                    'tolerance': self.bootstrap_tolerance
+                }),
+                ('metrics', 'score', {
                     'ref_graph': ref_graph, 'predicted_graph': 'G_final'})
             ]
             self.predict_pipeline.from_list(steps)
@@ -368,6 +353,10 @@ class Rex(BaseEstimator, ClassifierMixin):
 
         self.end_predict_time = time.time()
         self.predict_time = self.end_predict_time - self.init_predict_time
+
+        # For compatibility with compared methods, we always set an attribute
+        # called 'dag' for the final DAG.
+        self.dag = self.G_final
 
         return self
 
@@ -404,7 +393,7 @@ class Rex(BaseEstimator, ClassifierMixin):
     def _build_iterative_adjacency_matrix(
             self,
             X: pd.DataFrame,
-            num_iterations: int = DEFAULT_ITERATIVE_TRIALS,
+            num_iterations: int = DEFAULT_BOOTSTRAP_TRIALS,
             sampling_split: float = 0.5,
             prior: list = None,
             parallel: bool = True,
@@ -439,7 +428,8 @@ class Rex(BaseEstimator, ClassifierMixin):
             (self.n_features_in_, self.n_features_in_))
 
         def process_iteration(iter):
-            data_sample = X.sample(frac=sampling_split, random_state=iter*random_state)
+            data_sample = X.sample(frac=sampling_split,
+                                   random_state=iter*random_state)
 
             # Disable progress_bar in parallel execution
             if parallel:
@@ -453,16 +443,18 @@ class Rex(BaseEstimator, ClassifierMixin):
             if parallel:
                 self.shaps.prog_bar = pb_state
 
-            adjacency_matrix = utils.graph_to_adjacency(dag, self.feature_names)
+            adjacency_matrix = utils.graph_to_adjacency(
+                dag, self.feature_names)
             if self.verbose:
                 print("· Iteration", iter+1, "done.")
             return adjacency_matrix
 
         if parallel:
             results = Parallel(n_jobs=-1, prefer="threads")(delayed(process_iteration)(iter)
-                for iter in range(num_iterations))
+                                                            for iter in range(num_iterations))
         else:
-            results = [process_iteration(iter) for iter in range(num_iterations)]
+            results = [process_iteration(iter)
+                       for iter in range(num_iterations)]
 
         for result in results:
             iter_adjacency_matrix += result
@@ -535,15 +527,15 @@ class Rex(BaseEstimator, ClassifierMixin):
     def iterative_predict(
             self,
             X: pd.DataFrame,
-            ref_graph: nx.DiGraph=None,
-            num_iterations: int = DEFAULT_ITERATIVE_TRIALS,
-            sampling_split: float = 0.2,
+            ref_graph: nx.DiGraph = None,
+            num_iterations: int = DEFAULT_BOOTSTRAP_TRIALS,
+            sampling_split: float = DEFAULT_BOOTSTRAP_SAMPLING_SPLIT,
             prior: list = None,
             random_state: int = 1234,
-            tolerance: Union[float, str] = 'auto',
+            tolerance: Union[float, str] = DEFAULT_BOOTSTRAP_TOLERANCE,
             key_metric: str = 'f1',
             direction: str = 'maximize',
-            parallel: bool=False) -> nx.DiGraph:
+            parallel: bool = False) -> nx.DiGraph:
         """
         Finds the best tolerance value for the iterative predict method by iterating
         over different tolerance values and selecting the one that gives the best
@@ -571,9 +563,13 @@ class Rex(BaseEstimator, ClassifierMixin):
         nx.DiGraph : The best DAG found by the iterative predict method.
         """
         if ref_graph is None and tolerance == 'auto':
-            raise ValueError("ref_graph must be specified when tolerance set to 'auto'")
+            raise ValueError(
+                "ref_graph must be specified when tolerance set to 'auto'")
         if direction != 'maximize' and direction != 'minimize':
             raise ValueError("direction must be 'maximize' or 'minimize'")
+
+        if sampling_split == 'auto':
+            sampling_split = self._set_sampling_split()
 
         if self.verbose:
             print(f"Iterative prediction with {num_iterations} iterations, and "
@@ -845,12 +841,29 @@ class Rex(BaseEstimator, ClassifierMixin):
             input_path, ref_graph_file))
 
         if ref_graph is None:
-            print(f"WARNING: The reference graph '{ref_graph_file}' was not found.")
+            print(
+                f"WARNING: The reference graph '{ref_graph_file}' was not found.")
             return None
 
         root_nodes = [node for node,
                       degree in ref_graph.in_degree() if degree == 0]
         return [root_nodes, [node for node in ref_graph.nodes if node not in root_nodes]]
+
+    def _set_sampling_split(self):
+        r"""
+        Set the sampling splits for the bootstrap.
+
+        .. math::
+
+            \tau = \frac{s}{m} \ge 1 - p^{\frac{1}{r}} \ge 1-e^{\frac{\ln p}{r}}
+
+        We take \( p=0.01 \), so \( \ln p = -4.605170185988091 \)
+
+        Returns
+        -------
+        float
+        """
+        return 1.0 - np.e**(-4.605170185988091 / self.bootstrap_trials)
 
     def _steps_from_hpo(self, fit_steps) -> int:
         """
@@ -1006,7 +1019,8 @@ def custom_main(dataset_name,
         data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)
 
     if load_model:
-        rex: Rex = utils.load_experiment(f"{dataset_name}_{model_type}", output_path)
+        rex: Rex = utils.load_experiment(
+            f"{dataset_name}_{model_type}", output_path)
     else:
         rex = Rex(
             name=dataset_name, tune_model=tune_model,

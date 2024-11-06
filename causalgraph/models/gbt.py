@@ -310,11 +310,13 @@ class GBTRegressor(GradientBoostingRegressor):
                     train_data,
                     test_data,
                     device='cpu',
+                    prog_bar=True,
                     verbose=False):
                 self.train_data = train_data
                 self.test_data = test_data
                 self.device = device
                 self.random_state = GBTRegressor.random_state
+                self.prog_bar = prog_bar
                 self.verbose = verbose
 
             def __call__(self, trial):
@@ -356,7 +358,7 @@ class GBTRegressor(GradientBoostingRegressor):
                     max_leaf_nodes=self.max_leaf_nodes,
                     n_iter_no_change=self.n_iter_no_change,
                     tol=self.tol,
-                    prog_bar=True & (not self.verbose),
+                    prog_bar=True & (not self.verbose) & (self.prog_bar),
                     silent=True)
 
                 self.models.fit(self.train_data)
@@ -402,7 +404,7 @@ class GBTRegressor(GradientBoostingRegressor):
             load_if_exists=load_if_exists)
         study.optimize(
             Objective(
-                training_data, test_data, verbose=self.verbose),
+                training_data, test_data, prog_bar=self.prog_bar, verbose=self.verbose),
             n_trials=n_trials,
             gc_after_trial=True,
             show_progress_bar=(self.optuna_prog_bar & (

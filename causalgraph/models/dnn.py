@@ -176,7 +176,7 @@ class NNRegressor(BaseEstimator):
             caller_name = calframe[1][3]
             if caller_name == "__call__":
                 caller_name = "HPO"
-        except Exception:  # pylint: disable=broad-except
+        except Exception:                                # pylint: disable=broad-except
             caller_name = "unknown"
 
         if self.correlation_th:
@@ -387,6 +387,7 @@ class NNRegressor(BaseEstimator):
                     train_data,
                     test_data,
                     device='cpu',
+                    prog_bar=True,
                     verbose=False):
                 self.train_data = train_data
                 self.test_data = test_data
@@ -399,6 +400,7 @@ class NNRegressor(BaseEstimator):
                 self.batch_size = None
                 self.num_epochs = None
                 self.models = None
+                self.prog_bar = prog_bar
                 self.verbose = verbose
 
             def __call__(self, trial):
@@ -429,7 +431,7 @@ class NNRegressor(BaseEstimator):
                     device=self.device,
                     random_state=42,
                     verbose=self.verbose,
-                    prog_bar=True & (not self.verbose),
+                    prog_bar=True & (not self.verbose) & (self.prog_bar),
                     silent=True)
 
                 self.models.fit(self.train_data)
@@ -504,7 +506,7 @@ class NNRegressor(BaseEstimator):
             load_if_exists=load_if_exists)
         study.optimize(
             Objective(
-                training_data, test_data, verbose=self.verbose),
+                training_data, test_data, prog_bar=self.prog_bar, verbose=self.verbose),
             n_trials=n_trials,
             show_progress_bar=(self.optuna_prog_bar & (
                 not self.silent) & (not self.verbose)),
