@@ -1142,8 +1142,8 @@ if __name__ == "__main__":
             'prog_bar': True,
             'verbose': False,
             'hpo_n_trials': 1,
-            'bootstrap_trials': 10,
-            'bootstrap_parallel_jobs': 4
+            'bootstrap_trials': 50,
+            'bootstrap_parallel_jobs': -1
         },
         'pc': {},
         'ges': {},
@@ -1160,12 +1160,13 @@ if __name__ == "__main__":
     output_path = os.path.expanduser("~/phd/output/")
 
     method_name = "rex"
+    dataset_name = "toy_dataset"
 
     exp = Experiment(
-        experiment_name="toy_dataset",
-        csv_filename=os.path.join(input_path,  "toy_dataset.csv"),
-        dot_filename=os.path.join(input_path, "toy_dataset.dot"),
-        model_type="nn",
+        experiment_name=dataset_name,
+        csv_filename=os.path.join(input_path, f"{dataset_name}.csv"),
+        dot_filename=os.path.join(input_path, f"{dataset_name}.dot"),
+        model_type="gbt",
         input_path=input_path,
         output_path=output_path)
 

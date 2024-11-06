@@ -23,6 +23,7 @@ import pandas as pd
 from joblib import Parallel, delayed
 # type: ignore
 from mlforge.mlforge import Pipeline
+from mlforge.progbar import ProgBar
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.preprocessing import StandardScaler
 from sklearn.utils.validation import check_is_fitted, check_random_state
@@ -349,7 +350,13 @@ class Rex(BaseEstimator, ClassifierMixin):
 
         n_steps = self.predict_pipeline.len()
         n_steps += self._steps_from_hpo(self.predict_pipeline)
-        n_steps += (self._steps_from_iterations(self.predict_pipeline))*2
+        # If parallelization is ON nr of steps is the nr of iterations
+        # else, is the number of iterations * 2
+        if self.bootstrap_parallel_jobs != 0:
+            n_steps += (self._steps_from_bootstrap(self.predict_pipeline))
+        else:
+            n_steps += (self._steps_from_bootstrap(self.predict_pipeline) * 2)
+
 
         self.predict_pipeline.run(n_steps)
         # Check if "G_final" exists in this object (self)
@@ -434,41 +441,53 @@ class Rex(BaseEstimator, ClassifierMixin):
         iter_adjacency_matrix = np.zeros(
             (self.n_features_in_, self.n_features_in_))
 
-        def process_iteration(iter):
+        def process_iteration(iter, X, models, sampling_split, feature_names, prior,
+                              random_state, pbar=None, verbose=False):
+            """
+            Process an iteration of the iterative prediction.
+            """
             data_sample = X.sample(frac=sampling_split,
                                    random_state=iter*random_state)
-
-            # Disable progress_bar in parallel execution
-            if parallel_jobs != 0:
-                pb_state = self.shaps.prog_bar
-                self.shaps.prog_bar = False
-
-            self.shaps.fit(data_sample)
-            dag = self.shaps.predict(data_sample, prior=prior)
-
-            # Restate progress_bar to original state
-            if parallel_jobs != 0:
-                self.shaps.prog_bar = pb_state
-
+            shaps_instance = ShapEstimator(models=models, prog_bar=False)
+            shaps_instance.fit(data_sample)
+            dag = shaps_instance.predict(data_sample, prior=prior)
             adjacency_matrix = utils.graph_to_adjacency(
-                dag, self.feature_names)
-            if self.verbose:
+                dag, feature_names)
+            pbar.update_subtask("Bootstrap", 1) if pbar else None
+            if verbose:
                 print("· Iteration", iter+1, "done.")
+
             return adjacency_matrix
 
         if parallel_jobs != 0:
+            if self.prog_bar and not self.verbose:
+                pbar = ProgBar().start_subtask("Bootstrap", num_iterations)
+            else:
+                pbar = None
+            # Prepare arguments to pass to process_iteration
+            args = {
+                'X': X,
+                'models': self.models,
+                'sampling_split': sampling_split,
+                'feature_names': self.feature_names,
+                'prior': prior,
+                'random_state': random_state,
+                'pbar': pbar,
+                'verbose': self.verbose
+            }
             results = Parallel(
-                n_jobs=parallel_jobs, prefer="processes")(
-                    delayed(process_iteration)(iter)
-                        for iter in range(num_iterations)
-                )
+                n_jobs=parallel_jobs, prefer="threads")(
+                    delayed(process_iteration)(
+                        iter, **args)
+                for iter in range(num_iterations)
+            )
+            pbar.remove("Bootstrap") if self.prog_bar else None
         else:
-            results = [process_iteration(iter)
+            results = [process_iteration(iter, **args)
                        for iter in range(num_iterations)]
 
         for result in results:
             iter_adjacency_matrix += result
-
         iter_adjacency_matrix = iter_adjacency_matrix / num_iterations
 
         return iter_adjacency_matrix
@@ -587,6 +606,14 @@ class Rex(BaseEstimator, ClassifierMixin):
 
         iter_adjacency_matrix = self._build_iterative_adjacency_matrix(
             X, num_iterations, sampling_split, prior, parallel_jobs, random_state)
+
+        # Create shap object if I ran in parallel, as I avoided to create it then.
+        if parallel_jobs != 0:
+            self.shaps = ShapEstimator(
+                explainer=self.explainer, models=self.models, verbose=self.verbose,
+                prog_bar=self.prog_bar)
+            self.shaps.fit(X)
+            self.shaps.predict(X)
 
         if tolerance == 'auto':
             self.tolerance = self._find_best_tolerance(
@@ -897,7 +924,7 @@ class Rex(BaseEstimator, ClassifierMixin):
 
         return 0
 
-    def _steps_from_iterations(self, fit_steps) -> int:
+    def _steps_from_bootstrap(self, fit_steps) -> int:
         """
         Check if the pipeline contains a stage called iterative_fit and
         retrieve the number of iterations.
