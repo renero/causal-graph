@@ -224,7 +224,7 @@ class ShapEstimator(BaseEstimator):
             caller_name = calframe[1][3]
             if caller_name == "__call__" or caller_name == "_run_step":
                 caller_name = "ReX"
-        except Exception:  # pylint: disable=broad-except
+        except Exception:                               # pylint: disable=broad-except
             caller_name = "unknown"
 
         if self.prog_bar and not self.verbose:
@@ -275,8 +275,6 @@ class ShapEstimator(BaseEstimator):
             self.shap_values[target_name] = self._run_selected_shap_explainer(
                 target_name, model, X_train, X_test)
 
-            # self.shap_scaled_values[target_name] = self.shap_values[target_name]
-
             # Create the order list of features, in decreasing mean SHAP value
             self.feature_order[target_name] = np.argsort(
                 np.sum(np.abs(self.shap_values[target_name]), axis=0))
@@ -292,7 +290,8 @@ class ShapEstimator(BaseEstimator):
                 srcs = [src for src in self.feature_names if src != target_name]
                 for i in range(len(self.shap_mean_values[target_name])):
                     print(
-                        f"{srcs[i]}:{self.shap_mean_values[target_name][i]:.3f};", end="")
+                        f"{srcs[i]}:{self.shap_mean_values[target_name][i]:.3f};",
+                        end="")
                 print()
 
             # Add zeroes to positions of correlated features

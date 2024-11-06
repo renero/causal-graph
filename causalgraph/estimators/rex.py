@@ -21,7 +21,8 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
-from mlforge.mlforge import Pipeline                                     # type: ignore
+# type: ignore
+from mlforge.mlforge import Pipeline
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.preprocessing import StandardScaler
 from sklearn.utils.validation import check_is_fitted, check_random_state
@@ -92,6 +93,7 @@ class Rex(BaseEstimator, ClassifierMixin):
             bootstrap_trials: int = DEFAULT_BOOTSTRAP_TRIALS,
             bootstrap_sampling_split='auto',
             bootstrap_tolerance: float = 'auto',
+            bootstrap_parallel_jobs: int = 0,
             verbose: bool = False,
             prog_bar=True,
             silent: bool = False,
@@ -165,6 +167,7 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.bootstrap_trials = bootstrap_trials
         self.bootstrap_sampling_split = bootstrap_sampling_split
         self.bootstrap_tolerance = bootstrap_tolerance
+        self.bootstrap_parallel_jobs = bootstrap_parallel_jobs
 
         self.condlen = condlen
         self.condsize = condsize
@@ -335,7 +338,9 @@ class Rex(BaseEstimator, ClassifierMixin):
                 ('G_final', 'bootstrap', {
                     'num_iterations': self.bootstrap_trials,
                     'sampling_split': self.bootstrap_sampling_split,
-                    'tolerance': self.bootstrap_tolerance
+                    'tolerance': self.bootstrap_tolerance,
+                    'parallel_jobs': self.bootstrap_parallel_jobs,
+                    'random_state': self.random_state
                 }),
                 ('metrics', 'score', {
                     'ref_graph': ref_graph, 'predicted_graph': 'G_final'})
@@ -398,7 +403,7 @@ class Rex(BaseEstimator, ClassifierMixin):
             num_iterations: int = DEFAULT_BOOTSTRAP_TRIALS,
             sampling_split: float = 0.5,
             prior: list = None,
-            parallel: bool = True,
+            parallel_jobs: int = 0,
             random_state: int = 1234) -> np.ndarray:
         """
         Performs iterative prediction on the given directed acyclic graph (DAG)
@@ -434,7 +439,7 @@ class Rex(BaseEstimator, ClassifierMixin):
                                    random_state=iter*random_state)
 
             # Disable progress_bar in parallel execution
-            if parallel:
+            if parallel_jobs != 0:
                 pb_state = self.shaps.prog_bar
                 self.shaps.prog_bar = False
 
@@ -442,7 +447,7 @@ class Rex(BaseEstimator, ClassifierMixin):
             dag = self.shaps.predict(data_sample, prior=prior)
 
             # Restate progress_bar to original state
-            if parallel:
+            if parallel_jobs != 0:
                 self.shaps.prog_bar = pb_state
 
             adjacency_matrix = utils.graph_to_adjacency(
@@ -451,9 +456,12 @@ class Rex(BaseEstimator, ClassifierMixin):
                 print("· Iteration", iter+1, "done.")
             return adjacency_matrix
 
-        if parallel:
-            results = Parallel(n_jobs=-1, prefer="threads")(delayed(process_iteration)(iter)
-                                                            for iter in range(num_iterations))
+        if parallel_jobs != 0:
+            results = Parallel(
+                n_jobs=parallel_jobs, prefer="processes")(
+                    delayed(process_iteration)(iter)
+                        for iter in range(num_iterations)
+                )
         else:
             results = [process_iteration(iter)
                        for iter in range(num_iterations)]
@@ -537,7 +545,7 @@ class Rex(BaseEstimator, ClassifierMixin):
             tolerance: Union[float, str] = DEFAULT_BOOTSTRAP_TOLERANCE,
             key_metric: str = 'f1',
             direction: str = 'maximize',
-            parallel: bool = False) -> nx.DiGraph:
+            parallel_jobs: int = 0) -> nx.DiGraph:
         """
         Finds the best tolerance value for the iterative predict method by iterating
         over different tolerance values and selecting the one that gives the best
@@ -557,8 +565,8 @@ class Rex(BaseEstimator, ClassifierMixin):
         direction : str, optional
             The direction of the key metric. Defaults to 'maximize'.
             Possible values: 'maximize' or 'minimize'
-        parallel: bool, optional
-            Whether to run the iterations in parallel. Defaults to True.
+        parallel_jobs: int, optional
+            Number of processes to run the iterations in parallel. Defaults to 0.
 
         Returns
         -------
@@ -578,7 +586,7 @@ class Rex(BaseEstimator, ClassifierMixin):
                   f"{sampling_split:.2f} sampling split.")
 
         iter_adjacency_matrix = self._build_iterative_adjacency_matrix(
-            X, num_iterations, sampling_split, prior, parallel, random_state)
+            X, num_iterations, sampling_split, prior, parallel_jobs, random_state)
 
         if tolerance == 'auto':
             self.tolerance = self._find_best_tolerance(

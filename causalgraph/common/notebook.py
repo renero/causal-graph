@@ -362,13 +362,29 @@ class Experiment(BaseExperiment):
         super().__init__(
             input_path, output_path, train_size=train_size,
             random_state=random_state, verbose=verbose)
-        self.model_type = model_type
+        self.model_type = self._check_model_type(model_type)
         self.is_fitted = False
         self.verbose = verbose
 
         # Prepare the input
         self.prepare_experiment_input(
             experiment_name, csv_filename, dot_filename)
+
+    def _check_model_type(self, model_type):
+        """
+        Checks if the model type is valid.
+        """
+        model_type = model_type.lower()
+        if model_type in ['dnn', 'nn']:
+            model_type = 'nn'
+        elif model_type == 'gbt':
+            model_type = 'gbt'
+        else:
+            raise ValueError(
+                f"Model type '{model_type}' not supported. "
+                f"Supported options are: 'nn', 'gbt', 'pc', 'fci', 'ges' and 'lingam'.")
+
+        return model_type
 
     def fit(self, estimator_name='rex', **kwargs):
         """
@@ -1126,7 +1142,8 @@ if __name__ == "__main__":
             'prog_bar': True,
             'verbose': False,
             'hpo_n_trials': 1,
-            'bootstrap_trials': 10
+            'bootstrap_trials': 10,
+            'bootstrap_parallel_jobs': 4
         },
         'pc': {},
         'ges': {},
@@ -1148,7 +1165,7 @@ if __name__ == "__main__":
         experiment_name="toy_dataset",
         csv_filename=os.path.join(input_path,  "toy_dataset.csv"),
         dot_filename=os.path.join(input_path, "toy_dataset.dot"),
-        model_type="gbt",
+        model_type="nn",
         input_path=input_path,
         output_path=output_path)
 
