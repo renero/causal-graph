@@ -10,6 +10,9 @@ Main class for the REX estimator.
 # pylint: disable=R0914:too-many-locals, R0915:too-many-statements
 # pylint: disable=W0106:expression-not-assigned, R1702:too-many-branches
 
+from multiprocessing import Pool, get_context
+from functools import partial
+import multiprocessing
 import os
 import time
 import warnings
@@ -20,8 +23,6 @@ from typing import List, Tuple, Union
 import networkx as nx
 import numpy as np
 import pandas as pd
-from joblib import Parallel, delayed
-# type: ignore
 from mlforge.mlforge import Pipeline
 from mlforge.progbar import ProgBar
 from sklearn.base import BaseEstimator, ClassifierMixin
@@ -368,11 +369,12 @@ class Rex(BaseEstimator, ClassifierMixin):
         """
         n_steps = self.predict_pipeline.len()
         n_steps += self._steps_from_hpo(self.predict_pipeline)
+        n_steps += 1
         # If parallelization is ON nr of steps is 1, otherwise the nr of iterations * 2
-        if self.bootstrap_parallel_jobs != 0:
-            n_steps += 1
-        else:
-            n_steps += (self._steps_from_bootstrap(self.predict_pipeline) * 2)
+        # if self.bootstrap_parallel_jobs != 0:
+        #     n_steps += 1
+        # else:
+        #     n_steps += (self._steps_from_bootstrap(self.predict_pipeline) * 2)
         return n_steps
 
     def _set_predict_pipeline(
@@ -439,93 +441,201 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.predict(test, ref_graph, prior)
         return self
 
+    @staticmethod
+    def _bootstrap_iteration(iter, X, models, sampling_split, feature_names, prior,
+                             random_state, verbose=False):
+        """
+        Process an iteration of the iterative prediction.
+
+        Parameters
+        ----------
+        iter : int
+            The current iteration number.
+        X : pd.DataFrame
+            The input data.
+        models : list
+            A list of models to use for the prediction.
+        sampling_split : float
+            The fraction of the data to use for bootstrapping.
+        feature_names : list
+            The names of the features.
+        prior : list
+            The prior knowledge on the graph to use for bootstrapping.
+        random_state : int
+            The random state to use for bootstrapping.
+        verbose : bool
+            Whether to print verbose messages.
+        """
+        data_sample = X.sample(frac=sampling_split,
+                               random_state=iter * random_state)
+        shaps_instance = ShapEstimator(models=models, prog_bar=False)
+        shaps_instance.fit(data_sample)
+        dag = shaps_instance.predict(data_sample, prior=prior)
+        adjacency_matrix = utils.graph_to_adjacency(dag, feature_names)
+        if verbose:
+            print("· Iteration", iter + 1, "done.")
+        return adjacency_matrix
+
     def _build_bootstrapped_adjacency_matrix(
-            self,
-            X: pd.DataFrame,
-            num_iterations: int = DEFAULT_BOOTSTRAP_TRIALS,
-            sampling_split: float = 0.5,
-            prior: list = None,
-            parallel_jobs: int = 0,
-            random_state: int = 1234) -> np.ndarray:
+        self,
+        X: pd.DataFrame,
+        num_iterations: int = DEFAULT_BOOTSTRAP_TRIALS,
+        sampling_split: float = 0.5,
+        prior: list = None,
+        parallel_jobs: int = 0,
+        random_state: int = 1234,
+    ) -> np.ndarray:
         """
         Performs iterative prediction on the given directed acyclic graph (DAG)
         and adjacency matrix.
 
-        Parameters:
-            X (pd.DataFrame): The input data.
-            num_iterations (int): The number of iterations to perform. Defaults to 10.
-            sampling_split (float): The proportion of the data to use for
-                training. Defaults to 0.5.
-            prior (list): The prior knowledge. Defaults to None.
-            dag_names (list): A list of names for the DAG. Defaults to ['shap', 'rho',
-                'adjusted', 'perm_imp', 'indep', 'final'].
-            random_state (int): The random state. Defaults to 1234.
+        Parameters
+        ----------
+        X : pd.DataFrame
+            The input data.
+        num_iterations : int
+            The number of iterations to perform.
+        sampling_split : float
+            The fraction of the data to use for bootstrapping.
+        prior : list
+            The prior knowledge on the graph to use for bootstrapping.
+        parallel_jobs : int
+            The number of parallel jobs to use for bootstrapping.
+        random_state : int
+            The random state to use for bootstrapping.
 
-        Returns:
-            dict: The predicted adjacency matrices, normalized by the number
-                of iterations.
+        Returns
+        -------
+        adjacency_matrix : np.ndarray
         """
-
         # Assert that 'shaps' exists and has been fit
         check_is_fitted(self, "is_fitted_")
 
         if self.verbose:
-            print(f"Building iterative adjacency matrix with {num_iterations} "
-                  f"iterations, {sampling_split:.2f} split.")
+            print(
+                f"Building iterative adjacency matrix with {num_iterations} "
+                f"iterations, {sampling_split:.2f} split.")
 
         iter_adjacency_matrix = np.zeros(
             (self.n_features_in_, self.n_features_in_))
 
-        def process_iteration(iter, X, models, sampling_split, feature_names, prior,
-                              random_state, pbar=None, verbose=False):
-            """
-            Process an iteration of the iterative prediction.
-            """
-            data_sample = X.sample(frac=sampling_split,
-                                   random_state=iter*random_state)
-            shaps_instance = ShapEstimator(models=models, prog_bar=False)
-            shaps_instance.fit(data_sample)
-            dag = shaps_instance.predict(data_sample, prior=prior)
-            adjacency_matrix = utils.graph_to_adjacency(
-                dag, feature_names)
-            pbar.update_subtask("Bootstrap", iter) if pbar else None
-            if verbose:
-                print("· Iteration", iter+1, "done.")
-
-            return adjacency_matrix
-
-        if parallel_jobs != 0:
-            if self.prog_bar and not self.verbose:
-                pbar = ProgBar().start_subtask("Bootstrap", num_iterations)
-            else:
-                pbar = None
-            # Prepare arguments to pass to process_iteration
-            args = {
-                'X': X,
-                'models': self.models,
-                'sampling_split': sampling_split,
-                'feature_names': self.feature_names,
-                'prior': prior,
-                'random_state': random_state,
-                'pbar': pbar,
-                'verbose': self.verbose
-            }
-            results = Parallel(
-                n_jobs=parallel_jobs, prefer="threads")(
-                    delayed(process_iteration)(
-                        iter, **args)
-                for iter in range(num_iterations)
-            )
-            pbar.remove("Bootstrap") if self.prog_bar else None
+        if self.prog_bar and not self.verbose:
+            pbar = ProgBar().start_subtask("Bootstrap", num_iterations)
         else:
-            results = [process_iteration(iter, **args)
-                       for iter in range(num_iterations)]
+            pbar = None
+
+        results = []
+        if parallel_jobs != 0 and parallel_jobs != 1:
+            # Prepare the partial function with fixed arguments
+            partial_process_iteration = partial(
+                Rex._bootstrap_iteration, X=X, models=self.models,
+                sampling_split=sampling_split, feature_names=self.feature_names,
+                prior=prior, random_state=random_state, verbose=self.verbose)
+
+            # Determine the nr of processes to pass to Pool()
+            if parallel_jobs == -1:
+                nr_processes = min(multiprocessing.cpu_count(), num_iterations)
+            else:
+                nr_processes = min(parallel_jobs, multiprocessing.cpu_count())
+
+            # Use multiprocessing Pool
+            with get_context('spawn').Pool(processes=nr_processes) as pool:
+                for result in pool.imap_unordered(
+                        partial_process_iteration, range(num_iterations)):
+                    results.append(result)
+                    if pbar:
+                        pbar.update_subtask("Bootstrap", len(results))
+                if pbar:
+                    pbar.remove("Bootstrap")
+                    pbar = None
+        else:
+            # Sequential processing
+            for iter in range(num_iterations):
+                result = Rex._bootstrap_iteration(
+                    iter, X, self.models, sampling_split,
+                    self.feature_names, prior, random_state, self.verbose)
+                results.append(result)
+                if self.prog_bar and not self.verbose:
+                    pbar.update_subtask("Bootstrap", iter)
+            if self.prog_bar and not self.verbose:
+                pbar.remove("Bootstrap")
 
         for result in results:
             iter_adjacency_matrix += result
         iter_adjacency_matrix = iter_adjacency_matrix / num_iterations
 
         return iter_adjacency_matrix
+
+    def bootstrap(
+            self,
+            X: pd.DataFrame,
+            ref_graph: nx.DiGraph = None,
+            num_iterations: int = DEFAULT_BOOTSTRAP_TRIALS,
+            sampling_split: float = DEFAULT_BOOTSTRAP_SAMPLING_SPLIT,
+            prior: list = None,
+            random_state: int = 1234,
+            tolerance: Union[float, str] = DEFAULT_BOOTSTRAP_TOLERANCE,
+            key_metric: str = 'f1',
+            direction: str = 'maximize',
+            parallel_jobs: int = 0) -> nx.DiGraph:
+        """
+        Finds the best tolerance value for the iterative predict method by iterating
+        over different tolerance values and selecting the one that gives the best
+        `key_metric` with respect to the reference graph.
+
+        Parameters
+        ----------
+        ref_graph : nx.DiGraph
+            The reference graph to evaluate the F1 score against.
+        target : str, optional
+            The target DAG to evaluate. Defaults to 'shap'.
+            Possible values: 'shap', 'rho', 'adjusted', 'perm_imp', 'indep', and 'final'
+        key_metric : str, optional
+            The key metric to evaluate. Defaults to 'f1'.
+            Possible values: 'f1', 'precision', 'recall', 'shd', sid', 'aupr',
+            'Tp', 'Tn', 'Fp', 'Fn'    '
+        direction : str, optional
+            The direction of the key metric. Defaults to 'maximize'.
+            Possible values: 'maximize' or 'minimize'
+        parallel_jobs: int, optional
+            Number of processes to run the iterations in parallel. Defaults to 0.
+
+        Returns
+        -------
+        nx.DiGraph : The best DAG found by the iterative predict method.
+        """
+        if ref_graph is None and tolerance == 'auto':
+            raise ValueError(
+                "ref_graph must be specified when tolerance set to 'auto'")
+        if direction != 'maximize' and direction != 'minimize':
+            raise ValueError("direction must be 'maximize' or 'minimize'")
+
+        if sampling_split == 'auto':
+            sampling_split = self._set_sampling_split()
+
+        if self.verbose:
+            print(f"Iterative prediction with {num_iterations} iterations, and "
+                  f"{sampling_split:.2f} sampling split.")
+
+        iter_adjacency_matrix = self._build_bootstrapped_adjacency_matrix(
+            X, num_iterations, sampling_split, prior, parallel_jobs, random_state)
+
+        # Create shap object for shaps as bootstrap does not create the final one.
+        self.shaps = ShapEstimator(
+            explainer=self.explainer, models=self.models, verbose=self.verbose,
+            prog_bar=self.prog_bar)
+        self.shaps.fit(X)
+        self.shaps.predict(X)
+
+        if tolerance == 'auto':
+            self.tolerance = self._find_best_tolerance(
+                ref_graph, key_metric, direction, iter_adjacency_matrix)
+        else:
+            self.tolerance = tolerance
+
+        # Now, predict with selected tolerance
+        return self._dag_from_bootstrap_adj_matrix(
+            iter_adjacency_matrix, tolerance=self.tolerance)
 
     def _find_best_tolerance(
             self,
@@ -587,78 +697,6 @@ class Rex(BaseEstimator, ClassifierMixin):
                   f"{key_metric}: {reference_key_metric:.4f}")
 
         return best_tolerance
-
-    def bootstrap(
-            self,
-            X: pd.DataFrame,
-            ref_graph: nx.DiGraph = None,
-            num_iterations: int = DEFAULT_BOOTSTRAP_TRIALS,
-            sampling_split: float = DEFAULT_BOOTSTRAP_SAMPLING_SPLIT,
-            prior: list = None,
-            random_state: int = 1234,
-            tolerance: Union[float, str] = DEFAULT_BOOTSTRAP_TOLERANCE,
-            key_metric: str = 'f1',
-            direction: str = 'maximize',
-            parallel_jobs: int = 0) -> nx.DiGraph:
-        """
-        Finds the best tolerance value for the iterative predict method by iterating
-        over different tolerance values and selecting the one that gives the best
-        `key_metric` with respect to the reference graph.
-
-        Parameters
-        ----------
-        ref_graph : nx.DiGraph
-            The reference graph to evaluate the F1 score against.
-        target : str, optional
-            The target DAG to evaluate. Defaults to 'shap'.
-            Possible values: 'shap', 'rho', 'adjusted', 'perm_imp', 'indep', and 'final'
-        key_metric : str, optional
-            The key metric to evaluate. Defaults to 'f1'.
-            Possible values: 'f1', 'precision', 'recall', 'shd', sid', 'aupr',
-            'Tp', 'Tn', 'Fp', 'Fn'    '
-        direction : str, optional
-            The direction of the key metric. Defaults to 'maximize'.
-            Possible values: 'maximize' or 'minimize'
-        parallel_jobs: int, optional
-            Number of processes to run the iterations in parallel. Defaults to 0.
-
-        Returns
-        -------
-        nx.DiGraph : The best DAG found by the iterative predict method.
-        """
-        if ref_graph is None and tolerance == 'auto':
-            raise ValueError(
-                "ref_graph must be specified when tolerance set to 'auto'")
-        if direction != 'maximize' and direction != 'minimize':
-            raise ValueError("direction must be 'maximize' or 'minimize'")
-
-        if sampling_split == 'auto':
-            sampling_split = self._set_sampling_split()
-
-        if self.verbose:
-            print(f"Iterative prediction with {num_iterations} iterations, and "
-                  f"{sampling_split:.2f} sampling split.")
-
-        iter_adjacency_matrix = self._build_bootstrapped_adjacency_matrix(
-            X, num_iterations, sampling_split, prior, parallel_jobs, random_state)
-
-        # Create shap object if I ran in parallel, as I avoided to create it then.
-        if parallel_jobs != 0:
-            self.shaps = ShapEstimator(
-                explainer=self.explainer, models=self.models, verbose=self.verbose,
-                prog_bar=self.prog_bar)
-            self.shaps.fit(X)
-            self.shaps.predict(X)
-
-        if tolerance == 'auto':
-            self.tolerance = self._find_best_tolerance(
-                ref_graph, key_metric, direction, iter_adjacency_matrix)
-        else:
-            self.tolerance = tolerance
-
-        # Now, predict with selected tolerance
-        return self._dag_from_bootstrap_adj_matrix(
-            iter_adjacency_matrix, tolerance=self.tolerance)
 
     def _dag_from_bootstrap_adj_matrix(
             self,
@@ -1068,18 +1106,17 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.models.prog_bar = True
 
 
-
 def main(dataset_name,
-                input_path="/Users/renero/phd/data/RC4/",
-                output_path="/Users/renero/phd/output/RC4/",
-                load_model: bool = False,
-                fit_model: bool = True,
-                predict_model: bool = True,
-                scale_data: bool = False,
-                tune_model: bool = False,
-                model_type="nn",
-                explainer="gradient",
-                save=False):
+         input_path="/Users/renero/phd/data/RC4/",
+         output_path="/Users/renero/phd/output/RC4/",
+         load_model: bool = False,
+         fit_model: bool = True,
+         predict_model: bool = True,
+         scale_data: bool = False,
+         tune_model: bool = False,
+         model_type="nn",
+         explainer="gradient",
+         save=False):
     """
     Custom main function to run the pipeline with the given dataset.
     Specially useful for testing and debugging.
@@ -1100,27 +1137,26 @@ def main(dataset_name,
             model_type=model_type, explainer=explainer, hpo_n_trials=1)
 
     if fit_model:
-        rex.fit(data, pipeline=".fast_fit_pipeline.yaml")
+        rex.fit(data)  # , pipeline=".fast_fit_pipeline.yaml")
 
     if predict_model:
         prior = rex._get_prior_from_ref_graph(input_path)
-        rex.predict(data, ref_graph, prior=prior,
-                    pipeline=".fast_predict_pipeline.yaml")
+        rex.predict(data, ref_graph, prior=prior)  # ,
+        # pipeline=".fast_predict_pipeline.yaml")
 
     if save:
         where_to = utils.save_experiment(rex.name, output_path, rex)
         print(f"Saved '{rex.name}' to '{where_to}'")
 
 
-
 if __name__ == "__main__":
     main('toy_dataset',
-                input_path="/Users/renero/phd/data/",
-                model_type="nn",
-                explainer="gradient",
-                load_model=False,
-                fit_model=True,
-                predict_model=True,
-                scale_data=False,
-                tune_model=True,
-                save=False)
+         input_path="/Users/renero/phd/data/",
+         model_type="nn",
+         explainer="gradient",
+         load_model=False,
+         fit_model=True,
+         predict_model=True,
+         scale_data=False,
+         tune_model=True,
+         save=False)

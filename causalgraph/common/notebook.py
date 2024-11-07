@@ -437,12 +437,15 @@ class Experiment(BaseExperiment):
         Returns:
             Rex: The fitted experiment data.
         """
+        start_time = time.time()
         self.estimator_name = estimator
         estimator_object = self.create_estimator(
             estimator, name=self.experiment_name, **kwargs)
         estimator_object.fit_predict(
             self.train_data, self.test_data, self.ref_graph)
         setattr(self, estimator, estimator_object)
+        end_time = time.time()
+        self.fit_predict_time = end_time - start_time
 
         return self
 
@@ -1143,7 +1146,7 @@ if __name__ == "__main__":
             'verbose': False,
             'hpo_n_trials': 1,
             'bootstrap_trials': 10,
-            'bootstrap_parallel_jobs': 1
+            'bootstrap_parallel_jobs': -1
         },
         'pc': {},
         'ges': {},
@@ -1156,17 +1159,17 @@ if __name__ == "__main__":
         'notears': {}
     }
 
-    input_path = os.path.expanduser("~/phd/data/")
+    input_path = os.path.expanduser("~/phd/data/") #RC4/")
     output_path = os.path.expanduser("~/phd/output/")
 
     method_name = "rex"
-    dataset_name = "toy_dataset"
+    dataset_name =  "mid_dataset" # "generated_10vars_linear_0"
 
     exp = Experiment(
         experiment_name=dataset_name,
         csv_filename=os.path.join(input_path, f"{dataset_name}.csv"),
         dot_filename=os.path.join(input_path, f"{dataset_name}.dot"),
-        model_type="dnn",
+        model_type="gbt",
         input_path=input_path,
         output_path=output_path)
 
@@ -1174,3 +1177,5 @@ if __name__ == "__main__":
     method = getattr(exp, method_name)
     print(method.dag.edges())
     print(method.metrics)
+    t, u = utils.format_time(exp.fit_predict_time)
+    print(f"Elapsed time: {t:.1f}{u}")
