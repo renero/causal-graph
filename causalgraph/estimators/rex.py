@@ -94,6 +94,7 @@ class Rex(BaseEstimator, ClassifierMixin):
             bootstrap_sampling_split='auto',
             bootstrap_tolerance: float = 'auto',
             bootstrap_parallel_jobs: int = 0,
+            parallel_jobs: int = 0,
             verbose: bool = False,
             prog_bar=True,
             silent: bool = False,
@@ -168,6 +169,7 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.bootstrap_sampling_split = bootstrap_sampling_split
         self.bootstrap_tolerance = bootstrap_tolerance
         self.bootstrap_parallel_jobs = bootstrap_parallel_jobs
+        self.parallel_jobs = parallel_jobs
 
         self.condlen = condlen
         self.condsize = condsize
@@ -398,7 +400,10 @@ class Rex(BaseEstimator, ClassifierMixin):
                 self.predict_pipeline.from_config(pipeline)
         else:
             steps = [
-                ('shaps', ShapEstimator, {'models': 'models'}),
+                ('shaps', ShapEstimator, {
+                    'models': 'models',
+                    'parallel_jobs': self.parallel_jobs
+                }),
                 ('G_final', 'bootstrap', {
                     'num_iterations': self.bootstrap_trials,
                     'sampling_split': self.bootstrap_sampling_split,
@@ -468,7 +473,7 @@ class Rex(BaseEstimator, ClassifierMixin):
         """
         data_sample = X.sample(frac=sampling_split,
                                random_state=iter * random_state)
-        shaps_instance = ShapEstimator(models=models, prog_bar=False)
+        shaps_instance = ShapEstimator(models=models, parallel_jobs=0, prog_bar=False)
         shaps_instance.fit(data_sample)
         dag = shaps_instance.predict(data_sample, prior=prior)
         adjacency_matrix = utils.graph_to_adjacency(dag, feature_names)
@@ -621,9 +626,9 @@ class Rex(BaseEstimator, ClassifierMixin):
             X, num_iterations, sampling_split, prior, parallel_jobs, random_state)
 
         # Create shap object for shaps as bootstrap does not create the final one.
-        self.shaps = ShapEstimator(
-            explainer=self.explainer, models=self.models, verbose=self.verbose,
-            prog_bar=self.prog_bar)
+        # self.shaps = ShapEstimator(
+        #     explainer=self.explainer, models=self.models, verbose=self.verbose,
+        #     prog_bar=self.prog_bar)
         self.shaps.fit(X)
         self.shaps.predict(X)
 

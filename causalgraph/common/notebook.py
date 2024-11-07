@@ -1146,7 +1146,8 @@ if __name__ == "__main__":
             'verbose': False,
             'hpo_n_trials': 1,
             'bootstrap_trials': 10,
-            'bootstrap_parallel_jobs': -1
+            'bootstrap_parallel_jobs': -1,
+            'parallel_jobs': -1
         },
         'pc': {},
         'ges': {},
@@ -1159,11 +1160,12 @@ if __name__ == "__main__":
         'notears': {}
     }
 
-    input_path = os.path.expanduser("~/phd/data/") #RC4/")
+    input_path = os.path.expanduser("~/phd/data/RC4/")
     output_path = os.path.expanduser("~/phd/output/")
 
     method_name = "rex"
-    dataset_name =  "mid_dataset" # "generated_10vars_linear_0"
+    # dataset_name =  "toy_dataset"
+    dataset_name =  "generated_10vars_linear_0"
 
     exp = Experiment(
         experiment_name=dataset_name,
