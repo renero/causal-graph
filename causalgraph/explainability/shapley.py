@@ -217,17 +217,9 @@ class ShapEstimator(BaseEstimator):
         self.feature_order = {}
         self.all_mean_shap_values = np.empty((0, ), dtype=np.float16)
 
-        # Who is calling me?
-        try:
-            curframe = inspect.currentframe()
-            calframe = inspect.getouterframes(curframe, 2)
-            caller_name = calframe[1][3]
-            if caller_name == "__call__" or caller_name == "_run_step":
-                caller_name = "ReX"
-        except Exception:                               # pylint: disable=broad-except
-            caller_name = "unknown"
-
+        # Who is calling me? Set the description of prog_bar
         if self.prog_bar and not self.verbose:
+            caller_name = self._get_method_caller_name()
             pbar_name = f"({caller_name}) SHAP_fit"
             pbar = ProgBar().start_subtask(pbar_name, len(self.feature_names))
         else:
@@ -236,31 +228,7 @@ class ShapEstimator(BaseEstimator):
         self.X_train, self.X_test = train_test_split(
             X, test_size=min(0.2, 250 / len(X)), random_state=42)
 
-        # Make a copy of the data if correlation threshold is set, since I will have
-        # to drop some features at each iteration.
-        if self.correlation_th:
-            self.corr_matrix = Hierarchies.compute_correlation_matrix(X)
-            self.correlated_features = Hierarchies.compute_correlated_features(
-                self.corr_matrix, self.correlation_th, self.feature_names,
-                verbose=self.verbose)
-            X_train_original = self.X_train.copy()
-            X_test_original = self.X_test.copy()
-
         for target_idx, target_name in enumerate(self.feature_names):
-            # if correlation_th is not None then, remove features that are highly
-            # correlated with the target, at each step of the loop
-            if self.correlation_th is not None:
-                self.X_train = X_train_original.copy()
-                self.X_test = X_test_original.copy()
-                if len(self.correlated_features[target_name]) > 0:
-                    self.X_train = self.X_train.drop(
-                        self.correlated_features[target_name], axis=1)
-                    self.X_test = self.X_test.drop(
-                        self.correlated_features[target_name], axis=1)
-                    if self.verbose:
-                        print("REMOVED CORRELATED FEATURES: ",
-                              self.correlated_features[target_name])
-
             # Get the model and the data (tensor form)
             if hasattr(self.models.regressor[target_name], "model"):
                 model = self.models.regressor[target_name].model
@@ -283,10 +251,11 @@ class ShapEstimator(BaseEstimator):
             self.all_mean_shap_values = np.concatenate(
                 (self.all_mean_shap_values,
                  self.shap_mean_values[target_name]))
+
             if self.verbose:
                 print(f"  Feature order for '{target_name}' "
-                      f"{self.feature_order[target_name]}")
-                print(f"  Target({target_name}) -> ", end="")
+                      f"{self.feature_order[target_name]}\n"
+                      f"  Target({target_name}) -> ", end="")
                 srcs = [src for src in self.feature_names if src != target_name]
                 for i in range(len(self.shap_mean_values[target_name])):
                     print(
@@ -294,21 +263,11 @@ class ShapEstimator(BaseEstimator):
                         end="")
                 print()
 
-            # Add zeroes to positions of correlated features
-            if self.correlation_th is not None:
-                self._add_zeroes(
-                    target_name, self.correlated_features[target_name])
-
             pbar.update_subtask(pbar_name, target_idx + 1) if pbar else None
 
         pbar.remove(pbar_name) if pbar else None
         self.all_mean_shap_values = self.all_mean_shap_values.flatten()
         self._compute_scaled_shap_threshold()
-
-        # Leave X_train and X_test as they originally were
-        if self.correlation_th is not None:
-            self.X_train = X_train_original
-            self.X_test = X_test_original
 
         self.is_fitted_ = True
 
@@ -412,14 +371,7 @@ class ShapEstimator(BaseEstimator):
         self._compute_scaled_shap_threshold()
 
         # Who is calling me?
-        try:
-            curframe = inspect.currentframe()
-            calframe = inspect.getouterframes(curframe, 2)
-            caller_name = calframe[1][3]
-            if caller_name == "__call__" or caller_name == "_run_step":
-                caller_name = "ReX"
-        except Exception:  # pylint: disable=broad-except
-            caller_name = "unknown"
+        caller_name = self._get_method_caller_name()
 
         if self.prog_bar and (not self.verbose):
             pbar_name = f"({caller_name}) SHAP_predict"
@@ -871,6 +823,24 @@ class ShapEstimator(BaseEstimator):
               )
         if len(cycles) > 0 and self._nodes_in_cycles(cycles, feature, target):
             print(f"    ~~ Cycles: {cycles}")
+
+    def _get_method_caller_name(self):
+        """
+        Determine the name of the method that called it. It does this by using
+        the inspect module to get the outermost frame of the call stack and then
+        extracting the name of the third frame. If the name is either __call__ or
+        _run_step, it returns "ReX". If any exception occurs during this
+        process, it returns "unknown".
+        """
+        try:
+            curframe = inspect.currentframe()
+            calframe = inspect.getouterframes(curframe, 2)
+            caller_name = calframe[2][3]
+            if caller_name == "__call__" or caller_name == "_run_step":
+                caller_name = "ReX"
+        except Exception:                               # pylint: disable=broad-except
+            caller_name = "unknown"
+        return caller_name
 
     def _plot_shap_summary(
             self,
