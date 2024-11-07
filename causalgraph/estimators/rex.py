@@ -33,22 +33,10 @@ from causalgraph.common import (
     DEFAULT_BOOTSTRAP_TOLERANCE, DEFAULT_BOOTSTRAP_SAMPLING_SPLIT
 )
 from causalgraph.estimators.knowledge import Knowledge
-from causalgraph.explainability.hierarchies import Hierarchies
-from causalgraph.explainability.perm_importance import PermutationImportance
 from causalgraph.explainability.regression_quality import RegQuality
 from causalgraph.explainability.shapley import ShapEstimator
-from causalgraph.independence.graph_independence import GraphIndependence
 from causalgraph.metrics.compare_graphs import evaluate_graph
 from causalgraph.models import GBTRegressor, NNRegressor
-
-from rich.progress import (
-    BarColumn,
-    MofNCompleteColumn,
-    Progress,
-    TextColumn,
-    TimeElapsedColumn,
-    TimeRemainingColumn,
-)
 
 
 np.set_printoptions(precision=4, linewidth=120)
@@ -230,6 +218,29 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.y = copy(y) if y is not None else None
 
         # Create the pipeline for the training stages.
+        self._set_fit_pipeline(pipeline)
+
+        n_steps = self.fit_pipeline.len()
+        n_steps += (self._steps_from_hpo(self.fit_pipeline) * 2) - 1
+
+        self.fit_pipeline.run(n_steps)
+        self.fit_pipeline.close()
+        self.is_fitted_ = True
+
+        self.end_fit_time = time.time()
+        self.fit_time = self.end_fit_time - self.init_fit_time
+
+        return self
+
+    def _set_fit_pipeline(self, pipeline: list | str | None) -> None:
+        """
+        Set the pipeline for the training stages.
+
+        Parameters
+        ----------
+        pipeline : list
+            A list of tuples with the steps to add to the pipeline.
+        """
         self.fit_pipeline = Pipeline(
             self, description="Fitting models", prog_bar=self.prog_bar,
             verbose=self.verbose, silent=self.silent, subtask=True)
@@ -246,18 +257,6 @@ class Rex(BaseEstimator, ClassifierMixin):
                 ('models.score', {})
             ]
             self.fit_pipeline.from_list(steps)
-
-        n_steps = self.fit_pipeline.len()
-        n_steps += (self._steps_from_hpo(self.fit_pipeline) * 2) - 1
-
-        self.fit_pipeline.run(n_steps)
-        self.fit_pipeline.close()
-        self.is_fitted_ = True
-
-        self.end_fit_time = time.time()
-        self.fit_time = self.end_fit_time - self.init_fit_time
-
-        return self
 
     def predict(self,
                 X: pd.DataFrame,
@@ -338,6 +337,58 @@ class Rex(BaseEstimator, ClassifierMixin):
             self.shaps.verbose = self.verbose
 
         # Load a pipeline if specified, or create the default one.
+        self._set_predict_pipeline(ref_graph, pipeline)
+        n_steps = self._get_steps_predict_pipeline()
+
+        self.predict_pipeline.run(n_steps)
+
+        # Check if "G_final" exists in this object (self)
+        if 'G_final' in self.__dict__:
+            if '\\n' in self.G_final.nodes:
+                self.G_final.remove_node('\\n')
+        self.predict_pipeline.close()
+
+        self.end_predict_time = time.time()
+        self.predict_time = self.end_predict_time - self.init_predict_time
+
+        # For compatibility with compared methods, we always set an attribute
+        # called 'dag' for the final DAG.
+        self.dag = self.G_final
+
+        return self
+
+    def _get_steps_predict_pipeline(self):
+        """
+        Get the number of steps in the pipeline for the prediction stage.
+
+        Returns
+        -------
+        n_steps : int
+            The number of steps in the pipeline.
+        """
+        n_steps = self.predict_pipeline.len()
+        n_steps += self._steps_from_hpo(self.predict_pipeline)
+        # If parallelization is ON nr of steps is 1, otherwise the nr of iterations * 2
+        if self.bootstrap_parallel_jobs != 0:
+            n_steps += 1
+        else:
+            n_steps += (self._steps_from_bootstrap(self.predict_pipeline) * 2)
+        return n_steps
+
+    def _set_predict_pipeline(
+            self,
+            ref_graph: nx.DiGraph,
+            pipeline: list | str | None):
+        """
+        Set the pipeline for the prediction stage as `self.predict_pipeline`.
+
+        Parameters
+        ----------
+        ref_graph: nx.DiGraph
+            The reference graph, or ground truth.
+        pipeline: list | str | None
+            The pipeline to use for the prediction stage.
+        """
         if pipeline is not None:
             if isinstance(pipeline, list):
                 self.predict_pipeline.from_list(pipeline)
@@ -357,32 +408,6 @@ class Rex(BaseEstimator, ClassifierMixin):
                     'ref_graph': ref_graph, 'predicted_graph': 'G_final'})
             ]
             self.predict_pipeline.from_list(steps)
-
-        n_steps = self.predict_pipeline.len()
-        n_steps += self._steps_from_hpo(self.predict_pipeline)
-        # If parallelization is ON nr of steps is the nr of iterations
-        # else, is the number of iterations * 2
-        if self.bootstrap_parallel_jobs != 0:
-            n_steps += 1 #(self._steps_from_bootstrap(self.predict_pipeline))
-        else:
-            n_steps += (self._steps_from_bootstrap(self.predict_pipeline) * 2)
-
-
-        self.predict_pipeline.run(n_steps)
-        # Check if "G_final" exists in this object (self)
-        if 'G_final' in self.__dict__:
-            if '\\n' in self.G_final.nodes:
-                self.G_final.remove_node('\\n')
-        self.predict_pipeline.close()
-
-        self.end_predict_time = time.time()
-        self.predict_time = self.end_predict_time - self.init_predict_time
-
-        # For compatibility with compared methods, we always set an attribute
-        # called 'dag' for the final DAG.
-        self.dag = self.G_final
-
-        return self
 
     def fit_predict(
             self,
@@ -414,7 +439,7 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.predict(test, ref_graph, prior)
         return self
 
-    def _build_iterative_adjacency_matrix(
+    def _build_bootstrapped_adjacency_matrix(
             self,
             X: pd.DataFrame,
             num_iterations: int = DEFAULT_BOOTSTRAP_TRIALS,
@@ -544,7 +569,7 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.iterative_metrics = []
         best_tolerance = 0.0
         for tol in np.arange(0.1, 1.0, 0.05):
-            dag = self.build_dag_from_iter_adj_matrix(
+            dag = self._dag_from_bootstrap_adj_matrix(
                 iter_adjacency_matrix, tolerance=tol)
 
             metric = evaluate_graph(ref_graph, dag)
@@ -614,7 +639,7 @@ class Rex(BaseEstimator, ClassifierMixin):
             print(f"Iterative prediction with {num_iterations} iterations, and "
                   f"{sampling_split:.2f} sampling split.")
 
-        iter_adjacency_matrix = self._build_iterative_adjacency_matrix(
+        iter_adjacency_matrix = self._build_bootstrapped_adjacency_matrix(
             X, num_iterations, sampling_split, prior, parallel_jobs, random_state)
 
         # Create shap object if I ran in parallel, as I avoided to create it then.
@@ -632,10 +657,10 @@ class Rex(BaseEstimator, ClassifierMixin):
             self.tolerance = tolerance
 
         # Now, predict with selected tolerance
-        return self.build_dag_from_iter_adj_matrix(
+        return self._dag_from_bootstrap_adj_matrix(
             iter_adjacency_matrix, tolerance=self.tolerance)
 
-    def build_dag_from_iter_adj_matrix(
+    def _dag_from_bootstrap_adj_matrix(
             self,
             iter_adjacency_matrix: np.ndarray,
             tolerance: float = 0.3) -> dict:
@@ -672,29 +697,6 @@ class Rex(BaseEstimator, ClassifierMixin):
             dag, self.shaps.shap_discrepancies, self.prior, verbose=self.verbose)
 
         return dag
-
-    def custom_pipeline(self, steps):
-        """
-        Execute a pipeline formed by a list of custom steps previously defined.
-
-        Parameters
-        ----------
-        steps : list
-            A list of tuples with the steps to add to the pipeline.
-
-        Returns
-        -------
-        self : object
-            Returns self.
-        """
-        # Create the pipeline for the training stages.
-        pipeline = Pipeline(self, description="Custom pipeline", prog_bar=self.prog_bar,
-                            verbose=self.verbose, silent=self.silent, subtask=True)
-        pipeline.from_list(steps)
-        pipeline.run()
-        pipeline.close()
-
-        return self
 
     def score(
             self,
@@ -766,109 +768,7 @@ class Rex(BaseEstimator, ClassifierMixin):
         return utils.break_cycles_if_present(
             dag, self.shaps.shap_discrepancies, self.prior, verbose=self.verbose)
 
-    def adjust_discrepancy(self, dag: nx.DiGraph):
-        """
-        Adjusts the discrepancy in the directed acyclic graph (DAG) by adding new
-        edges based on the goodness-of-fit (GOF) R2 values calculated from the
-        learning data.
-
-        Args:
-            dag (nx.DiGraph): The original DAG.
-
-        Returns:
-            nx.DiGraph: The adjusted DAG with new edges added based on GOF values.
-        """
-        G_adj = dag.copy()
-        gof = np.zeros((len(self.feature_names), len(self.feature_names)))
-
-        # Loop through all pairs of nodes where the edge is not present in the graph.
-        for origin in self.feature_names:
-            for target in self.feature_names:
-                if origin == target:
-                    continue
-                if not G_adj.has_edge(origin, target) and not G_adj.has_edge(target, origin):
-                    i = self.feature_names.index(origin)
-                    j = self.feature_names.index(target)
-                    gof[i, j] = self.shaps.shap_discrepancies[target][origin].shap_gof
-
-        new_edges = set()
-        # Loop through the i, j positions in the matrix `gof` that are
-        # greater than zero.
-        for i, j in zip(*np.where(gof > 0)):
-            # If the edge (i, j) is not present in the graph, then add it,
-            # but only if position (i, j) is greater than position (j, i).
-            if not G_adj.has_edge(self.feature_names[i], self.feature_names[j]) and \
-                not G_adj.has_edge(self.feature_names[j], self.feature_names[i]) \
-                    and gof[i, j] > 0.0 and gof[j, i] > 0.0:
-                if gof[j, i] < gof[i, j]:
-                    new_edges.add(
-                        (self.feature_names[i], self.feature_names[j]))
-        # Add the new edges to the graph `G_adj`, if any.
-        if new_edges:
-            G_adj.add_edges_from(new_edges)
-
-        G_adj = self.break_cycles(G_adj)
-
-        return G_adj
-
-    def dag_from_discrepancy(
-            self,
-            discrepancy_upper_threshold: float = 0.99,
-            verbose: bool = False) -> nx.DiGraph:
-        """
-        Build a directed acyclic graph (DAG) from the discrepancies in the SHAP values.
-        The discrepancies are calculated as 1.0 - GoodnessOfFit, so that a low
-        discrepancy means that the GoodnessOfFit is close to 1.0, which means that
-        the SHAP values are similar.
-
-        Parameters:
-        -----------
-            discrepancy_upper_threshold (float): The threshold for the discrepancy.
-                Default is 0.99, which means that the GoodnessOfFit must be
-                at least 0.01.
-
-        Returns:
-        --------
-            nx.DiGraph: The directed acyclic graph (DAG) built from the discrepancies.
-        """
-        if verbose:
-            print("-----\ndag_from_discrepancies()")
-
-        # Find out what pairs of features have low discrepancy, and add them as edges.
-        # A low discrepancy means that 1.0 - GoodnesOfFit is lower than the threshold.
-        low_discrepancy_edges = defaultdict(list)
-        if verbose:
-            print('    ' + ' '.join([f"{f:^5s}" for f in self.feature_names]))
-        for child in self.feature_names:
-            if verbose:
-                print(f"{child}: ", end="")
-            for parent in self.feature_names:
-                if child == parent:
-                    if verbose:
-                        print("  X  ", end=" ")
-                    continue
-                discrepancy = 1. - \
-                    self.shaps.shap_discrepancies[child][parent].shap_gof
-                if verbose:
-                    print(f"{discrepancy:+.2f}", end=" ")
-                if discrepancy < discrepancy_upper_threshold:
-                    if low_discrepancy_edges[child]:
-                        low_discrepancy_edges[child].append(parent)
-                    else:
-                        low_discrepancy_edges[child] = [parent]
-            if verbose:
-                print()
-
-        # Build a DAG from the connected features.
-        self.G_rho = utils.digraph_from_connected_features(
-            self.X, self.feature_names, self.models, low_discrepancy_edges,
-            root_causes=self.root_causes, prior=self.prior, verbose=verbose)
-
-        self.G_rho = self.break_cycles(self.G_rho)
-
-        return self.G_rho
-
-    def get_prior_from_ref_graph(self, input_path) -> List[List[str]]:
+    def _get_prior_from_ref_graph(self, input_path) -> List[List[str]]:
         """
         Get the prior from a reference graph.
 
@@ -1017,7 +917,132 @@ class Rex(BaseEstimator, ClassifierMixin):
     def __str__(self):
         return utils.stringfy_object(self)
 
-    def verbose_on(self):
+    def _unused_adjust_discrepancy(self, dag: nx.DiGraph):
+        """
+        Adjusts the discrepancy in the directed acyclic graph (DAG) by adding new
+        edges based on the goodness-of-fit (GOF) R2 values calculated from the
+        learning data.
+
+        Args:
+            dag (nx.DiGraph): The original DAG.
+
+        Returns:
+            nx.DiGraph: The adjusted DAG with new edges added based on GOF values.
+        """
+        G_adj = dag.copy()
+        gof = np.zeros((len(self.feature_names), len(self.feature_names)))
+
+        # Loop through all pairs of nodes where the edge is not present in the graph.
+        for origin in self.feature_names:
+            for target in self.feature_names:
+                if origin == target:
+                    continue
+                if not G_adj.has_edge(origin, target) and not G_adj.has_edge(target, origin):
+                    i = self.feature_names.index(origin)
+                    j = self.feature_names.index(target)
+                    gof[i, j] = self.shaps.shap_discrepancies[target][origin].shap_gof
+
+        new_edges = set()
+        # Loop through the i, j positions in the matrix `gof` that are
+        # greater than zero.
+        for i, j in zip(*np.where(gof > 0)):
+            # If the edge (i, j) is not present in the graph, then add it,
+            # but only if position (i, j) is greater than position (j, i).
+            if not G_adj.has_edge(self.feature_names[i], self.feature_names[j]) and \
+                not G_adj.has_edge(self.feature_names[j], self.feature_names[i]) \
+                    and gof[i, j] > 0.0 and gof[j, i] > 0.0:
+                if gof[j, i] < gof[i, j]:
+                    new_edges.add(
+                        (self.feature_names[i], self.feature_names[j]))
+        # Add the new edges to the graph `G_adj`, if any.
+        if new_edges:
+            G_adj.add_edges_from(new_edges)
+
+        G_adj = self.break_cycles(G_adj)
+
+        return G_adj
+
+    def _unused_dag_from_discrepancy(
+            self,
+            discrepancy_upper_threshold: float = 0.99,
+            verbose: bool = False) -> nx.DiGraph:
+        """
+        Build a directed acyclic graph (DAG) from the discrepancies in the SHAP values.
+        The discrepancies are calculated as 1.0 - GoodnessOfFit, so that a low
+        discrepancy means that the GoodnessOfFit is close to 1.0, which means that
+        the SHAP values are similar.
+
+        Parameters:
+        -----------
+            discrepancy_upper_threshold (float): The threshold for the discrepancy.
+                Default is 0.99, which means that the GoodnessOfFit must be
+                at least 0.01.
+
+        Returns:
+        --------
+            nx.DiGraph: The directed acyclic graph (DAG) built from the discrepancies.
+        """
+        if verbose:
+            print("-----\ndag_from_discrepancies()")
+
+        # Find out what pairs of features have low discrepancy, and add them as edges.
+        # A low discrepancy means that 1.0 - GoodnesOfFit is lower than the threshold.
+        low_discrepancy_edges = defaultdict(list)
+        if verbose:
+            print('    ' + ' '.join([f"{f:^5s}" for f in self.feature_names]))
+        for child in self.feature_names:
+            if verbose:
+                print(f"{child}: ", end="")
+            for parent in self.feature_names:
+                if child == parent:
+                    if verbose:
+                        print("  X  ", end=" ")
+                    continue
+                discrepancy = 1. - \
+                    self.shaps.shap_discrepancies[child][parent].shap_gof
+                if verbose:
+                    print(f"{discrepancy:+.2f}", end=" ")
+                if discrepancy < discrepancy_upper_threshold:
+                    if low_discrepancy_edges[child]:
+                        low_discrepancy_edges[child].append(parent)
+                    else:
+                        low_discrepancy_edges[child] = [parent]
+            if verbose:
+                print()
+
+        # Build a DAG from the connected features.
+        self.G_rho = utils.digraph_from_connected_features(
+            self.X, self.feature_names, self.models, low_discrepancy_edges,
+            root_causes=self.root_causes, prior=self.prior, verbose=verbose)
+
+        self.G_rho = self.break_cycles(self.G_rho)
+
+        return self.G_rho
+
+    def _unused_custom_pipeline(self, steps):
+        """
+        Execute a pipeline formed by a list of custom steps previously defined.
+
+        Parameters
+        ----------
+        steps : list
+            A list of tuples with the steps to add to the pipeline.
+
+        Returns
+        -------
+        self : object
+            Returns self.
+        """
+        # Create the pipeline for the training stages.
+        pipeline = Pipeline(self, description="Custom pipeline", prog_bar=self.prog_bar,
+                            verbose=self.verbose, silent=self.silent, subtask=True)
+        pipeline.from_list(steps)
+        pipeline.run()
+        pipeline.close()
+
+        return self
+
+    def _unused_verbose_on(self):
         self.verbose = True
         self.silent = False
         self.prog_bar = False
@@ -1030,7 +1055,7 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.models.verbose = True
         self.models.prog_bar = False
 
-    def verbose_off(self):
+    def _unused_verbose_off(self):
         self.verbose = False
         self.prog_bar = True
         self.shaps.verbose = False
@@ -1043,7 +1068,8 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.models.prog_bar = True
 
 
-def custom_main(dataset_name,
+
+def main(dataset_name,
                 input_path="/Users/renero/phd/data/RC4/",
                 output_path="/Users/renero/phd/output/RC4/",
                 load_model: bool = False,
@@ -1077,7 +1103,7 @@ def custom_main(dataset_name,
         rex.fit(data, pipeline=".fast_fit_pipeline.yaml")
 
     if predict_model:
-        prior = rex.get_prior_from_ref_graph(input_path)
+        prior = rex._get_prior_from_ref_graph(input_path)
         rex.predict(data, ref_graph, prior=prior,
                     pipeline=".fast_predict_pipeline.yaml")
 
@@ -1086,8 +1112,9 @@ def custom_main(dataset_name,
         print(f"Saved '{rex.name}' to '{where_to}'")
 
 
+
 if __name__ == "__main__":
-    custom_main('toy_dataset',
+    main('toy_dataset',
                 input_path="/Users/renero/phd/data/",
                 model_type="nn",
                 explainer="gradient",

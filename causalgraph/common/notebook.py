@@ -1142,7 +1142,7 @@ if __name__ == "__main__":
             'prog_bar': True,
             'verbose': False,
             'hpo_n_trials': 1,
-            'bootstrap_trials': 100,
+            'bootstrap_trials': 10,
             'bootstrap_parallel_jobs': -1
         },
         'pc': {},
@@ -1166,7 +1166,7 @@ if __name__ == "__main__":
         experiment_name=dataset_name,
         csv_filename=os.path.join(input_path, f"{dataset_name}.csv"),
         dot_filename=os.path.join(input_path, f"{dataset_name}.dot"),
-        model_type="gbt",
+        model_type="dnn",
         input_path=input_path,
         output_path=output_path)
 
