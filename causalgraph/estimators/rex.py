@@ -41,6 +41,16 @@ from causalgraph.independence.graph_independence import GraphIndependence
 from causalgraph.metrics.compare_graphs import evaluate_graph
 from causalgraph.models import GBTRegressor, NNRegressor
 
+from rich.progress import (
+    BarColumn,
+    MofNCompleteColumn,
+    Progress,
+    TextColumn,
+    TimeElapsedColumn,
+    TimeRemainingColumn,
+)
+
+
 np.set_printoptions(precision=4, linewidth=120)
 warnings.filterwarnings('ignore')
 
@@ -353,7 +363,7 @@ class Rex(BaseEstimator, ClassifierMixin):
         # If parallelization is ON nr of steps is the nr of iterations
         # else, is the number of iterations * 2
         if self.bootstrap_parallel_jobs != 0:
-            n_steps += (self._steps_from_bootstrap(self.predict_pipeline))
+            n_steps += 1 #(self._steps_from_bootstrap(self.predict_pipeline))
         else:
             n_steps += (self._steps_from_bootstrap(self.predict_pipeline) * 2)
 
@@ -453,9 +463,11 @@ class Rex(BaseEstimator, ClassifierMixin):
             dag = shaps_instance.predict(data_sample, prior=prior)
             adjacency_matrix = utils.graph_to_adjacency(
                 dag, feature_names)
-            pbar.update_subtask("Bootstrap", 1) if pbar else None
+            pbar.update_subtask("Bootstrap", iter) if pbar else None
             if verbose:
                 print("· Iteration", iter+1, "done.")
+
+            time.sleep(0.5)
 
             return adjacency_matrix
 

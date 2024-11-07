@@ -1143,7 +1143,7 @@ if __name__ == "__main__":
             'verbose': False,
             'hpo_n_trials': 1,
             'bootstrap_trials': 50,
-            'bootstrap_parallel_jobs': -1
+            'bootstrap_parallel_jobs': 2
         },
         'pc': {},
         'ges': {},
