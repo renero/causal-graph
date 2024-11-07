@@ -467,8 +467,6 @@ class Rex(BaseEstimator, ClassifierMixin):
             if verbose:
                 print("· Iteration", iter+1, "done.")
 
-            time.sleep(0.5)
-
             return adjacency_matrix
 
         if parallel_jobs != 0:

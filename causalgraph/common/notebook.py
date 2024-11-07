@@ -1142,8 +1142,8 @@ if __name__ == "__main__":
             'prog_bar': True,
             'verbose': False,
             'hpo_n_trials': 1,
-            'bootstrap_trials': 50,
-            'bootstrap_parallel_jobs': 2
+            'bootstrap_trials': 100,
+            'bootstrap_parallel_jobs': -1
         },
         'pc': {},
         'ges': {},
