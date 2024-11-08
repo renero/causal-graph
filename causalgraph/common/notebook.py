@@ -72,7 +72,6 @@ COMBINED_DAG_NAMES = ['un_G_shap', 'in_G_shap',
                       'un_G_iter_prior', 'in_G_iter_prior']
 
 
-
 class BaseExperiment:
     """
     Base class for experiments.
@@ -393,46 +392,6 @@ class Experiment(BaseExperiment):
         return where_to
 
 
-def combined_dag_from_experiment(
-    full_path_filename: str,
-    combined: str,
-    prior: bool = False,
-    iterative: bool = False,
-    verbose: bool = False
-) -> nx.DiGraph:
-
-    dnn = Experiment(
-        full_path_filename, model_type='nn', verbose=verbose).load()
-    gbt = Experiment(
-        full_path_filename, model_type='gbt', verbose=verbose).load()
-
-    dags = defaultdict(nx.DiGraph)
-    for dag_name in RAW_DAG_NAMES:
-        un_name = f'un_{dag_name}'
-        in_name = f'in_{dag_name}'
-        dag1 = getattr(dnn.rex, dag_name)
-        dag2 = getattr(gbt.rex, dag_name)
-        if 'prio' not in dag_name:
-            prior = None
-        else:
-            prior = dnn.rex.prior
-        _, _, dags[un_name], dags[in_name] = utils.combine_dags(
-            dag1, dag2, dnn.rex.shaps.shap_discrepancies, prior=prior)
-
-    comb = "un_G" if combined == 'union' else "in_G"
-    prior = "_prior" if prior else ""
-    iter = "_iter" if iterative else ""
-    if not prior and not iterative:
-        comb = comb + "_shap"
-
-    # Build the DAG name, from those in the 'combined_dag_names' list, based
-    # on the values from "comb", "prior", and "iter".
-    dag_name = comb + iter + prior
-
-    return dags[dag_name]
-
-
-
 if __name__ == "__main__":
     np.set_printoptions(precision=4, linewidth=150)
     warnings.filterwarnings('ignore')
@@ -460,7 +419,7 @@ if __name__ == "__main__":
     output_path = os.path.expanduser("~/phd/output/")
 
     method_name = "rex"
-    dataset_name =  "toy_dataset"
+    dataset_name = "toy_dataset"
     # dataset_name =  "generated_10vars_linear_0"
 
     exp = Experiment(
