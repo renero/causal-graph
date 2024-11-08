@@ -571,6 +571,9 @@ class Rex(BaseEstimator, ClassifierMixin):
 
         return iter_adjacency_matrix
 
+    def iterative_predict(self, X, ref_graph=None, **kwargs):
+        return self.bootstrap(X, ref_graph, **kwargs)
+
     def bootstrap(
             self,
             X: pd.DataFrame,
@@ -810,6 +813,9 @@ class Rex(BaseEstimator, ClassifierMixin):
         """
         return utils.break_cycles_if_present(
             dag, self.shaps.shap_discrepancies, self.prior, verbose=self.verbose)
+
+    def get_prior_from_ref_graph(self, input_path):
+        return self._get_prior_from_ref_graph(input_path)
 
     def _get_prior_from_ref_graph(self, input_path) -> List[List[str]]:
         """
