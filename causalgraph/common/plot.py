@@ -31,6 +31,9 @@ from sklearn.base import BaseEstimator
 from sklearn.preprocessing import StandardScaler
 
 from causalgraph.metrics.compare_graphs import evaluate_graph
+from common import utils
+from common.notebook import Experiment, method_labels, score_titles, \
+    synth_data_labels, synth_data_types, metric_labels, metric_columns
 
 # Defaults for the graphs plotted
 formatting_kwargs = {
@@ -190,13 +193,13 @@ def subplots(
             index = i * num_cols + j
             if index < len(plot_args):
                 # axe = ax[i][j]
-                plot_func(plot_args[index], ax=ax_index(i,j))
+                plot_func(plot_args[index], ax=ax_index(i, j))
             else:
-                blank(ax_index(i,j))
+                blank(ax_index(i, j))
 
     if title is not None:
         fig.suptitle(title)
-    
+
     if pdf_filename is not None:
         plt.tight_layout(rect=[0, 0.0, 1, 0.97])
         plt.savefig(pdf_filename, bbox_inches='tight')
@@ -720,8 +723,10 @@ def dags(
     Returns:
     - None
     """
-    assert len(titles) == len(dags), "Number of titles must match number of DAGs"
-    assert len(dags) <=12 and len(dags) > 1, "Number of DAGs must be between 2 and 12"
+    assert len(titles) == len(
+        dags), "Number of titles must match number of DAGs"
+    assert len(dags) <= 12 and len(
+        dags) > 1, "Number of DAGs must be between 2 and 12"
 
     layout = _get_subplot_mosaic_layout(len(dags))
 
@@ -782,7 +787,7 @@ def shap_discrepancies(
         shaps: BaseEstimator,
         target_name: str,
         threshold: float = +100.0,
-        regression_line:bool=False,
+        regression_line: bool = False,
         reduced: bool = False,
         **kwargs):
     """
@@ -817,7 +822,8 @@ def shap_discrepancies(
     feature_names = [
         f for f in shaps.feature_names if (
             (f != target_name) and
-            ((1. - shaps.shap_discrepancies[target_name][f].shap_gof) < threshold)
+            ((1. - shaps.shap_discrepancies[target_name]
+             [f].shap_gof) < threshold)
         )
     ]
     # If no features are found, gracefully return
@@ -941,7 +947,7 @@ def _plot_discrepancy(x, y, s, target_name, parent_name, r, ax, regression_line,
             r.parent_model.fittedvalues.reshape(-1, 1))
         ax[3].scatter(s_fitted_scaled, s_resid, alpha=0.5, marker='+')
         ax[3].scatter(y_fitted_scaled, y_resid, alpha=0.5,
-                        marker='.', color='tab:orange')
+                      marker='.', color='tab:orange')
         ax[3].set_title(r'$\mathrm{Residuals}$', fontsize=10)
         ax[3].set_xlabel(
             rf'$ \mathrm{{{target_name}}} /  \phi_{{{parent_name}}} $')
@@ -1031,3 +1037,429 @@ def deprecated_dags(
         draw_graph_subplot(G, layout=ref_layout, title=names[0], ax=ax_graph,
                            **formatting_kwargs)
         plt.show()
+
+
+#
+# Methods below this line were in `plot.py'. I'm moving them here, so they must
+# be called now without the leading 'plot_' in the name, but with `plot.` instead.
+#
+
+def all_dags(what, include_others=True, **kwargs):
+    """
+    Plot the directed acyclic graphs (DAGs) for various methods.
+
+    Parameters:
+    - what (str): The name of the experiment.
+    - include_others (bool, optional): Whether to include the DAGs for the other
+        methods. Default is True. Other methods are: 'pc', 'lingam', 'ges' and 'fci'.
+
+    Returns:
+    None
+    """
+    pdf_filename = kwargs.get("pdf_filename", None)
+    figsize_ = kwargs.get("figsize", (18, 15))
+    dpi_ = kwargs.get("dpi", 300)
+
+    if include_others:
+        pc = Experiment(f"{what}").load(f"{what}_pc")
+        lingam = Experiment(f"{what}").load(f"{what}_lingam")
+        ges = Experiment(f"{what}").load(f"{what}_ges")
+        fci = Experiment(f"{what}").load(f"{what}_fci")
+    nn = Experiment(f"{what}").load(f"{what}_nn")
+    gbt = Experiment(f"{what}").load(f"{what}_gbt")
+    union = utils.graph_union(nn.rex.G_shag, gbt.rex.G_shag)
+    union = utils.break_cycles_if_present(union, nn.rex.learnings)
+    inter = utils.graph_intersection(nn.rex.G_shag, gbt.rex.G_shag)
+    inter = utils.break_cycles_if_present(inter, nn.rex.learnings)
+    union_adj = utils.graph_union(nn.rex.G_adjnc, gbt.rex.G_adjnc)
+    union_adj = utils.break_cycles_if_present(union_adj, nn.rex.learnings)
+    inter_adj = utils.graph_intersection(nn.rex.G_adjnc, gbt.rex.G_adjnc)
+    inter_adj = utils.break_cycles_if_present(inter_adj, nn.rex.learnings)
+
+    if include_others:
+        _, ax = plt.subplots(3, 4, figsize=figsize_, dpi=dpi_,
+                             gridspec_kw={'hspace': 0.5, 'wspace': 0.2})
+    else:
+        _, ax = plt.subplots(2, 4, figsize=figsize_, dpi=dpi_,
+                             gridspec_kw={'hspace': 0.5, 'wspace': 0.2})
+
+    setup_plot()
+    dag(graph=nn.rex.G_shag, reference=nn.ref_graph, show_node_fill=False,
+        ax=ax[0, 0], title=method_labels["nn"])
+    dag(gbt.rex.G_shag, nn.ref_graph, show_node_fill=False,
+        ax=ax[0, 1], title=method_labels["gbt"])
+    dag(union, nn.ref_graph, ax=ax[0, 2], title=method_labels["union"])
+    dag(inter, nn.ref_graph, ax=ax[0, 3],
+        title=method_labels["intersection"])
+
+    dag(graph=nn.rex.G_adj, reference=nn.ref_graph, show_node_fill=False,
+        ax=ax[1, 0], title=method_labels["nn_adj"])
+    dag(gbt.rex.G_adj, nn.ref_graph, show_node_fill=False,
+        ax=ax[1, 1], title=method_labels["gbt_adj"])
+    dag(union_adj, nn.ref_graph,
+        ax=ax[1, 2], title=method_labels["union_adj"])
+    dag(inter_adj, nn.ref_graph,
+        ax=ax[1, 3], title=method_labels["intersection_adj"])
+
+    if include_others:
+        dag(graph=pc.pc.dag, reference=nn.ref_graph,
+            ax=ax[2, 0], title=method_labels["pc"])
+        dag(graph=lingam.lingam.dag, reference=nn.ref_graph,
+            ax=ax[2, 1], title=method_labels["lingam"])
+        dag(graph=ges.ges.dag, reference=nn.ref_graph,
+            ax=ax[2, 2], title=method_labels["ges"])
+        dag(graph=fci.fci.dag, reference=nn.ref_graph,
+            ax=ax[2, 3], title=method_labels["fci"])
+
+    plt.suptitle(what)
+
+    if pdf_filename is not None:
+        plt.savefig(pdf_filename, bbox_inches='tight')
+        plt.close()
+    else:
+        plt.tight_layout()
+        plt.show()
+
+
+def score_by_method(metrics, metric, methods, **kwargs):
+    """
+    Plots the score by method.
+
+    Parameters:
+    - metrics: DataFrame containing the metrics data.
+    - metric: The metric to be plotted.
+    - methods: List of methods to be included in the plot.
+    - **kwargs: Additional keyword arguments for customization, like
+        - figsize: The size of the figure. Default is (4, 3).
+        - dpi: The resolution of the figure in dots per inch. Default is 300.
+        - title: The title of the plot. Default is None.
+        - pdf_filename: The filename to save the plot to. If None, the plot
+            will be displayed on screen, otherwise it will be saved to the
+        - method_column: The name of the column containing the method names.
+            Default is 'method'.
+
+    Returns:
+    None
+    """
+    assert metric in list(score_titles.keys()), \
+        ValueError(f"Metric '{metric}' not recognized.")
+    figsize_ = kwargs.get('figsize', (4, 3))
+    dpi_ = kwargs.get('dpi', 300)
+    title_ = kwargs.get('title', None)
+    pdf_filename = kwargs.get('pdf_filename', None)
+    method_column = kwargs.get('method_column', 'method')
+
+    if methods is None:
+        methods = ['rex_mlp', 'rex_gbt', 'rex_intersection', 'rex_union']
+
+    _, ax = plt.subplots(1, 1, figsize=figsize_, dpi=dpi_)
+
+    metric_values = [metrics[metrics[method_column] == m][metric]
+                     for m in methods]
+
+    plt.boxplot(metric_values)
+    ax.set_xticklabels(labels=[method_labels[key]
+                               for key in methods], fontsize=7)
+    ax.grid(axis='y', linestyle='--', linewidth=0.5, which='both')
+
+    # check if any value is above 1
+    if np.all(np.array(metric_values) <= 1.0) and \
+            np.all(np.array(metric_values) >= 0.0):
+        ax.set_ylim([0, 1.05])
+    if not np.any(np.array(metric_values) < 0.0):
+        ax.set_ylim(bottom=0)
+
+    # Set the Y tick labels and left axis bounds
+    yticks = ax.get_yticks()
+    if np.max(metric_values) <= yticks[-1]:
+        yticks = ax.get_yticks()[:-1]
+    ax.set_yticklabels(labels=[f"{t:.1f}" for t in yticks], fontsize=6)
+
+    #  Remove the top and right axes
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['left'].set_bounds(high=yticks[-1])
+    ax.spines['left'].set_visible(False)
+
+    if title_ is None:
+        ax.set_title(score_titles[metric], fontsize=10)
+    else:
+        ax.set_title(title_, fontsize=10)
+
+    if pdf_filename is not None:
+        plt.savefig(pdf_filename, bbox_inches='tight')
+        plt.close()
+    else:
+        plt.tight_layout()
+        plt.show()
+
+
+def scores_by_method(
+        metrics: pd.DataFrame,
+        methods=None,
+        title: str = None,
+        pdf_filename=None,
+        **kwargs):
+    """
+    Plot the metrics for all the experiments matching the input pattern
+
+    Parameters
+    ----------
+    metrics : pandas DataFrame
+        A DataFrame with the metrics for all the experiments
+    method_types : list
+        The list of methods to plot. If None, all the methods will be plotted
+        The methods included are: 'rex_mlp', 'rex_gbt', 'rex_intersection' and
+        'rex_union'
+    title : str
+        The title of the plot
+    pdf_filename : str
+        The filename to save the plot to. If None, the plot will be displayed
+        on screen, otherwise it will be saved to the specified filename.
+
+    Optional parameters:
+    - figsize (tuple, optional): The size of the figure. Default is (7, 5).
+    - dpi (int, optional): The resolution of the figure in dots per inch.
+        Default is 300.
+    - ylim (tuple, optional): The y-axis limits of the plot. Default is None.
+
+
+    Returns
+    -------
+    None
+    """
+    figsize_ = kwargs.get('figsize', (9, 5))
+    dpi_ = kwargs.get('dpi', 300)
+    method_column = kwargs.get('method_column', 'method')
+    if methods is None:
+        methods = ['rex_mlp', 'rex_gbt', 'rex_intersection', 'rex_union']
+
+    what = ['f1', 'precision', 'recall', 'shd', 'sid']
+    axs = plt.figure(layout="constrained", figsize=figsize_, dpi=dpi_).\
+        subplot_mosaic('AABBCC;.DDEE.')
+
+    ax_labels = list(axs.keys())
+    for i, metric in enumerate(what):
+        ax = axs[ax_labels[i]]
+        metric_values = [metrics[metrics[method_column] == m][metric]
+                         for m in methods]
+
+        ax.boxplot(metric_values)
+        ax.set_xticklabels(labels=[method_labels[key]
+                                   for key in methods], fontsize=6)
+        ax.grid(axis='y', linestyle='--', linewidth=0.5, which='both')
+
+        # check if any value is above 1
+        if np.all(np.array(metric_values) <= 1.0) and \
+                np.all(np.array(metric_values) >= 0.0):
+            ax.set_ylim([0, 1.05])
+        if not np.any(np.array(metric_values) < 0.0):
+            ax.set_ylim(bottom=0)
+
+        # Set the Y tick labels and left axis bounds
+        yticks = ax.get_yticks()
+        if np.max(metric_values) <= yticks[-1]:
+            yticks = ax.get_yticks()[:-1]
+        ax.set_yticklabels(labels=[f"{t:.1f}" for t in yticks], fontsize=6)
+
+        #  Remove the top and right axes
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['left'].set_bounds(high=yticks[-1])
+        ax.spines['left'].set_visible(False)
+
+        ax.set_title(score_titles[metric], fontsize=10)
+
+    if title is not None:
+        fig = plt.gcf()
+        fig.suptitle(title)
+
+    if pdf_filename is not None:
+        plt.savefig(pdf_filename, bbox_inches='tight')
+        plt.close()
+    else:
+        plt.tight_layout()
+        plt.show()
+
+
+def score_by_subtype(
+        metrics: pd.DataFrame,
+        score_name: str,
+        methods=None,
+        pdf_filename=None,
+        **kwargs):
+    """
+    Plots the score by subtype.
+
+    Parameters:
+    - metrics (pandas DataFrame): The metrics for all the experiments. This dataframe
+    contains the following columns:
+        - method (str): The name of the method used.
+        - data_type (str): The type of data used.
+        - f1 (float): The F1 score.
+        - precision (float): The precision score.
+        - recall (float): The recall score.
+        - aupr (float): The area under the precision-recall curve.
+        - Tp (int): The number of true positives.
+        - Tn (int): The number of true negatives.
+        - Fp (int): The number of false positives.
+        - Fn (int): The number of false negatives.
+        - shd (int): The structural Hamming distance.
+        - sid (int): The structural intervention distance.
+        - n_edges (int): The number of edges in the graph.
+        - ref_n_edges (int): The number of edges in the reference graph.
+        - diff_edges (int): The difference between the number of edges in the graph
+        and the reference graph.
+        - name (str): The name of the experiment.
+    and stores one experiment per row.
+    - score_name (str): The name of the score to plot. Valid names are 'f1',
+    'precision', 'recall', 'aupr', 'shd', 'sid', 'n_edges', 'ref_n_edges' and
+    'diff_edges'.
+    - methods (list, optional): The list of methods to plot. If None, all the methods
+    will be plotted. The methods included are: 'rex_intersection', 'rex_union',
+    'pc', 'fci', 'ges', 'lingam'
+    - pdf_filename (str, optional): The filename to save the plot to. If None, the plot
+    will be displayed on screen, otherwise it will be saved to the specified filename.
+
+    Optional parameters:
+    - figsize (tuple, optional): The size of the figure. Default is (2, 1).
+    - dpi (int, optional): The resolution of the figure in dots per inch. Default is 300.
+    - method_column (str, optional): The name of the column in the metrics dataframe
+        that contains the method name. Default is 'method'.
+
+    Returns:
+    None
+    """
+    figsize_ = kwargs.get('figsize', (9, 5))
+    dpi_ = kwargs.get('dpi', 300)
+    method_column = kwargs.get('method_column', 'method')
+
+    if methods is None:
+        methods = ['pc', 'fci', 'ges', 'lingam', 'cam', 'notears', 'un_G_iter']
+    x_labels = [method_labels[m] for m in methods]
+    axs = plt.figure(layout="constrained", figsize=figsize_, dpi=dpi_).\
+        subplot_mosaic('AABBCC;.EEFF.')
+
+    # Loop through all the subtypes
+    ax_labels = list(axs.keys())
+    for i, subtype in enumerate(synth_data_types):  # + ['all']):
+        ax = axs[ax_labels[i]]
+        if subtype == 'all':
+            sub_df = metrics
+        else:
+            sub_df = metrics[metrics['data_type'] == subtype]
+        metric_values = [sub_df[sub_df[method_column] == m][score_name]
+                         for m in methods]
+        ax.boxplot(metric_values)
+        ax.set_xticklabels(labels=x_labels, fontsize=6)
+
+        if np.all(np.array(metric_values) <= 1.0) and \
+                np.all(np.array(metric_values) >= 0.0):
+            ax.set_ylim([0, 1.05])
+        if not np.any(np.array(metric_values) < 0.0):
+            ax.set_ylim(bottom=0)
+
+        yticks = ax.get_yticks()
+        if np.max(metric_values) <= yticks[-2]:
+            yticks = ax.get_yticks()[:-1]
+        ax.set_yticklabels(labels=[f"{t:.1f}" for t in yticks], fontsize=6)
+
+        ax.grid(axis='y', linestyle='--', linewidth=0.5, which='both')
+
+        #  Remove the top and right axes
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['left'].set_bounds(high=yticks[-1])
+        ax.spines['left'].set_visible(False)
+
+        # Set the title to the score name, in Latex math mode
+        if subtype == 'all':
+            ax.set_title(
+                r'$\textrm{{all data}}$',
+                fontsize=10)  # , y=-0.25)
+        else:
+            ax.set_title(
+                rf'{synth_data_labels[synth_data_types.index(subtype)]} data',
+                fontsize=10)  # , y=-0.25)
+
+    plt.suptitle(f"{score_titles[score_name]} score")
+    if pdf_filename is not None:
+        plt.savefig(pdf_filename, bbox_inches='tight')
+        plt.close()
+    else:
+        plt.tight_layout()
+        plt.show()
+
+
+def combined_metrics(
+        metrics: dict,
+        metric_types: list = None,
+        title: str = None,
+        acyclic=False,
+        medians=False,
+        pdf_filename=None):
+    """
+    Plot the metrics for all the experiments matching the input pattern
+
+    Parameters
+    ----------
+    metrics : dict
+        A dictionary with the metrics for all the experiments
+    title : str
+        The title of the plot
+    acyclic : bool
+        Whether to plot the metrics for the no_cycles graphs
+    medians: bool
+        Whether to plot the median lines
+
+    Returns
+    -------
+    None
+    """
+    what = ['f1', 'precision', 'recall', 'shd', 'sid']
+    axs = plt.figure(layout="constrained").subplot_mosaic(
+        """
+        AABBCC
+        .DDEE.
+        """
+    )
+    # fig, axs = plt.subplots(2, 2, figsize=(6, 5))
+    if metric_types is None:
+        if acyclic:
+            metric_types = global_nc_metric_types
+        else:
+            metric_types = global_metric_types
+
+    ax_labels = list(axs.keys())
+    for i, metric in enumerate(what):
+        # row, col = i // 2, i % 2
+        ax = axs[ax_labels[i]]
+        metric_values = [metrics[key].loc[:, metric] for key in metric_types]
+
+        if medians:
+            combined_median = np.median(metrics['intersection'].loc[:, metric])
+            added_median = np.median(metrics['union'].loc[:, metric])
+            ax.axhline(
+                combined_median, color='g', linestyle='--', linewidth=0.5)
+            ax.axhline(
+                added_median, color='b', linestyle='--', linewidth=0.5)
+
+        ax.boxplot(
+            metric_values,
+            labels=[metric_labels[key] for key in metric_types])
+        # check if any value is above 1
+        if np.all(np.array(metric_values) <= 1.0):
+            ax.set_ylim([0, 1.05])
+        ax.set_title(score_titles[metric])
+
+    if title is not None:
+        fig = plt.gcf()
+        fig.suptitle(title)
+
+    if pdf_filename is not None:
+        plt.savefig(pdf_filename, bbox_inches='tight')
+        plt.close()
+    else:
+        plt.tight_layout()
+        plt.show()
+
