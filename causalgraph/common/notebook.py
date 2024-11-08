@@ -236,16 +236,6 @@ class BaseExperiment:
 
         self.ref_graph = utils.graph_from_dot_file(dot_filename)
 
-        # if self.verbose:
-        #     print(
-        #         f"Data for {self.experiment_name}\n"
-        #         f"  ↳ Train....: {self.data.shape[0]} rows, "
-        #         f"{self.data.shape[1]} cols\n"
-        #         f"  ↳ Test.....: {self.test_data.shape[0]} rows, "
-        #         f"{self.data.shape[1]} cols\n"
-        #         f"  ↳ CSV.data.: {csv_filename}\n"
-        #         f"  ↳ Ref.graph: {dot_filename}")
-
     def experiment_exists(self, name):
         """Checks whether the experiment exists in the output path"""
         return os.path.exists(
@@ -314,6 +304,11 @@ class BaseExperiment:
             print(f"Estimator '{estimator_name}' not found.")
             return None
 
+        # Special case: when estimator is ReX, model_type needs also to be passed to
+        # the constructor
+        if estimator_name == 'rex':
+            kwargs['model_type'] = self.model_type
+
         return estimator_class(name=name, **kwargs)
 
 
@@ -367,13 +362,29 @@ class Experiment(BaseExperiment):
         super().__init__(
             input_path, output_path, train_size=train_size,
             random_state=random_state, verbose=verbose)
-        self.model_type = model_type
+        self.model_type = self._check_model_type(model_type)
         self.is_fitted = False
         self.verbose = verbose
 
         # Prepare the input
         self.prepare_experiment_input(
             experiment_name, csv_filename, dot_filename)
+
+    def _check_model_type(self, model_type):
+        """
+        Checks if the model type is valid.
+        """
+        model_type = model_type.lower()
+        if model_type in ['dnn', 'nn']:
+            model_type = 'nn'
+        elif model_type == 'gbt':
+            model_type = 'gbt'
+        else:
+            raise ValueError(
+                f"Model type '{model_type}' not supported. "
+                f"Supported options are: 'nn', 'gbt', 'pc', 'fci', 'ges' and 'lingam'.")
+
+        return model_type
 
     def fit(self, estimator_name='rex', **kwargs):
         """
@@ -426,15 +437,15 @@ class Experiment(BaseExperiment):
         Returns:
             Rex: The fitted experiment data.
         """
-
-        # self.rex = Rex(name=self.experiment_name, **kwargs)
-        # self.rex.fit_predict(self.train_data, self.test_data, self.ref_graph)
+        start_time = time.time()
         self.estimator_name = estimator
         estimator_object = self.create_estimator(
             estimator, name=self.experiment_name, **kwargs)
         estimator_object.fit_predict(
             self.train_data, self.test_data, self.ref_graph)
         setattr(self, estimator, estimator_object)
+        end_time = time.time()
+        self.fit_predict_time = end_time - start_time
 
         return self
 
@@ -1129,18 +1140,15 @@ def plot_all_dags(what, include_others=True, **kwargs):
 if __name__ == "__main__":
     np.set_printoptions(precision=4, linewidth=150)
     warnings.filterwarnings('ignore')
-
-    input_path = os.path.expanduser("~/phd/data/")
-    output_path = os.path.expanduser("~/phd/output/")
-    exp = Experiment(
-        experiment_name="toy_dataset",
-        csv_filename=os.path.join(input_path,  "toy_dataset.csv"),
-        dot_filename=os.path.join(input_path, "toy_dataset.dot"),
-        # model_type="nn",
-        input_path=input_path,
-        output_path=output_path)
-
     extra_args = {
+        'rex': {
+            'prog_bar': True,
+            'verbose': False,
+            'hpo_n_trials': 1,
+            'bootstrap_trials': 10,
+            'bootstrap_parallel_jobs': -1,
+            'parallel_jobs': -1
+        },
         'pc': {},
         'ges': {},
         'lingam': {},
@@ -1152,8 +1160,24 @@ if __name__ == "__main__":
         'notears': {}
     }
 
-    method_name = "notears"
+    input_path = os.path.expanduser("~/phd/data/RC4/")
+    output_path = os.path.expanduser("~/phd/output/")
+
+    method_name = "rex"
+    # dataset_name =  "toy_dataset"
+    dataset_name =  "generated_10vars_linear_0"
+
+    exp = Experiment(
+        experiment_name=dataset_name,
+        csv_filename=os.path.join(input_path, f"{dataset_name}.csv"),
+        dot_filename=os.path.join(input_path, f"{dataset_name}.dot"),
+        model_type="gbt",
+        input_path=input_path,
+        output_path=output_path)
+
     exp = exp.fit_predict(method_name, **extra_args[method_name])
     method = getattr(exp, method_name)
     print(method.dag.edges())
     print(method.metrics)
+    t, u = utils.format_time(exp.fit_predict_time)
+    print(f"Elapsed time: {t:.1f}{u}")
