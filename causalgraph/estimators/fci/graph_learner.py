@@ -24,7 +24,8 @@ from pygam import pygam
 
 from mlforge.progbar import ProgBar
 
-from causalgraph.common.utils import graph_from_adjacency_file
+# from causalgraph.common.utils import graph_from_adjacency_file
+from ...common import utils
 from causalgraph.estimators.fci.initialization import (dsep_set_from_csv,
                                                        save_graph, save_sepset)
 from causalgraph.estimators.fci.debug import *
@@ -107,7 +108,7 @@ class GraphLearner():
             sk_file = Path(self.output_path, self.base_skeleton)
             ss_file = Path(self.output_path, self.base_sepset)
             if os.path.exists(sk_file) and os.path.exists(ss_file):
-                skeleton = graph_from_adjacency_file(sk_file)
+                skeleton = utils.graph_from_adjacency_file(sk_file)
                 sepset = dsep_set_from_csv(ss_file)
                 if self.log:
                     self.log.info(f"Read {sk_file}")

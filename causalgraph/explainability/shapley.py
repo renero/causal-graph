@@ -3,7 +3,6 @@ This module builds the causal graph based on the informacion that we derived
 from the SHAP values. The main idea is to use the SHAP values to compute the
 discrepancy between the SHAP values and the target values. This discrepancy
 is then used to build the graph.
-
 """
 
 # pylint: disable=E1101:no-member, W0201:attribute-defined-outside-init, W0511:fixme
@@ -13,15 +12,16 @@ is then used to build the graph.
 # pylint: disable=R0914:too-many-locals, R0915:too-many-statements
 # pylint: disable=W0106:expression-not-assigned, R1702:too-many-branches
 
-from multiprocessing import Pool, get_context
-from functools import partial
 import inspect
 import math
+import multiprocessing
 from collections import defaultdict
 from dataclasses import dataclass
-import multiprocessing
+from functools import partial
+from multiprocessing import get_context
 from typing import List, Union
 
+import colorama
 import networkx as nx
 import numpy as np
 import pandas as pd
@@ -31,19 +31,24 @@ import statsmodels.stats.api as sms
 import torch
 from matplotlib import pyplot as plt
 from matplotlib.ticker import FormatStrFormatter
+from mlforge.progbar import ProgBar  # type: ignore
 from scipy.stats import kstest, spearmanr
 from sklearn.base import BaseEstimator
 from sklearn.discriminant_analysis import StandardScaler
 from sklearn.metrics import r2_score
 from sklearn.model_selection import train_test_split
 from sklearn.utils.validation import check_is_fitted
-from mlforge.progbar import ProgBar  # type: ignore
 
-from causalgraph.common import *
-from causalgraph.common import utils
-from causalgraph.explainability.hierarchies import Hierarchies
-from causalgraph.independence.feature_selection import select_features
+# from causalgraph.common import *
+# from causalgraph.common import utils
+# from causalgraph.explainability.hierarchies import Hierarchies
+from ..independence.feature_selection import select_features
+from ..common import utils
 
+RED = colorama.Fore.RED
+GREEN = colorama.Fore.GREEN
+GRAY = colorama.Fore.LIGHTBLACK_EX
+RESET = colorama.Style.RESET_ALL
 
 AnyGraph = Union[nx.DiGraph, nx.Graph]
 K = 180.0 / math.pi
@@ -249,7 +254,8 @@ class ShapEstimator(BaseEstimator):
             print()
 
         # Return results
-        return target_name, shap_values_target, feature_order_target, shap_mean_values_target
+        return target_name, shap_values_target, feature_order_target, \
+            shap_mean_values_target
 
 
     def fit(self, X):

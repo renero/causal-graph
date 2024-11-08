@@ -17,14 +17,13 @@ import warnings
 from collections import defaultdict
 from os import path
 
-import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
 
-from causalgraph.common import plot, utils
 from causalgraph.common import utils
+from causalgraph.common import *
 from causalgraph.estimators.cam.cam import CAM
 from causalgraph.estimators.fci.fci import FCI
 from causalgraph.estimators.ges.ges import GES
@@ -53,70 +52,6 @@ global_nc_metric_types = [
     'mlp_nc', 'gbt_nc', 'intersection_nc', 'union_nc',
     'mlp_adjnc', 'gbt_adjnc', 'intersection_adjnc', 'union_adjnc',
     'union_all_nc', 'int_indep', 'int_final', 'union_indep', 'union_final']
-metric_labels = {
-    'mlp': 'DFN',
-    'gbt': 'GBT',
-    'intersection': r'$\textrm{DAG}_\cap$',
-    'union': r'$\textrm{DAG}_\cup$',
-    'union_all': 'all',
-    'int_indep': '∩i',
-    'int_final': '∩f',
-    'union_indep': '∪i',
-    'union_final': '∪f',
-    'mlp_nc': 'DFN',
-    'gbt_nc': 'GBT',
-    'intersection_nc': '∩',
-    'union_nc': '∪',
-    'union_all_nc': 'all'
-}
-score_titles = {
-    'f1': r'$\textrm{F1}$',
-    'precision': r'$\textrm{Precision}$',
-    'recall': r'$\textrm{Recall}$',
-    'aupr': r'$\textrm{AuPR}$',
-    'Tp': r'$\textrm{TP}$',
-    'Tn': r'$\textrm{TN}$',
-    'Fp': r'$\textrm{FP}$',
-    'Fn': r'$\textrm{FN}$',
-    'shd': r'$\textrm{SHD}$',
-    'sid': r'$\textrm{SID}$',
-    'n_edges': r'$\textrm{Nr. Edges}$',
-    'ref_n_edges': r'$\textrm{Edges in Ground Truth}$',
-    'diff_edges': r'$\textrm{Diff. Edges}$',
-}
-method_labels = {
-    'nn': r'$\textrm{R\textsc{e}X}_{\textrm{\tiny DFN}}$',
-    'rex_mlp': r'$\textrm{R\textsc{e}X}_{\textrm{\tiny DFN}}$',
-    'nn_adj': r'$\textrm{R\textsc{e}X}_{\textrm{\tiny DFN}}^{\textrm{\tiny adj}}$',
-    'rex_mlp_adj': r'$\textrm{R\textsc{e}X}_{\textrm{\tiny DFN}}^{\textrm{\tiny adj}}$',
-    'gbt': r'$\textrm{R\textsc{e}X}_{\textrm{\tiny GBT}}$',
-    'rex_gbt': r'$\textrm{R\textsc{e}X}_{\textrm{\tiny GBT}}$',
-    'gbt_adj': r'$\textrm{R\textsc{e}X}_{\textrm{\tiny GBT}}^{\textrm{\tiny adj}}$',
-    'rex_gbt_adj': r'$\textrm{R\textsc{e}X}_{\textrm{\tiny GBT}}^{\textrm{\tiny adj}}$',
-    'union': r'$\textrm{R\textsc{e}X}_{\cup}$',
-    'rex_union': r'$\textrm{R\textsc{e}X}_{\cup}$',
-    'union_adj': r'$\textrm{R\textsc{e}X}_{\cup}^{\textrm{\tiny adj}}$',
-    'rex_union_adj': r'$\textrm{R\textsc{e}X}_{\cup}^{\textrm{\tiny adj}}$',
-    'rex_union_adjnc': r'$\textrm{R\textsc{e}X}_{\cup}^{\textrm{\tiny adj}}$',
-    'intersection': r'$\textrm{R\textsc{e}X}_{\cap}$',
-    'rex_intersection': r'$\textrm{R\textsc{e}X}_{\cap}$',
-    'intersection_adj': r'$\textrm{R\textsc{e}X}_{\cap}^{\textrm{\tiny adj}}$',
-    'rex_intersection_adj': r'$\textrm{R\textsc{e}X}_{\cap}^{\textrm{\tiny adj}}$',
-    'rex_intersection_adjnc': r'$\textrm{R\textsc{e}X}_{\cap}^{\textrm{\tiny adj}}$',
-    'pc': r'$\textrm{PC}$',
-    'fci': r'$\textrm{FCI}$',
-    'ges': r'$\textrm{GES}$',
-    'lingam': r'$\textrm{LiNGAM}$',
-    'cam': r'$\textrm{CAM}$',
-    'notears': r'$\textrm{NOTEARS}$',
-    'G_pc': r'$\textrm{PC}$',
-    'G_fci': r'$\textrm{FCI}$',
-    'G_ges': r'$\textrm{GES}$',
-    'G_lingam': r'$\textrm{LiNGAM}$',
-    'G_cam': r'$\textrm{CAM}$',
-    'G_notears': r'$\textrm{NOTEARS}$',
-    'un_G_iter': r'$\textrm{R\textsc{e}X}$'
-}
 estimators = {
     'rex': Rex,
     'fci': FCI,
@@ -127,9 +62,6 @@ estimators = {
     'notears': NOTEARS
 }
 method_names = ['pc', 'fci', 'ges', 'lingam', 'cam', 'notears']
-synth_data_types = ['linear', 'polynomial', 'gp_add', 'gp_mix', 'sigmoid_add']
-synth_data_labels = ['Linear', 'Polynomial',
-                     'Gaussian(add)', 'Gaussian(mix)', 'Sigmoid(add)']
 metric_columns = ['method', 'data_type', 'f1', 'precision',
                   'recall', 'aupr', 'Tp', 'Tn', 'Fp', 'Fn', 'shd', 'sid',
                   'n_edges', 'ref_n_edges', 'diff_edges', 'name']
@@ -139,27 +71,6 @@ COMBINED_DAG_NAMES = ['un_G_shap', 'in_G_shap',
                       'un_G_iter', 'in_G_iter',
                       'un_G_iter_prior', 'in_G_iter_prior']
 
-
-def list_files(input_pattern: str, where: str) -> list:
-    """
-    List all the files in the input path matching the input pattern
-
-    Parameters:
-    -----------
-    input_pattern : str
-        The pattern to match the files
-    where : str
-        The path to use to look for the files matching the pattern
-    """
-    input_files = glob.glob(os.path.join(
-        where, input_pattern))
-    input_files = sorted([os.path.basename(os.path.splitext(f)[0])
-                         for f in input_files])
-
-    assert len(input_files) > 0, \
-        f"No files found in {where} matching <{input_pattern}>"
-
-    return sorted(list(set(input_files)))
 
 
 class BaseExperiment:
@@ -240,50 +151,6 @@ class BaseExperiment:
         """Checks whether the experiment exists in the output path"""
         return os.path.exists(
             os.path.join(self.output_path, f"{os.path.basename(name)}.pickle"))
-
-    def decide_what_to_do(self):
-        """
-        Decides whether to load or train the model, and whether to save the
-        experiment or not. The decision is based on the following rules:
-
-        - If the experiment exists, it will be loaded unless train_anyway is True
-        - If the experiment does not exist, it will be trained unless train_anyway
-            is False
-        - If the experiment exists, it will be saved unless save_anyway is False
-        - If the experiment does not exist, it will be saved unless save_anyway
-            is False
-        """
-        experiment_exists = self.experiment_exists(self.experiment_name)
-        if experiment_exists:
-            self.load_experiment = True and not self.train_anyway
-        else:
-            self.load_experiment = False and not self.train_anyway
-        self.save_experiment = (
-            True if self.load_experiment is False else False) or self.save_anyway
-
-        if self.verbose:
-            if self.load_experiment:
-                print(
-                    f"      ↳ Experiment '{self.experiment_name}' will be LOADED")
-            else:
-                print(
-                    f"      ↳ Experiment '{self.experiment_name}' will be TRAINED")
-
-        self.save_experiment = True
-
-    def list_files(self, input_pattern, where='input') -> list:
-        """
-        List all the files in the input path matching the input pattern
-        """
-        where = self.input_path if where == 'input' else self.output_path
-        input_files = glob.glob(os.path.join(
-            where, input_pattern))
-        input_files = sorted([os.path.splitext(f)[0] for f in input_files])
-
-        assert len(input_files) > 0, \
-            f"No files found in {where} matching <{input_pattern}>"
-
-        return sorted(list(set(input_files)))
 
     def create_estimator(self, estimator_name: str, name: str, **kwargs):
         """
@@ -484,6 +351,8 @@ class Experiment(BaseExperiment):
             self.estimator_name = 'fci'
         elif isinstance(exp_object, CAM):
             self.estimator_name = 'cam'
+        elif isinstance(exp_object, NOTEARS):
+            self.estimator_name = 'notears'
         else:
             raise ValueError(
                 f"Estimator '{exp_name}' not recognized.")
@@ -542,7 +411,7 @@ def get_combined_metrics(subtype: str, where: str = None) -> dict:
     """
     if where is None:
         where = "/Users/renero/phd/output/RC4/"
-    files = list_files(f"rex_generated_{subtype}_*_nn.pickle", where=where)
+    files = utils.list_files(f"rex_generated_{subtype}_*_nn.pickle", where=where)
 
     metrics = defaultdict(list)
     for exp_name in files:
@@ -668,57 +537,6 @@ def combined_dag_from_experiment(
 
 
 
-def _format_mean_std(data):
-    # """\scalemath{0.6}{\ \pm\ 0.05}"""
-    return rf'${data.mean():.2f} \scalemath{{0.6}}{{\ \pm\ {data.std():.1f}}}$'
-
-
-def latex_table_by_datatype(df, method, metrics=None):
-    if metrics is None:
-        metrics = ['precision', 'recall', 'f1', 'shd', 'sid']
-
-    table = "\\begin{tabular}{l|" + 'c'*len(metrics) + "}\n\\toprule\n"
-    # table += "{} & Precision & Recall & F1 & SHD & SID \\\\ \\midrule\n"
-    table += "{} " + \
-        ''.join(
-            f"& {score_titles[m]}" for m in metrics) + " \\\\ \\midrule\n"
-    for i, data_type in enumerate(synth_data_types):
-        table += synth_data_labels[i]
-        for metric in metrics:
-            data = df[(df.method == method) & (
-                df.data_type == data_type)][metric]
-            table += f" & {_format_mean_std(data)}"
-        table += " \\\\\n"
-    table += "\\bottomrule\n"
-    table += "\\end{tabular}"
-    print(table)
-
-
-def latex_table_by_method(df, methods=None, metric_names=None):
-
-    if methods is None:
-        methods = ['rex_mlp', 'rex_gbt', 'rex_union',
-                   'rex_union_adjnc', 'pc', 'fci', 'ges', 'lingam']
-
-    if metric_names is None:
-        metric_names = ['precision', 'recall', 'f1', 'shd', 'sid']
-
-    table = "\\begin{tabular}{l|" + 'c'*len(metric_names) + "}\n\\toprule\n"
-    table += "{} " + \
-        ''.join(
-            f"& {score_titles[m]}" for m in metric_names) + " \\\\ \\midrule\n"
-    for method in methods:
-        table += method_labels[method]
-        for metric in metric_names:
-            data = df[(df.method == method)][metric]
-            table += f" & {_format_mean_std(data)}"
-        table += " \\\\\n"
-    table += "\\bottomrule\n"
-    table += "\\end{tabular}"
-    print(table)
-
-
-
 if __name__ == "__main__":
     np.set_printoptions(precision=4, linewidth=150)
     warnings.filterwarnings('ignore')
@@ -742,12 +560,12 @@ if __name__ == "__main__":
         'notears': {}
     }
 
-    input_path = os.path.expanduser("~/phd/data/RC4/")
+    input_path = os.path.expanduser("~/phd/data/")
     output_path = os.path.expanduser("~/phd/output/")
 
     method_name = "rex"
-    # dataset_name =  "toy_dataset"
-    dataset_name =  "generated_10vars_linear_0"
+    dataset_name =  "toy_dataset"
+    # dataset_name =  "generated_10vars_linear_0"
 
     exp = Experiment(
         experiment_name=dataset_name,

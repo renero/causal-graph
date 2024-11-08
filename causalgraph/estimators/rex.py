@@ -10,7 +10,7 @@ Main class for the REX estimator.
 # pylint: disable=R0914:too-many-locals, R0915:too-many-statements
 # pylint: disable=W0106:expression-not-assigned, R1702:too-many-branches
 
-from multiprocessing import Pool, get_context
+from multiprocessing import get_context
 from functools import partial
 import multiprocessing
 import os
@@ -29,15 +29,15 @@ from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.preprocessing import StandardScaler
 from sklearn.utils.validation import check_is_fitted, check_random_state
 
-from causalgraph.common import (
+from ..common import (
     utils, DEFAULT_HPO_TRIALS, DEFAULT_BOOTSTRAP_TRIALS,
     DEFAULT_BOOTSTRAP_TOLERANCE, DEFAULT_BOOTSTRAP_SAMPLING_SPLIT
 )
-from causalgraph.estimators.knowledge import Knowledge
-from causalgraph.explainability.regression_quality import RegQuality
-from causalgraph.explainability.shapley import ShapEstimator
-from causalgraph.metrics.compare_graphs import evaluate_graph
-from causalgraph.models import GBTRegressor, NNRegressor
+from .knowledge import Knowledge
+from ..explainability.regression_quality import RegQuality
+from ..explainability.shapley import ShapEstimator
+from ..metrics.compare_graphs import evaluate_graph
+from ..models import GBTRegressor, NNRegressor
 
 
 np.set_printoptions(precision=4, linewidth=120)
