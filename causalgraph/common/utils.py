@@ -25,7 +25,7 @@ import pydot
 import pydotplus
 import torch
 
-from causalgraph.independence.edge_orientation import get_edge_orientation
+from ..independence.edge_orientation import get_edge_orientation
 
 
 AnyGraph = Union[nx.Graph, nx.DiGraph]

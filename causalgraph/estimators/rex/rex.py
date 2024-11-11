@@ -29,15 +29,15 @@ from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.preprocessing import StandardScaler
 from sklearn.utils.validation import check_is_fitted, check_random_state
 
-from ..common import (
+from ...common import (
     utils, DEFAULT_HPO_TRIALS, DEFAULT_BOOTSTRAP_TRIALS,
     DEFAULT_BOOTSTRAP_TOLERANCE, DEFAULT_BOOTSTRAP_SAMPLING_SPLIT
 )
 from .knowledge import Knowledge
-from ..explainability.regression_quality import RegQuality
-from ..explainability.shapley import ShapEstimator
-from ..metrics.compare_graphs import evaluate_graph
-from ..models import GBTRegressor, NNRegressor
+from ...explainability.regression_quality import RegQuality
+from ...explainability.shapley import ShapEstimator
+from ...metrics.compare_graphs import evaluate_graph
+from ...models import GBTRegressor, NNRegressor
 
 
 np.set_printoptions(precision=4, linewidth=120)

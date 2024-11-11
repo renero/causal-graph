@@ -5,9 +5,9 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "python": "/Users/renero/.pyenv/versions/causality/bin/python",
-            "cwd": "/Users/renero/Documents/Universidades/PhD/code/causal-graph",
             "name": "Debug: Current File",
+            "python": "/Users/renero/.pyenv/versions/causality/bin/python",
+            "cwd": "/Users/renero/Documents/Universidades/PhD/code/causalgraph",
             "type": "debugpy",
             "request": "launch",
             "program": "${file}",
@@ -16,6 +16,19 @@
             ],
             "console": "integratedTerminal",
             "justMyCode": false,
+        },
+        {
+            "name": "Run: Package",
+            "python": "/Users/renero/.pyenv/versions/3.10.12/envs/causality/bin/python",
+            "cwd": "/Users/renero/Documents/Universidades/PhD/code/causalgraph",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "args": [
+                "-d", "/Users/renero/phd/data/RC4/generated_10vars_linear_0.csv"
+            ],
+            "justMyCode": false
         }
     ]
 }

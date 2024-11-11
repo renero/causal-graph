@@ -10,11 +10,9 @@ Example:
 (C) 2023, 2024 J. Renero
 """
 
-import glob
 import os
 import time
 import warnings
-from collections import defaultdict
 from os import path
 
 import networkx as nx
@@ -22,16 +20,15 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
 
-from causalgraph.common import utils
-from causalgraph.common import *
-from causalgraph.estimators.cam.cam import CAM
-from causalgraph.estimators.fci.fci import FCI
-from causalgraph.estimators.ges.ges import GES
-from causalgraph.estimators.lingam.lingam import DirectLiNGAM as LiNGAM
-from causalgraph.estimators.pc.pc import PC
-from causalgraph.estimators.notears.notears import NOTEARS
-from causalgraph.estimators.rex import Rex
-from causalgraph.metrics.compare_graphs import evaluate_graph
+from . import utils
+from . import *
+from ..estimators.cam.cam import CAM
+from ..estimators.fci.fci import FCI
+from ..estimators.ges.ges import GES
+from ..estimators.lingam.lingam import DirectLiNGAM as LiNGAM
+from ..estimators.pc.pc import PC
+from ..estimators.notears.notears import NOTEARS
+from ..estimators.rex.rex import Rex
 
 warnings.filterwarnings('ignore')
 

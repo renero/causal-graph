@@ -6,7 +6,7 @@ import pandas as pd
 from sklearn.preprocessing import StandardScaler
 
 # from causalgraph.common.utils import graph_from_dot_file, load_experiment
-from ..common import utils
+from ...common import utils
 
 # pylint: disable=E1101:no-member, W0201:attribute-defined-outside-init, W0511:fixme
 # pylint: disable=C0103:invalid_name, C0116:missing-function-docstring
