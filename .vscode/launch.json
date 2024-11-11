@@ -14,21 +14,27 @@
             "purpose": [
                 "debug-test"
             ],
+            "args": [
+                "-d", "/Users/renero/phd/data/RC4/toy_dataset.csv",
+                "-t", "/Users/renero/phd/data/RC4/toy_dataset.dot",
+                "-i", "1",
+                "-b", "1",
+            ],
             "console": "integratedTerminal",
             "justMyCode": false,
         },
         {
-            "name": "Run: Package",
-            "python": "/Users/renero/.pyenv/versions/3.10.12/envs/causality/bin/python",
-            "cwd": "/Users/renero/Documents/Universidades/PhD/code/causalgraph",
+            "name": "Python: Current File with my args",
             "type": "python",
             "request": "launch",
             "program": "${file}",
-            "console": "integratedTerminal",
             "args": [
-                "-d", "/Users/renero/phd/data/RC4/generated_10vars_linear_0.csv"
+                "-d", "/Users/renero/phd/data/toy_dataset.csv",
+                "-t", "/Users/renero/phd/data/toy_dataset.dot",
+                "-i", "1",
+                "-b", "5",
             ],
-            "justMyCode": false
-        }
+            "console": "integratedTerminal",
+        },
     ]
 }

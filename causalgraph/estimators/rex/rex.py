@@ -372,11 +372,7 @@ class Rex(BaseEstimator, ClassifierMixin):
         n_steps = self.predict_pipeline.len()
         n_steps += self._steps_from_hpo(self.predict_pipeline)
         n_steps += 1
-        # If parallelization is ON nr of steps is 1, otherwise the nr of iterations * 2
-        # if self.bootstrap_parallel_jobs != 0:
-        #     n_steps += 1
-        # else:
-        #     n_steps += (self._steps_from_bootstrap(self.predict_pipeline) * 2)
+
         return n_steps
 
     def _set_predict_pipeline(
@@ -613,8 +609,11 @@ class Rex(BaseEstimator, ClassifierMixin):
         nx.DiGraph : The best DAG found by the iterative predict method.
         """
         if ref_graph is None and tolerance == 'auto':
-            raise ValueError(
-                "ref_graph must be specified when tolerance set to 'auto'")
+            print(f"Setting tolerance to {DEFAULT_BOOTSTRAP_TOLERANCE}, as no "
+                  f"true_graph was provided.")
+            tolerance = DEFAULT_BOOTSTRAP_TOLERANCE
+            # raise ValueError(
+            #     "ref_graph must be specified when tolerance set to 'auto'")
         if direction != 'maximize' and direction != 'minimize':
             raise ValueError("direction must be 'maximize' or 'minimize'")
 

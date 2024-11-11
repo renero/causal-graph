@@ -21,7 +21,8 @@ import pandas as pd
 
 from causalgraph.common import utils
 from causalgraph.common import (
-    DEFAULT_BOOTSTRAP_TOLERANCE, DEFAULT_SEED, DEFAULT_REGRESSORS
+    DEFAULT_BOOTSTRAP_TOLERANCE, DEFAULT_SEED, DEFAULT_REGRESSORS,
+    DEFAULT_BOOTSTRAP_TRIALS, DEFAULT_HPO_TRIALS
 )
 from causalgraph.common.notebook import Experiment
 
@@ -66,7 +67,7 @@ def parse_args():
     parser.add_argument(
         '-S', '--seed', type=int, required=False, help='Random seed')
     parser.add_argument(
-        '-s', '--save_model', type=str, required=False,
+        '-s', '--save_model', type=str, required=False, nargs='?',
         help='Save model as specified name. If not specified the model will be saved' +
         ' with the same name as the dataset, but with pickle extension.')
     parser.add_argument(
@@ -92,16 +93,18 @@ def check_args_validity(args):
         assert args.method in ['rex', 'pc', 'fci',
                                'ges', 'lingam', 'cam', 'notears']
         "Method must be one of: 'rex', 'pc', 'fci', 'ges', 'lingam', 'cam', 'notears'"
-        estimator = args.method
+        estimator = str(args.method)
 
     # Check that the dataset file exist, and load it (data)
     assert args.dataset is not None, "Dataset file must be specified"
     assert os.path.isfile(args.dataset), "Dataset file does not exist"
     data = pd.read_csv(args.dataset)
+    dataset_filepath = args.dataset
 
     # Extract the path from where the dataset is, dataset basename
     dataset_path = os.path.dirname(args.dataset)
     dataset_name = os.path.basename(args.dataset)
+    dataset_name = dataset_name.replace('.csv', '')
 
     # Load true DAG, if specified (true_dag)
     true_dag = None
@@ -111,38 +114,53 @@ def check_args_validity(args):
         true_dag = utils.graph_from_dot_file(args.true_dag)
 
     # Determine where to save the model pickle.
-    if args.save_model is None:
+    if args.save_model is None or args.save_model == '':
         save_model = f"{args.dataset.replace('.csv', '')}.pickle"
         save_model = os.path.basename(save_model)
         # Output_path is the current directory
         output_path = os.getcwd()
+        model_filename = utils.valid_output_name(
+            filename=save_model, path=output_path)
     else:
         save_model = args.save_model
         output_path = os.path.dirname(save_model)
+        model_filename = args.save_model
 
     # Set default regressors in case ReX is called.
     if args.method == 'rex' and args.regressor is None:
         regressors = DEFAULT_REGRESSORS
 
     seed = args.seed if args.seed is not None else DEFAULT_SEED
+
+    hpo_iterations = args.iterations if args.iterations is not None \
+        else DEFAULT_HPO_TRIALS
+    bootstrap_iterations = args.bootstrap if args.bootstrap is not None \
+        else DEFAULT_BOOTSTRAP_TRIALS
     bootstrap_tolerance = args.threshold if args.threshold is not None \
         else DEFAULT_BOOTSTRAP_TOLERANCE
 
     verbose = True if args.verbose else False
     quiet = True if args.quiet else False
-    output_dag_file = args.output
+    if args.output is None:
+        output_dag_file = utils.valid_output_name(
+            filename=dataset_name, path=output_path, extension="dot")
+    else:
+        output_dag_file = args.output
 
     # return a dictionary with all the new variables created
     return {
         'estimator': estimator,
         'regressors': regressors,
         'data': data,
+        'dataset_filepath': dataset_filepath,
         'dataset_name': dataset_name,
         'dataset_path': dataset_path,
         'true_dag': true_dag,
-        'save_model': save_model,
+        'model_filename': model_filename,
         'output_path': output_path,
         'seed': seed,
+        'hpo_iterations': hpo_iterations,
+        'bootstrap_iterations': bootstrap_iterations,
         'bootstrap_tolerance': bootstrap_tolerance,
         'verbose': verbose,
         'quiet': quiet,
@@ -150,26 +168,79 @@ def check_args_validity(args):
     }
 
 
-def train_rex(**args):
+def create_experiments(**args):
+    trainer = {}
     for model_type in args['regressors']:
-        trainer = Experiment(
-            experiment_name=args['dataset_name'],
+        trainer_name = f"{args['dataset_name']}_{model_type}"
+        trainer[trainer_name] = Experiment(
+            experiment_name=f"{args['dataset_name']}",
             model_type=model_type,
             input_path=args['dataset_path'],
             output_path=args['output_path'],
             verbose=False)
-        trainer.ref_graph = args.true_dag
-        print(f"Created experiment named '{args['dataset_name']}'", flush=True)
-        # fit(experiment, model_type)
-        # predict(experiment)
-        # save_experiment(experiment)
+        trainer[trainer_name].ref_graph = args['true_dag']
+        print(
+            f"Created experiment named '{trainer_name}'", flush=True)
+
+    return trainer
+
+
+def fit_experiments(trainer, run_values):
+    xargs = {
+        'verbose': run_values['verbose'],
+        'hpo_n_trials': run_values['hpo_iterations'],
+        'bootstrap_trials': run_values['bootstrap_iterations']
+    }
+
+    for trainer_name, experiment in trainer.items():
+        experiment.fit_predict(estimator=run_values['estimator'], **xargs)
+
+
+def retrieve_dag(trainer, run_values):
+    if run_values['estimator'] != 'rex':
+        estimator = getattr(trainer, run_values['estimator'])
+        return estimator.dag
+
+    estimator1 = getattr(trainer[list(trainer.keys())[0]], 'rex')
+    estimator2 = getattr(trainer[list(trainer.keys())[1]], 'rex')
+    _, _, dag, _ = utils.combine_dags(estimator1.dag, estimator2.dag,
+                                      estimator1.shaps.shap_discrepancies)
+
+    return dag
+
+
+def show_run_values(run_values):
+    for k, v in run_values.items():
+        if isinstance(v, pd.DataFrame):
+            print(f"{k}: {v.shape[0]}x{v.shape[1]} DataFrame")
+            continue
+        print(f"{k}: {v}")
+
+    print("-----")
+
+
+def header_():
+    print(
+        """
+   ____                      _  ____                 _
+  / ___|__ _ _   _ ___  __ _| |/ ___|_ __ __ _ _ __ | |__
+ | |   / _` | | | / __|/ _` | | |  _| '__/ _` | '_ \| '_ \\
+ | |__| (_| | |_| \__ \ (_| | | |_| | | | (_| | |_) | | | |
+  \____\__,_|\__,_|___/\__,_|_|\____|_|  \__,_| .__/|_| |_|
+                                              |_|
+""")
 
 
 def main():
+    header_()
     args = parse_args()
     run_values = check_args_validity(args)
-    # for k,v in run_values.items():
-    #     print(f"{k}={v}")
+    show_run_values(run_values)
+
+    trainer = create_experiments(**run_values)
+    fit_experiments(trainer, run_values)
+    dag = retrieve_dag(trainer, run_values)
+    print(dag)
 
 
 if __name__ == "__main__":
