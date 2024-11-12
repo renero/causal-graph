@@ -2,6 +2,7 @@ causal_learn==0.1.3.3
 colorama==0.4.6
 daft==0.1.2
 Deprecated==1.2.14
+gadjid==0.1.0
 hyppo==0.4.0
 joblib==1.3.2
 kneed==0.8.5
