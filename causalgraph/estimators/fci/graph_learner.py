@@ -24,7 +24,8 @@ from pygam import pygam
 
 from mlforge.progbar import ProgBar
 
-from causalgraph.common.utils import graph_from_adjacency_file
+# from causalgraph.common.utils import graph_from_adjacency_file
+from ...common import utils
 from causalgraph.estimators.fci.initialization import (dsep_set_from_csv,
                                                        save_graph, save_sepset)
 from causalgraph.estimators.fci.debug import *
@@ -107,7 +108,7 @@ class GraphLearner():
             sk_file = Path(self.output_path, self.base_skeleton)
             ss_file = Path(self.output_path, self.base_sepset)
             if os.path.exists(sk_file) and os.path.exists(ss_file):
-                skeleton = graph_from_adjacency_file(sk_file)
+                skeleton = utils.graph_from_adjacency_file(sk_file)
                 sepset = dsep_set_from_csv(ss_file)
                 if self.log:
                     self.log.info(f"Read {sk_file}")
@@ -142,12 +143,9 @@ class GraphLearner():
         """
         actions, condlen, condsize, graph, sepset = self.init_learning()
 
-        # Iterate over each pair of adjacent nodes
-        # pbar = tqdm(
-        #     self.labels,
-        #     **tqdm_params("Base Skeleton", self.prog_bar, silent=self.silent))
-        pbar = ProgBar().start_subtask(len(self.labels)) if self.prog_bar else None
+        # pbar = ProgBar().start_subtask("Base Skeleton", len(self.labels)) if self.prog_bar else None
 
+        # Iterate over each pair of adjacent nodes
         while condlen != 0:
             # condlen controls the amount of potential dependencies to explore
             # at each iteration the nr of cond. sets are added to this variable
@@ -156,13 +154,13 @@ class GraphLearner():
             condlen = 0
             self.oo(f"> Iterating over labels: {','.join(self.labels)}")
             for lx, x in enumerate(self.labels):
-                pbar.refresh() if self.prog_bar else None
                 self.oo(f" + x = {x}; {lx + 1}/{len(self.all_labels_but(x))}")
                 condlen, actions = self.check_independence(
                     x, graph, condlen, condsize, sepset, actions)
-                pbar.update_subtask(1) if self.prog_bar else None
+                # pbar.update_subtask("Base Skeleton", 1) if self.prog_bar else None
             condsize += 1
 
+        # pbar.remove("Base Skeleton") if self.prog_bar else None
         self.debug.stack(actions)
         return graph, sepset
 
@@ -211,13 +209,9 @@ class GraphLearner():
             if not self.verbose:
                 pbar.update(1)
 
-        # Iterate over each pair of adjacent nodes
-        # pbar = tqdm(
-        #     len(self.labels),
-        #     **tqdm_params("Base Skeleton", self.prog_bar, silent=self.silent))
-        pbar = ProgBar().start_subtask(len(self.labels))
+        pbar = ProgBar().start_subtask("Base Skeleton", len(self.labels))
 
-        pbar.set_description("Base skeleton")
+        # Iterate over each pair of adjacent nodes
         while condlen != 0:
             # condlen controls the amount of potential dependencies to explore
             # at each iteration the nr of cond. sets are added to this variable
@@ -232,7 +226,7 @@ class GraphLearner():
                     args=(x, graph, condlen, condsize, sepset),
                     callback=collect_result)
                 results.append(result)
-                pbar.update_subtask()
+                pbar.update_subtask("Base Skeleton")
                 # pbar.refresh()
             [result.wait() for result in results]
             condsize += 1

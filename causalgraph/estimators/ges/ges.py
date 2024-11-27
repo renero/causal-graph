@@ -75,7 +75,8 @@ from sklearn.discriminant_analysis import StandardScaler
 
 from causalgraph.estimators.ges.scores import GaussObsL0Pen
 from causalgraph.estimators.ges import utils
-from causalgraph.common.utils import graph_from_adjacency, graph_from_dot_file
+# from causalgraph.common.utils import graph_from_adjacency, graph_from_dot_file
+from ...common import utils
 from causalgraph.metrics.compare_graphs import evaluate_graph
 
 
@@ -162,7 +163,7 @@ class GES(object):
         self.feature_names = list(X.columns)
         X = X.values
         self.ges_adjmat, self.ges_score = self.fit_bic(X, A0=A0)
-        self.dag = graph_from_adjacency(
+        self.dag = utils.graph_from_adjacency(
             self.ges_adjmat, node_labels=self.feature_names)
         self.is_fitted_ = True
         return self
@@ -1061,7 +1062,7 @@ def main(dataset_name,
          output_path="/Users/renero/phd/output/RC4/sachs/compared",
          save=False):
 
-    ref_graph = graph_from_dot_file(f"{input_path}{dataset_name}.dot")
+    ref_graph = utils.graph_from_dot_file(f"{input_path}{dataset_name}.dot")
     data = pd.read_csv(f"{input_path}{dataset_name}.csv")
     scaler = StandardScaler()
     data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)

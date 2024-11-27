@@ -1,11 +1,11 @@
 [![Travis](https://travis-ci.org/scikit-learn-contrib/project-template.svg?branch=master)](https://travis-ci.org/scikit-learn-contrib/project-template)
 [![AppVeyor](https://ci.appveyor.com/api/projects/status/coy2qqaqr1rnnt5y/branch/master?svg=true)](https://ci.appveyor.com/project/glemaitre/project-template)
-[![Codecov](https://codecov.io/gh/renero/causal-graph/graph/badge.svg?token=HCV0IJDFLQ)](https://codecov.io/gh/renero/causal-graph)
+[![Codecov](https://codecov.io/gh/renero/causalgraph/graph/badge.svg?token=HCV0IJDFLQ)](https://codecov.io/gh/renero/causalgraph)
 [![ReadTheDocs](https://readthedocs.org/projects/sklearn-template/badge/?version=latest)](https://sklearn-template.readthedocs.io/en/latest/?badge=latest)
 
-# causal-graph - A library to infer causal-effect relationships from continuous tabular data
+# causalgraph - A library to infer causal-effect relationships from continuous tabular data
 
-**causal-graph** is a library that implements methods to extract the causal graph,
+**causalgraph** is a library that implements methods to extract the causal graph,
 from continuous tabular data.
 
 It is built using SKLearn estimators, so that it can be used in scikit-learn pipelines
@@ -25,7 +25,7 @@ At the moment, the library is not available in PyPI. You can install it from the
 
 ```bash
 git clone
-cd causal-graph
+cd causalgraph
 pip install .
 ```
 

@@ -3,7 +3,6 @@ This module builds the causal graph based on the informacion that we derived
 from the SHAP values. The main idea is to use the SHAP values to compute the
 discrepancy between the SHAP values and the target values. This discrepancy
 is then used to build the graph.
-
 """
 
 # pylint: disable=E1101:no-member, W0201:attribute-defined-outside-init, W0511:fixme
@@ -15,10 +14,14 @@ is then used to build the graph.
 
 import inspect
 import math
+import multiprocessing
 from collections import defaultdict
 from dataclasses import dataclass
+from functools import partial
+from multiprocessing import get_context
 from typing import List, Union
 
+import colorama
 import networkx as nx
 import numpy as np
 import pandas as pd
@@ -28,19 +31,24 @@ import statsmodels.stats.api as sms
 import torch
 from matplotlib import pyplot as plt
 from matplotlib.ticker import FormatStrFormatter
+from mlforge.progbar import ProgBar  # type: ignore
 from scipy.stats import kstest, spearmanr
 from sklearn.base import BaseEstimator
 from sklearn.discriminant_analysis import StandardScaler
 from sklearn.metrics import r2_score
 from sklearn.model_selection import train_test_split
 from sklearn.utils.validation import check_is_fitted
-from mlforge.progbar import ProgBar  # type: ignore
 
-from causalgraph.common import *
-from causalgraph.common import utils
-from causalgraph.explainability.hierarchies import Hierarchies
-from causalgraph.independence.feature_selection import select_features
+# from causalgraph.common import *
+# from causalgraph.common import utils
+# from causalgraph.explainability.hierarchies import Hierarchies
+from ..independence.feature_selection import select_features
+from ..common import utils
 
+RED = colorama.Fore.RED
+GREEN = colorama.Fore.GREEN
+GRAY = colorama.Fore.LIGHTBLACK_EX
+RESET = colorama.Style.RESET_ALL
 
 AnyGraph = Union[nx.DiGraph, nx.Graph]
 K = 180.0 / math.pi
@@ -138,6 +146,7 @@ class ShapEstimator(BaseEstimator):
             reciprocity: False = False,
             min_impact: float = 1e-06,
             exhaustive: bool = False,
+            parallel_jobs: int = 0,
             on_gpu: bool = False,
             verbose: bool = False,
             prog_bar: bool = True,
@@ -188,16 +197,66 @@ class ShapEstimator(BaseEstimator):
         self.reciprocity = reciprocity
         self.min_impact = min_impact
         self.exhaustive = exhaustive
+        self.parallel_jobs = parallel_jobs
+        self.on_gpu = on_gpu
         self.verbose = verbose
         self.prog_bar = prog_bar
         self.silent = silent
-        self.on_gpu = on_gpu
 
         self._fit_desc = f"Running SHAP explainer ({self.explainer})"
         self._pred_desc = "Building graph skeleton"
 
     def __str__(self):
         return utils.stringfy_object(self)
+
+    # Define the process_target function at the top level
+    @staticmethod
+    def _shap_fit_target_variable(
+        target_name,
+        models,
+        X_train,
+        X_test,
+        feature_names,
+        on_gpu,
+        verbose,
+        run_selected_shap_explainer_func,
+    ):
+        """
+        Process a single target in the SHAP fit process.
+        """
+        # Get the model and the data (tensor form)
+        if hasattr(models.regressor[target_name], "model"):
+            model = models.regressor[target_name].model
+            model = model.cuda() if on_gpu else model.cpu()
+        else:
+            model = models.regressor[target_name]
+
+        X_train_target = X_train.drop(target_name, axis=1).values
+        X_test_target = X_test.drop(target_name, axis=1).values
+
+        # Run the selected SHAP explainer
+        shap_values_target = run_selected_shap_explainer_func(
+            target_name, model, X_train_target, X_test_target
+        )
+
+        # Create the order list of features, in decreasing mean SHAP value
+        feature_order_target = np.argsort(
+            np.sum(np.abs(shap_values_target), axis=0))
+        shap_mean_values_target = np.abs(shap_values_target).mean(0)
+
+        # Optionally, print verbose output
+        if verbose:
+            print(f"  Feature order for '{target_name}' {feature_order_target}")
+            print(f"  Target({target_name}) -> ", end="")
+            srcs = [src for src in feature_names if src != target_name]
+            for i in range(len(shap_mean_values_target)):
+                print(f"{srcs[i]}:{shap_mean_values_target[i]:.3f};", end="")
+            print()
+
+        # Return results
+        return target_name, shap_values_target, feature_order_target, \
+            shap_mean_values_target
+
 
     def fit(self, X):
         """
@@ -209,108 +268,77 @@ class ShapEstimator(BaseEstimator):
         Returns:
         - self: The fitted ShapleyExplainer model.
         """
-        # X, y = check_X_y(X, y, accept_sparse=True)
         self.feature_names = list(self.models.regressor.keys())
         self.shap_explainer = {}
         self.shap_values = {}
-        # self.shap_scaled_values = {}
         self.shap_mean_values = {}
         self.feature_order = {}
-        self.all_mean_shap_values = np.empty((0, ), dtype=np.float16)
+        self.all_mean_shap_values = np.empty((0,), dtype=np.float16)
 
-        # Who is calling me?
-        try:
-            curframe = inspect.currentframe()
-            calframe = inspect.getouterframes(curframe, 2)
-            caller_name = calframe[1][3]
-            if caller_name == "__call__" or caller_name == "_run_step":
-                caller_name = "ReX"
-        except Exception:  # pylint: disable=broad-except
-            caller_name = "unknown"
-
+        # Initialize the progress bar
         if self.prog_bar and not self.verbose:
+            caller_name = self._get_method_caller_name()
             pbar_name = f"({caller_name}) SHAP_fit"
             pbar = ProgBar().start_subtask(pbar_name, len(self.feature_names))
         else:
             pbar = None
 
         self.X_train, self.X_test = train_test_split(
-            X, test_size=min(0.2, 250 / len(X)), random_state=42)
+            X, test_size=min(0.2, 250 / len(X)), random_state=42
+        )
 
-        # Make a copy of the data if correlation threshold is set, since I will have
-        # to drop some features at each iteration.
-        if self.correlation_th:
-            self.corr_matrix = Hierarchies.compute_correlation_matrix(X)
-            self.correlated_features = Hierarchies.compute_correlated_features(
-                self.corr_matrix, self.correlation_th, self.feature_names,
-                verbose=self.verbose)
-            X_train_original = self.X_train.copy()
-            X_test_original = self.X_test.copy()
+        # Prepare arguments for partial function
+        partial_process_target = partial(
+            ShapEstimator._shap_fit_target_variable,
+            models=self.models,
+            X_train=self.X_train,
+            X_test=self.X_test,
+            feature_names=self.feature_names,
+            on_gpu=self.on_gpu,
+            verbose=self.verbose,
+            run_selected_shap_explainer_func=self._run_selected_shap_explainer,
+        )
 
-        for target_idx, target_name in enumerate(self.feature_names):
-            # if correlation_th is not None then, remove features that are highly
-            # correlated with the target, at each step of the loop
-            if self.correlation_th is not None:
-                self.X_train = X_train_original.copy()
-                self.X_test = X_test_original.copy()
-                if len(self.correlated_features[target_name]) > 0:
-                    self.X_train = self.X_train.drop(
-                        self.correlated_features[target_name], axis=1)
-                    self.X_test = self.X_test.drop(
-                        self.correlated_features[target_name], axis=1)
-                    if self.verbose:
-                        print("REMOVED CORRELATED FEATURES: ",
-                              self.correlated_features[target_name])
-
-            # Get the model and the data (tensor form)
-            if hasattr(self.models.regressor[target_name], "model"):
-                model = self.models.regressor[target_name].model
-                model = model.cuda() if self.on_gpu else model.cpu()
+        if self.parallel_jobs != 0:
+            if self.parallel_jobs == -1:
+                nr_processes = min(multiprocessing.cpu_count(), len(self.feature_names))
             else:
-                model = self.models.regressor[target_name]
+                nr_processes = min(self.parallel_jobs, multiprocessing.cpu_count())
 
-            X_train = self.X_train.drop(target_name, axis=1).values
-            X_test = self.X_test.drop(target_name, axis=1).values
+            # Use 'spawn' start method to avoid semaphore leaks
+            with get_context('spawn').Pool(processes=nr_processes) as pool:
+                results = []
+                for result in pool.imap_unordered(partial_process_target, self.feature_names):
+                    results.append(result)
+                    if pbar:
+                        pbar.update_subtask(pbar_name, len(results))
+                pbar.remove(pbar_name)
+                pbar = None
+                pool.close()
+                pool.join()
+        else:
+            # Sequential processing
+            results = []
+            for target_name in self.feature_names:
+                result = partial_process_target(target_name)
+                results.append(result)
+                if pbar:
+                    pbar.update_subtask(pbar_name, len(results))
 
-            # Run the selected SHAP explainer
-            self.shap_values[target_name] = self._run_selected_shap_explainer(
-                target_name, model, X_train, X_test)
-
-            # self.shap_scaled_values[target_name] = self.shap_values[target_name]
-
-            # Create the order list of features, in decreasing mean SHAP value
-            self.feature_order[target_name] = np.argsort(
-                np.sum(np.abs(self.shap_values[target_name]), axis=0))
-            self.shap_mean_values[target_name] = np.abs(
-                self.shap_values[target_name]).mean(0)
+        # Collect results
+        for target_name, shap_values_target, feature_order_target, shap_mean_values_target in results:
+            self.shap_values[target_name] = shap_values_target
+            self.feature_order[target_name] = feature_order_target
+            self.shap_mean_values[target_name] = shap_mean_values_target
             self.all_mean_shap_values = np.concatenate(
-                (self.all_mean_shap_values,
-                 self.shap_mean_values[target_name]))
-            if self.verbose:
-                print(f"  Feature order for '{target_name}' "
-                      f"{self.feature_order[target_name]}")
-                print(f"  Target({target_name}) -> ", end="")
-                srcs = [src for src in self.feature_names if src != target_name]
-                for i in range(len(self.shap_mean_values[target_name])):
-                    print(
-                        f"{srcs[i]}:{self.shap_mean_values[target_name][i]:.3f};", end="")
-                print()
+                (self.all_mean_shap_values, shap_mean_values_target)
+            )
 
-            # Add zeroes to positions of correlated features
-            if self.correlation_th is not None:
-                self._add_zeroes(
-                    target_name, self.correlated_features[target_name])
+        if pbar:
+            pbar.remove(pbar_name)
 
-            pbar.update_subtask(pbar_name, target_idx + 1) if pbar else None
-
-        pbar.remove(pbar_name) if pbar else None
         self.all_mean_shap_values = self.all_mean_shap_values.flatten()
         self._compute_scaled_shap_threshold()
-
-        # Leave X_train and X_test as they originally were
-        if self.correlation_th is not None:
-            self.X_train = X_train_original
-            self.X_test = X_test_original
 
         self.is_fitted_ = True
 
@@ -414,14 +442,7 @@ class ShapEstimator(BaseEstimator):
         self._compute_scaled_shap_threshold()
 
         # Who is calling me?
-        try:
-            curframe = inspect.currentframe()
-            calframe = inspect.getouterframes(curframe, 2)
-            caller_name = calframe[1][3]
-            if caller_name == "__call__" or caller_name == "_run_step":
-                caller_name = "ReX"
-        except Exception:  # pylint: disable=broad-except
-            caller_name = "unknown"
+        caller_name = self._get_method_caller_name()
 
         if self.prog_bar and (not self.verbose):
             pbar_name = f"({caller_name}) SHAP_predict"
@@ -873,6 +894,24 @@ class ShapEstimator(BaseEstimator):
               )
         if len(cycles) > 0 and self._nodes_in_cycles(cycles, feature, target):
             print(f"    ~~ Cycles: {cycles}")
+
+    def _get_method_caller_name(self):
+        """
+        Determine the name of the method that called it. It does this by using
+        the inspect module to get the outermost frame of the call stack and then
+        extracting the name of the third frame. If the name is either __call__ or
+        _run_step, it returns "ReX". If any exception occurs during this
+        process, it returns "unknown".
+        """
+        try:
+            curframe = inspect.currentframe()
+            calframe = inspect.getouterframes(curframe, 2)
+            caller_name = calframe[2][3]
+            if caller_name == "__call__" or caller_name == "_run_step":
+                caller_name = "ReX"
+        except Exception:                               # pylint: disable=broad-except
+            caller_name = "unknown"
+        return caller_name
 
     def _plot_shap_summary(
             self,

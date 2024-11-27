@@ -24,10 +24,11 @@ import pandas as pd
 import networkx as nx
 from networkx import Graph
 from sklearn.discriminant_analysis import StandardScaler
-from mlforge.progbar import ProgBar
+from mlforge.progbar import ProgBar                         # type: ignore
 
-from causalgraph.common.utils import (graph_from_adjacency_file,
-                                      graph_from_dot_file)
+# from causalgraph.common.utils import (graph_from_adjacency_file,
+#                                       graph_from_dot_file)
+from ...common import utils
 from causalgraph.estimators.fci.colliders import (get_dsep_combs,
                                                   get_neighbors, init_pag,
                                                   orientEdges)
@@ -106,7 +107,7 @@ class FCI(GraphLearner):
         self.base_skeleton = kwargs.get("base_skeleton", None)
         self.base_sepset = kwargs.get("base_sepset", None)
         self.log = kwargs.get("logger", None)
-        self.prog_bar = kwargs.get("prog_bar", False)
+        self.prog_bar = kwargs.get("prog_bar", True)
         self.silent = kwargs.get("silent", False)
 
         super().__init__(logger=self.log,
@@ -131,17 +132,22 @@ class FCI(GraphLearner):
         assert isinstance(X, pd.DataFrame), "Data must be a pandas DataFrame"
         self.data = X
         self.feature_names = list(X.columns)
+
         super()._init_data(self.data)
+
         if self.verbose:
             print("Getting Skeleton of graph...")
+
         start_time = time.time()
         skeleton, sepset = self.learn_or_load_final_skeleton()
         if self.verbose:
             print("Orienting Edges...")
+
         self.pag = orientEdges(skeleton, sepset, data_file=self.data_file,
                                output_path=self.output_path, log=self.log,
                                verbose=self.verbose, debug=self.debug,
                                prog_bar=self.prog_bar, silent=self.silent)
+
         self.dag = self.pag.to_dag(self.feature_names)
 
         if self.verbose:
@@ -168,10 +174,24 @@ class FCI(GraphLearner):
         nx.DiGraph
             learned causal graph
         """
+        pbar = ProgBar("FCI", 2, verbose=False) if self.prog_bar else None
+
         self.fit(train)
+
+        # For compatibility with the other methods, the PAG is copied to a variable
+        # called `dag`.
+        if (len(self.dag.edges()) == 0) and (len(self.pag.edges()) != 0):
+            # Copy pag nodes and edges to dag, one by one.
+            for node in self.pag.nodes:
+                self.dag.add_node(node, **self.pag.nodes[node])
+            for edge in self.pag.edges:
+                self.dag.add_edge(edge[0], edge[1], **self.pag.edges[edge])
+
         if ref_graph and self.dag:
             self.metrics = evaluate_graph(
                 ref_graph, self.dag, self.feature_names)
+
+        pbar.remove("FCI")
 
         return self.dag
 
@@ -186,7 +206,7 @@ class FCI(GraphLearner):
             sk_file = Path(self.output_path, self.final_skeleton)
             ss_file = Path(self.output_path, self.final_sepset)
             if os.path.exists(sk_file) and os.path.exists(ss_file):
-                skeleton = graph_from_adjacency_file(sk_file)
+                skeleton = utils.graph_from_adjacency_file(sk_file)
                 sepset = dsep_set_from_csv(ss_file)
                 if self.log:
                     self.log.info(f"Read {sk_file}")
@@ -231,16 +251,15 @@ class FCI(GraphLearner):
         if self.verbose:
             print("Finding colliders...", flush=True)
 
-        # pbar = tqdm(
-        #     pag,
-        #     **tqdm_params("Learn Skeleton", self.prog_bar, silent=self.silent))
-        pbar = ProgBar().start_subtask(len(pag)) if self.prog_bar else None
+        pbar = ProgBar().start_subtask(
+            "Learn Skeleton", len(pag)) if self.prog_bar else None
 
         for lx, x in enumerate(pag):
             neighbors = get_neighbors(x, pag)
             self.debug.neighbors(x, lx, neighbors, pag)
             if len(neighbors) == 0:
-                pbar.update_subtask(1) if self.prog_bar else None
+                pbar.update_subtask(
+                    "Learn Skeleton", 1) if self.prog_bar else None
                 continue
             for ny, y in enumerate(neighbors):
                 tup = self.find_colliders(x, y, pag, ny, dseps, sepSet,
@@ -248,9 +267,9 @@ class FCI(GraphLearner):
                 if tup:
                     self.update_actions(pag_actions, tup)
             self.debug.stack(pag_actions)
-            pbar.update_subtask(1) if self.prog_bar else None
+            pbar.update_subtask("Learn Skeleton", 1) if self.prog_bar else None
 
-        pbar.finish_subtask() if self.prog_bar else None
+        pbar.remove("Learn Skeleton") if self.prog_bar else None
 
         return pag, sepSet
 
@@ -290,9 +309,7 @@ class FCI(GraphLearner):
             print("Finding colliders...", flush=True)
         pool = mp.Pool(self.njobs)
 
-        # pbar = tqdm(
-        #     len(pag), **tqdm_params("Learn Skeleton", self.prog_bar, silent=self.silent))
-        pbar = ProgBar().start_subtask(len(pag))
+        pbar = ProgBar().start_subtask("Learn skeleton", len(pag))
 
         results = []
         for lx, x in enumerate(pag):
@@ -300,7 +317,7 @@ class FCI(GraphLearner):
                 self.explore_neighbours,
                 args=(x, lx, pag, dseps, sepSet),
                 callback=update_PAG)
-            pbar.update_subtask()
+            pbar.update_subtask("Learn skeleton", 1)
 
         # Wait until everyone is finished...
         pool.join()
@@ -359,7 +376,7 @@ def main(dataset_name,
     """
     Create a call to FCI with a sample dataset.
     """
-    ref_graph = graph_from_dot_file(f"{input_path}{dataset_name}.dot")
+    ref_graph = utils.graph_from_dot_file(f"{input_path}{dataset_name}.dot")
     data = pd.read_csv(f"{input_path}{dataset_name}.csv")
     scaler = StandardScaler()
     data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)

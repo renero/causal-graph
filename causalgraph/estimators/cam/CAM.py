@@ -1,4 +1,18 @@
 """
+
+(C) Original Code from R implementation of the Causal Additive Model (CAM)
+
+@article{buhlmann2014cam,
+  title={CAM: Causal additive models, high-dimensional order search and penalized regression},
+  author={B{\"u}hlmann, Peter and Peters, Jonas and Ernest, Jan},
+  journal={The Annals of Statistics},
+  volume={42},
+  number={6},
+  pages={2526--2556},
+  year={2014},
+  publisher={Institute of Mathematical Statistics}
+}
+
 - **Imports**: Imported necessary modules and functions. Assumed that
 `computeScoreMat`, `updateScoreMat`, `pruning`, `selGamBoost`, and `selGam`
 are defined in separate Python files in the same directory.
@@ -36,13 +50,13 @@ from causalgraph.estimators.cam.selGamBoost import selGamBoost
 from causalgraph.estimators.cam.updateScoreMat import updateScoreMat
 
 from causalgraph.metrics.compare_graphs import evaluate_graph
-from causalgraph.common import utils
-from causalgraph.common import plot
+from causalgraph.common import plot, utils
 
 
 class CAM:
     def __init__(
             self,
+            name:str,
             scoreName="SEMGAM",
             parsScore=None,
             numCores=1,
@@ -51,12 +65,13 @@ class CAM:
             variableSel=False,
             variableSelMethod=selGamBoost,
             variableSelMethodPars=None,
-            pruning=False,
+            pruning=True,
             pruneMethod=selGam,
-            pruneMethodPars=None,
+            pruneMethodPars={"cutOffPVal": 0.05, "numBasisFcts": 10},
             intervData=False,
             intervMat=None):
 
+        self.name = name
         self.scoreName = scoreName
         self.parsScore = parsScore
         self.numCores = numCores
@@ -279,34 +294,40 @@ class CAM:
         if ref_graph is not None:
             self.metrics = evaluate_graph(
                 ref_graph, self.dag, self.feature_names)
+        else:
+            self.metrics = None
 
         return self.dag
 
-    def fit_predict(self, X, ref_graph: nx.DiGraph = None):
-        self.fit(X)
+    def fit_predict(
+            self,
+            train_data:pd.DataFrame,
+            test_data:pd.DataFrame = None,
+            ref_graph: nx.DiGraph = None):
+        self.fit(train_data)
         self.predict(ref_graph)
-        # self.metrics = evaluate_graph(ref_graph, self.dag)
 
         return self.dag
 
 
 def main(dataset_name,
-         input_path="/Users/renero/phd/data/RC3/",
-         output_path="/Users/renero/phd/output/RC4/",
+         input_path="/Users/renero/phd/data/",
+         output_path="/Users/renero/phd/output/",
          do_plot:bool=False,
          save=False):
 
     data = pd.read_csv(f"{input_path}{dataset_name}.csv")
     ref_graph = utils.graph_from_dot_file(f"{input_path}{dataset_name}.dot")
 
-    cam = CAM(pruning=True,
+    cam = CAM(name="main_run",
+              pruning=True,
               pruneMethodPars={"cutOffPVal": 0.05, "numBasisFcts": 10},
               verbose=False)
-    cam.fit_predict(data, ref_graph)
+    cam.fit_predict(data, ref_graph=ref_graph)
     print(cam.metrics)
     if do_plot:
         plot.dag(cam.dag, reference=ref_graph)
 
 
 if __name__ == "__main__":
-    main("short")
+    main("toy_dataset")

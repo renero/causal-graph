@@ -3,44 +3,45 @@ Main class for the REX estimator.
 (C) J. Renero, 2022, 2023, 2024
 """
 
-import os
-import warnings
-import time
-from collections import defaultdict
-from copy import deepcopy, copy
-from typing import List, Tuple, Union
-
-import networkx as nx
-import numpy as np
-import pandas as pd
-from mlforge.mlforge import Pipeline  # type: ignore
-from mlforge.progbar import ProgBar   # type: ignore
-from rich.progress import Progress
-from sklearn.base import BaseEstimator, ClassifierMixin
-from sklearn.preprocessing import StandardScaler
-from sklearn.utils.validation import check_is_fitted, check_random_state
-
-from causalgraph.common import utils, DEFAULT_ITERATIVE_TRIALS, DEFAULT_HPO_TRIALS
-from causalgraph.estimators.knowledge import Knowledge
-from causalgraph.explainability.hierarchies import Hierarchies
-from causalgraph.explainability.perm_importance import PermutationImportance
-from causalgraph.explainability.regression_quality import RegQuality
-from causalgraph.explainability.shapley import ShapEstimator
-from causalgraph.independence.graph_independence import GraphIndependence
-from causalgraph.metrics.compare_graphs import evaluate_graph
-from causalgraph.models import GBTRegressor, NNRegressor
-from joblib import Parallel, delayed
-
-np.set_printoptions(precision=4, linewidth=120)
-warnings.filterwarnings('ignore')
-
-
 # pylint: disable=E1101:no-member, W0201:attribute-defined-outside-init, W0511:fixme
 # pylint: disable=C0103:invalid-name, W0221:arguments-differ
 # pylint: disable=C0116:missing-function-docstring
 # pylint: disable=R0913:too-many-arguments
 # pylint: disable=R0914:too-many-locals, R0915:too-many-statements
 # pylint: disable=W0106:expression-not-assigned, R1702:too-many-branches
+
+from multiprocessing import get_context
+from functools import partial
+import multiprocessing
+import os
+import time
+import warnings
+from collections import defaultdict
+from copy import copy, deepcopy
+from typing import List, Tuple, Union
+
+import networkx as nx
+import numpy as np
+import pandas as pd
+from mlforge.mlforge import Pipeline
+from mlforge.progbar import ProgBar
+from sklearn.base import BaseEstimator, ClassifierMixin
+from sklearn.preprocessing import StandardScaler
+from sklearn.utils.validation import check_is_fitted, check_random_state
+
+from ...common import (
+    utils, DEFAULT_HPO_TRIALS, DEFAULT_BOOTSTRAP_TRIALS,
+    DEFAULT_BOOTSTRAP_TOLERANCE, DEFAULT_BOOTSTRAP_SAMPLING_SPLIT
+)
+from .knowledge import Knowledge
+from ...explainability.regression_quality import RegQuality
+from ...explainability.shapley import ShapEstimator
+from ...metrics.compare_graphs import evaluate_graph
+from ...models import GBTRegressor, NNRegressor
+
+
+np.set_printoptions(precision=4, linewidth=120)
+warnings.filterwarnings('ignore')
 
 
 class Rex(BaseEstimator, ClassifierMixin):
@@ -88,6 +89,12 @@ class Rex(BaseEstimator, ClassifierMixin):
             condsize: int = 0,
             mean_pi_percentile: float = 0.8,
             discrepancy_threshold: float = 0.99,
+            hpo_n_trials: int = DEFAULT_HPO_TRIALS,
+            bootstrap_trials: int = DEFAULT_BOOTSTRAP_TRIALS,
+            bootstrap_sampling_split='auto',
+            bootstrap_tolerance: float = 'auto',
+            bootstrap_parallel_jobs: int = 0,
+            parallel_jobs: int = 0,
             verbose: bool = False,
             prog_bar=True,
             silent: bool = False,
@@ -138,6 +145,12 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.prior = None
         self.hpo_study_name = kwargs.get(
             'hpo_study_name', f"{self.name}_{model_type}")
+
+        self.prog_bar = prog_bar
+        self.verbose = verbose
+        self.silent = silent
+        self.random_state = random_state
+
         self.model_type = NNRegressor if model_type == "nn" else GBTRegressor
         self.explainer = explainer
         self._check_model_and_explainer(model_type, explainer)
@@ -150,15 +163,19 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.corr_method = corr_method
         self.corr_alpha = corr_alpha
         self.corr_clusters = corr_clusters
+
+        self.hpo_n_trials = hpo_n_trials
+        self.bootstrap_trials = bootstrap_trials
+        self.bootstrap_sampling_split = bootstrap_sampling_split
+        self.bootstrap_tolerance = bootstrap_tolerance
+        self.bootstrap_parallel_jobs = bootstrap_parallel_jobs
+        self.parallel_jobs = parallel_jobs
+
         self.condlen = condlen
         self.condsize = condsize
         self.mean_pi_percentile = mean_pi_percentile
         self.mean_pi_threshold = 0.0
         self.discrepancy_threshold = discrepancy_threshold
-        self.prog_bar = prog_bar
-        self.verbose = verbose
-        self.silent = silent
-        self.random_state = random_state
 
         self.is_fitted_ = False
         self.is_iterative_fitted_ = False
@@ -204,33 +221,10 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.y = copy(y) if y is not None else None
 
         # Create the pipeline for the training stages.
-        self.fit_pipeline = Pipeline(
-            self, description="Fitting models", prog_bar=self.prog_bar,
-            verbose=self.verbose, silent=self.silent, subtask=True)
-        if pipeline is not None:
-            if isinstance(pipeline, list):
-                self.fit_pipeline.from_list(pipeline)
-            elif isinstance(pipeline, str):
-                self.fit_pipeline.from_config(pipeline)
-        else:
-            steps = [
-                ('hierarchies', Hierarchies),
-                ('hierarchies.fit'),
-                ('models', self.model_type),
-                (self.fit_step),
-                ('models.score', {'X': X}),
-                ('root_causes', 'compute_regression_quality'),
-                ('shaps', ShapEstimator, {'models': 'models'}),
-                ('shaps.fit'),
-                ('pi', PermutationImportance, {
-                    'models': 'models', 'discrepancies': 'shaps.shap_discrepancies'}),
-                ('pi.fit'),
-            ]
-            pipeline.from_list(steps)
+        self._set_fit_pipeline(pipeline)
 
         n_steps = self.fit_pipeline.len()
-        n_steps += self._steps_from_hpo(self.fit_pipeline)
-        n_steps += (self._steps_from_iterations(self.fit_pipeline))
+        n_steps += (self._steps_from_hpo(self.fit_pipeline) * 2) - 1
 
         self.fit_pipeline.run(n_steps)
         self.fit_pipeline.close()
@@ -240,6 +234,32 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.fit_time = self.end_fit_time - self.init_fit_time
 
         return self
+
+    def _set_fit_pipeline(self, pipeline: list | str | None) -> None:
+        """
+        Set the pipeline for the training stages.
+
+        Parameters
+        ----------
+        pipeline : list
+            A list of tuples with the steps to add to the pipeline.
+        """
+        self.fit_pipeline = Pipeline(
+            self, description="Fitting models", prog_bar=self.prog_bar,
+            verbose=self.verbose, silent=self.silent, subtask=True)
+        if pipeline is not None:
+            if isinstance(pipeline, list):
+                self.fit_pipeline.from_list(pipeline)
+            elif isinstance(pipeline, str):
+                self.fit_pipeline.from_config(pipeline)
+        else:
+            # This is the final set of steps in default mode.
+            steps = [
+                ('models', self.model_type),
+                ('models.tune_fit', {'hpo_n_trials': self.hpo_n_trials}),
+                ('models.score', {})
+            ]
+            self.fit_pipeline.from_list(steps)
 
     def predict(self,
                 X: pd.DataFrame,
@@ -314,52 +334,17 @@ class Rex(BaseEstimator, ClassifierMixin):
             subtask=True)
 
         # Overwrite values for prog_bar and verbosity with current pipeline
-        #  values, in case predict is called from a loaded experiment
-        self.shaps.prog_bar = self.prog_bar
-        self.shaps.verbose = self.verbose
+        # values, in case predict is called from a loaded experiment
+        if hasattr(self, "shaps"):
+            self.shaps.prog_bar = self.prog_bar
+            self.shaps.verbose = self.verbose
 
-        if pipeline is not None:
-            if isinstance(pipeline, list):
-                self.predict_pipeline.from_list(pipeline)
-            elif isinstance(pipeline, str):
-                self.predict_pipeline.from_config(pipeline)
-        else:
-            steps = [
-                # DAGs construction
-                ('G_shap', 'shaps.predict', {
-                    'root_causes': 'root_causes', 'prior': prior}),
-                ('G_rho', 'dag_from_discrepancy', {
-                    'discrepancy_upper_threshold': self.discrepancy_threshold,
-                    "verbose": False}),
-                ('G_adj', 'adjust_discrepancy', {'dag': 'G_shap'}),
-                ('G_pi', 'pi.predict', {
-                    'root_causes': 'root_causes', 'prior': prior}),
-                ('indep', GraphIndependence, {'base_graph': 'G_shap'}),
-                ('G_indep', 'indep.fit_predict'),
-                ('G_final', 'shaps.adjust', {'graph': 'G_indep'}),
-
-                # Knowledge Summarization
-                ('summarize_knowledge', {'ref_graph': ref_graph}),
-
-                # Metrics Generation, here
-                ('metrics_shap', 'score', {
-                    'ref_graph': ref_graph, 'predicted_graph': 'G_shap'}),
-                ('metrics_rho', 'score', {
-                    'ref_graph': ref_graph, 'predicted_graph': 'G_rho'}),
-                ('metrics_adj', 'score', {
-                    'ref_graph': ref_graph, 'predicted_graph': 'G_adj'}),
-                ('metrics_indep', 'score', {
-                    'ref_graph': ref_graph, 'predicted_graph': 'G_indep'}),
-                ('metrics_final', 'score', {
-                    'ref_graph': ref_graph, 'predicted_graph': 'G_final'})
-            ]
-            self.predict_pipeline.from_list(steps)
-
-        n_steps = self.fit_pipeline.len()
-        n_steps += self._steps_from_hpo(self.fit_pipeline)
-        n_steps += (self._steps_from_iterations(self.fit_pipeline))
+        # Load a pipeline if specified, or create the default one.
+        self._set_predict_pipeline(ref_graph, pipeline)
+        n_steps = self._get_steps_predict_pipeline()
 
         self.predict_pipeline.run(n_steps)
+
         # Check if "G_final" exists in this object (self)
         if 'G_final' in self.__dict__:
             if '\\n' in self.G_final.nodes:
@@ -369,7 +354,63 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.end_predict_time = time.time()
         self.predict_time = self.end_predict_time - self.init_predict_time
 
+        # For compatibility with compared methods, we always set an attribute
+        # called 'dag' for the final DAG.
+        self.dag = self.G_final
+
         return self
+
+    def _get_steps_predict_pipeline(self):
+        """
+        Get the number of steps in the pipeline for the prediction stage.
+
+        Returns
+        -------
+        n_steps : int
+            The number of steps in the pipeline.
+        """
+        n_steps = self.predict_pipeline.len()
+        n_steps += self._steps_from_hpo(self.predict_pipeline)
+        n_steps += 1
+
+        return n_steps
+
+    def _set_predict_pipeline(
+            self,
+            ref_graph: nx.DiGraph,
+            pipeline: list | str | None):
+        """
+        Set the pipeline for the prediction stage as `self.predict_pipeline`.
+
+        Parameters
+        ----------
+        ref_graph: nx.DiGraph
+            The reference graph, or ground truth.
+        pipeline: list | str | None
+            The pipeline to use for the prediction stage.
+        """
+        if pipeline is not None:
+            if isinstance(pipeline, list):
+                self.predict_pipeline.from_list(pipeline)
+            elif isinstance(pipeline, str):
+                self.predict_pipeline.from_config(pipeline)
+        else:
+            steps = [
+                ('shaps', ShapEstimator, {
+                    'models': 'models',
+                    'parallel_jobs': self.parallel_jobs
+                }),
+                ('G_final', 'bootstrap', {
+                    'num_iterations': self.bootstrap_trials,
+                    'sampling_split': self.bootstrap_sampling_split,
+                    'tolerance': self.bootstrap_tolerance,
+                    'parallel_jobs': self.bootstrap_parallel_jobs,
+                    'random_state': self.random_state
+                }),
+                ('metrics', 'score', {
+                    'ref_graph': ref_graph, 'predicted_graph': 'G_final'})
+            ]
+            self.predict_pipeline.from_list(steps)
 
     def fit_predict(
             self,
@@ -401,75 +442,207 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.predict(test, ref_graph, prior)
         return self
 
-    def _build_iterative_adjacency_matrix(
-            self,
-            X: pd.DataFrame,
-            num_iterations: int = DEFAULT_ITERATIVE_TRIALS,
-            sampling_split: float = 0.5,
-            prior: list = None,
-            parallel: bool = True,
-            random_state: int = 1234) -> np.ndarray:
+    @staticmethod
+    def _bootstrap_iteration(iter, X, models, sampling_split, feature_names, prior,
+                             random_state, verbose=False):
+        """
+        Process an iteration of the iterative prediction.
+
+        Parameters
+        ----------
+        iter : int
+            The current iteration number.
+        X : pd.DataFrame
+            The input data.
+        models : list
+            A list of models to use for the prediction.
+        sampling_split : float
+            The fraction of the data to use for bootstrapping.
+        feature_names : list
+            The names of the features.
+        prior : list
+            The prior knowledge on the graph to use for bootstrapping.
+        random_state : int
+            The random state to use for bootstrapping.
+        verbose : bool
+            Whether to print verbose messages.
+        """
+        data_sample = X.sample(frac=sampling_split,
+                               random_state=iter * random_state)
+        shaps_instance = ShapEstimator(models=models, parallel_jobs=0, prog_bar=False)
+        shaps_instance.fit(data_sample)
+        dag = shaps_instance.predict(data_sample, prior=prior)
+        adjacency_matrix = utils.graph_to_adjacency(dag, feature_names)
+        if verbose:
+            print("· Iteration", iter + 1, "done.")
+        return adjacency_matrix
+
+    def _build_bootstrapped_adjacency_matrix(
+        self,
+        X: pd.DataFrame,
+        num_iterations: int = DEFAULT_BOOTSTRAP_TRIALS,
+        sampling_split: float = 0.5,
+        prior: list = None,
+        parallel_jobs: int = 0,
+        random_state: int = 1234,
+    ) -> np.ndarray:
         """
         Performs iterative prediction on the given directed acyclic graph (DAG)
         and adjacency matrix.
 
-        Parameters:
-            X (pd.DataFrame): The input data.
-            num_iterations (int): The number of iterations to perform. Defaults to 10.
-            sampling_split (float): The proportion of the data to use for
-                training. Defaults to 0.5.
-            prior (list): The prior knowledge. Defaults to None.
-            dag_names (list): A list of names for the DAG. Defaults to ['shap', 'rho',
-                'adjusted', 'perm_imp', 'indep', 'final'].
-            random_state (int): The random state. Defaults to 1234.
+        Parameters
+        ----------
+        X : pd.DataFrame
+            The input data.
+        num_iterations : int
+            The number of iterations to perform.
+        sampling_split : float
+            The fraction of the data to use for bootstrapping.
+        prior : list
+            The prior knowledge on the graph to use for bootstrapping.
+        parallel_jobs : int
+            The number of parallel jobs to use for bootstrapping.
+        random_state : int
+            The random state to use for bootstrapping.
 
-        Returns:
-            dict: The predicted adjacency matrices, normalized by the number
-                of iterations.
+        Returns
+        -------
+        adjacency_matrix : np.ndarray
         """
-
         # Assert that 'shaps' exists and has been fit
         check_is_fitted(self, "is_fitted_")
 
         if self.verbose:
-            print(f"Building iterative adjacency matrix with {num_iterations} "
-                  f"iterations, {sampling_split:.2f} split.")
+            print(
+                f"Building iterative adjacency matrix with {num_iterations} "
+                f"iterations, {sampling_split:.2f} split.")
 
         iter_adjacency_matrix = np.zeros(
             (self.n_features_in_, self.n_features_in_))
 
-        def process_iteration(iter):
-            data_sample = X.sample(frac=sampling_split, random_state=iter*random_state)
-
-            # Disable progress_bar in parallel execution
-            if parallel:
-                pb_state = self.shaps.prog_bar
-                self.shaps.prog_bar = False
-
-            self.shaps.fit(data_sample)
-            dag = self.shaps.predict(data_sample, prior=prior)
-
-            # Restate progress_bar to original state
-            if parallel:
-                self.shaps.prog_bar = pb_state
-
-            adjacency_matrix = utils.graph_to_adjacency(dag, self.feature_names)
-            if self.verbose:
-                print("· Iteration", iter+1, "done.")
-            return adjacency_matrix
-
-        if parallel:
-            results = Parallel(n_jobs=-1, prefer="threads")(delayed(process_iteration)(iter)
-                for iter in range(num_iterations))
+        if self.prog_bar and not self.verbose:
+            pbar = ProgBar().start_subtask("Bootstrap", num_iterations)
         else:
-            results = [process_iteration(iter) for iter in range(num_iterations)]
+            pbar = None
+
+        results = []
+        if parallel_jobs != 0 and parallel_jobs != 1:
+            # Prepare the partial function with fixed arguments
+            partial_process_iteration = partial(
+                Rex._bootstrap_iteration, X=X, models=self.models,
+                sampling_split=sampling_split, feature_names=self.feature_names,
+                prior=prior, random_state=random_state, verbose=self.verbose)
+
+            # Determine the nr of processes to pass to Pool()
+            if parallel_jobs == -1:
+                nr_processes = min(multiprocessing.cpu_count(), num_iterations)
+            else:
+                nr_processes = min(parallel_jobs, multiprocessing.cpu_count())
+
+            # Use multiprocessing Pool
+            with get_context('spawn').Pool(processes=nr_processes) as pool:
+                for result in pool.imap_unordered(
+                        partial_process_iteration, range(num_iterations)):
+                    results.append(result)
+                    if pbar:
+                        pbar.update_subtask("Bootstrap", len(results))
+                if pbar:
+                    pbar.remove("Bootstrap")
+                    pbar = None
+        else:
+            # Sequential processing
+            for iter in range(num_iterations):
+                result = Rex._bootstrap_iteration(
+                    iter, X, self.models, sampling_split,
+                    self.feature_names, prior, random_state, self.verbose)
+                results.append(result)
+                if self.prog_bar and not self.verbose:
+                    pbar.update_subtask("Bootstrap", iter)
+            if self.prog_bar and not self.verbose:
+                pbar.remove("Bootstrap")
 
         for result in results:
             iter_adjacency_matrix += result
-
         iter_adjacency_matrix = iter_adjacency_matrix / num_iterations
 
         return iter_adjacency_matrix
+
+    def iterative_predict(self, X, ref_graph=None, **kwargs):
+        return self.bootstrap(X, ref_graph, **kwargs)
+
+    def bootstrap(
+            self,
+            X: pd.DataFrame,
+            ref_graph: nx.DiGraph = None,
+            num_iterations: int = DEFAULT_BOOTSTRAP_TRIALS,
+            sampling_split: float = DEFAULT_BOOTSTRAP_SAMPLING_SPLIT,
+            prior: list = None,
+            random_state: int = 1234,
+            tolerance: Union[float, str] = DEFAULT_BOOTSTRAP_TOLERANCE,
+            key_metric: str = 'f1',
+            direction: str = 'maximize',
+            parallel_jobs: int = 0) -> nx.DiGraph:
+        """
+        Finds the best tolerance value for the iterative predict method by iterating
+        over different tolerance values and selecting the one that gives the best
+        `key_metric` with respect to the reference graph.
+
+        Parameters
+        ----------
+        ref_graph : nx.DiGraph
+            The reference graph to evaluate the F1 score against.
+        target : str, optional
+            The target DAG to evaluate. Defaults to 'shap'.
+            Possible values: 'shap', 'rho', 'adjusted', 'perm_imp', 'indep', and 'final'
+        key_metric : str, optional
+            The key metric to evaluate. Defaults to 'f1'.
+            Possible values: 'f1', 'precision', 'recall', 'shd', sid', 'aupr',
+            'Tp', 'Tn', 'Fp', 'Fn'    '
+        direction : str, optional
+            The direction of the key metric. Defaults to 'maximize'.
+            Possible values: 'maximize' or 'minimize'
+        parallel_jobs: int, optional
+            Number of processes to run the iterations in parallel. Defaults to 0.
+
+        Returns
+        -------
+        nx.DiGraph : The best DAG found by the iterative predict method.
+        """
+        if ref_graph is None and tolerance == 'auto':
+            print(f"Setting tolerance to {DEFAULT_BOOTSTRAP_TOLERANCE}, as no "
+                  f"true_graph was provided.")
+            tolerance = DEFAULT_BOOTSTRAP_TOLERANCE
+            # raise ValueError(
+            #     "ref_graph must be specified when tolerance set to 'auto'")
+        if direction != 'maximize' and direction != 'minimize':
+            raise ValueError("direction must be 'maximize' or 'minimize'")
+
+        if sampling_split == 'auto':
+            sampling_split = self._set_sampling_split()
+
+        if self.verbose:
+            print(f"Iterative prediction with {num_iterations} iterations, and "
+                  f"{sampling_split:.2f} sampling split.")
+
+        iter_adjacency_matrix = self._build_bootstrapped_adjacency_matrix(
+            X, num_iterations, sampling_split, prior, parallel_jobs, random_state)
+
+        # Create shap object for shaps as bootstrap does not create the final one.
+        # self.shaps = ShapEstimator(
+        #     explainer=self.explainer, models=self.models, verbose=self.verbose,
+        #     prog_bar=self.prog_bar)
+        self.shaps.fit(X)
+        self.shaps.predict(X)
+
+        if tolerance == 'auto':
+            self.tolerance = self._find_best_tolerance(
+                ref_graph, key_metric, direction, iter_adjacency_matrix)
+        else:
+            self.tolerance = tolerance
+
+        # Now, predict with selected tolerance
+        return self._dag_from_bootstrap_adj_matrix(
+            iter_adjacency_matrix, tolerance=self.tolerance)
 
     def _find_best_tolerance(
             self,
@@ -513,7 +686,7 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.iterative_metrics = []
         best_tolerance = 0.0
         for tol in np.arange(0.1, 1.0, 0.05):
-            dag = self.build_dag_from_iter_adj_matrix(
+            dag = self._dag_from_bootstrap_adj_matrix(
                 iter_adjacency_matrix, tolerance=tol)
 
             metric = evaluate_graph(ref_graph, dag)
@@ -532,69 +705,7 @@ class Rex(BaseEstimator, ClassifierMixin):
 
         return best_tolerance
 
-    def iterative_predict(
-            self,
-            X: pd.DataFrame,
-            ref_graph: nx.DiGraph=None,
-            num_iterations: int = DEFAULT_ITERATIVE_TRIALS,
-            sampling_split: float = 0.2,
-            prior: list = None,
-            random_state: int = 1234,
-            tolerance: Union[float, str] = 'auto',
-            key_metric: str = 'f1',
-            direction: str = 'maximize',
-            parallel: bool=False) -> nx.DiGraph:
-        """
-        Finds the best tolerance value for the iterative predict method by iterating
-        over different tolerance values and selecting the one that gives the best
-        `key_metric` with respect to the reference graph.
-
-        Parameters
-        ----------
-        ref_graph : nx.DiGraph
-            The reference graph to evaluate the F1 score against.
-        target : str, optional
-            The target DAG to evaluate. Defaults to 'shap'.
-            Possible values: 'shap', 'rho', 'adjusted', 'perm_imp', 'indep', and 'final'
-        key_metric : str, optional
-            The key metric to evaluate. Defaults to 'f1'.
-            Possible values: 'f1', 'precision', 'recall', 'shd', sid', 'aupr',
-            'Tp', 'Tn', 'Fp', 'Fn'    '
-        direction : str, optional
-            The direction of the key metric. Defaults to 'maximize'.
-            Possible values: 'maximize' or 'minimize'
-        parallel: bool, optional
-            Whether to run the iterations in parallel. Defaults to True.
-
-        Returns
-        -------
-        nx.DiGraph : The best DAG found by the iterative predict method.
-        """
-        if ref_graph is None and tolerance == 'auto':
-            raise ValueError("ref_graph must be specified when tolerance set to 'auto'")
-        if direction != 'maximize' and direction != 'minimize':
-            raise ValueError("direction must be 'maximize' or 'minimize'")
-
-        if self.verbose:
-            print(f"Iterative prediction with {num_iterations} iterations, and "
-                  f"{sampling_split:.2f} sampling split.")
-            m = evaluate_graph(ref_graph, self.G_shap)
-            print(f"Base {key_metric}: {getattr(m, key_metric):.4f}")
-
-        iter_adjacency_matrix = self._build_iterative_adjacency_matrix(
-            X, num_iterations, sampling_split, prior, parallel, random_state)
-
-        if tolerance == 'auto':
-            self.tolerance = self._find_best_tolerance(
-                ref_graph, key_metric, direction, iter_adjacency_matrix)
-        else:
-            self.tolerance = tolerance
-
-        # Now, predict with selected tolerance
-        return self.build_dag_from_iter_adj_matrix(
-            iter_adjacency_matrix, tolerance=self.tolerance)
-
-    def build_dag_from_iter_adj_matrix(
+    def _dag_from_bootstrap_adj_matrix(
             self,
             iter_adjacency_matrix: np.ndarray,
             tolerance: float = 0.3) -> dict:
@@ -631,29 +742,6 @@ class Rex(BaseEstimator, ClassifierMixin):
             dag, self.shaps.shap_discrepancies, self.prior, verbose=self.verbose)
 
         return dag
-
-    def custom_pipeline(self, steps):
-        """
-        Execute a pipeline formed by a list of custom steps previously defined.
-
-        Parameters
-        ----------
-        steps : list
-            A list of tuples with the steps to add to the pipeline.
-
-        Returns
-        -------
-        self : object
-            Returns self.
-        """
-        # Create the pipeline for the training stages.
-        pipeline = Pipeline(self, description="Custom pipeline", prog_bar=self.prog_bar,
-                            verbose=self.verbose, silent=self.silent, subtask=True)
-        pipeline.from_list(steps)
-        pipeline.run()
-        pipeline.close()
-
-        return self
 
     def score(
             self,
@@ -725,7 +813,159 @@ class Rex(BaseEstimator, ClassifierMixin):
         return utils.break_cycles_if_present(
             dag, self.shaps.shap_discrepancies, self.prior, verbose=self.verbose)
 
-    def adjust_discrepancy(self, dag: nx.DiGraph):
+    def get_prior_from_ref_graph(self, input_path):
+        return self._get_prior_from_ref_graph(input_path)
+
+    def _get_prior_from_ref_graph(self, input_path) -> List[List[str]]:
+        """
+        Get the prior from a reference graph.
+
+        Returns
+        -------
+        List[List[str]]
+            A list of two lists of nodes. The first list contains the root nodes,
+            and the second list contains the rest of the nodes. The root nodes are
+            the nodes with no incoming edges, and the rest of the nodes are the
+            ones with at least one incoming edge.
+        """
+        ref_graph_file = self.name.replace(f"_{self.model_type}", "")
+        ref_graph_file = f"{ref_graph_file}.dot"
+        ref_graph = utils.graph_from_dot_file(os.path.join(
+            input_path, ref_graph_file))
+
+        if ref_graph is None:
+            print(
+                f"WARNING: The reference graph '{ref_graph_file}' was not found.")
+            return None
+
+        root_nodes = [node for node,
+                      degree in ref_graph.in_degree() if degree == 0]
+        return [root_nodes, [node for node in ref_graph.nodes if node not in root_nodes]]
+
+    def _set_sampling_split(self):
+        r"""
+        Set the sampling splits for the bootstrap.
+
+        .. math::
+
+            \tau = \frac{s}{m} \ge 1 - p^{\frac{1}{r}} \ge 1-e^{\frac{\ln p}{r}}
+
+        We take \( p=0.01 \), so \( \ln p = -4.605170185988091 \)
+
+        Returns
+        -------
+        float
+        """
+        return 1.0 - np.e**(-4.605170185988091 / self.bootstrap_trials)
+
+    def _steps_from_hpo(self, fit_steps) -> int:
+        """
+        Update the number of trials for the HPO.
+
+        Parameters
+        ----------
+        fit_steps: Pipeline
+            The pipeline where looking for the number of trials.
+
+        Returns
+        -------
+        int
+        """
+        if fit_steps.contains_method('tune_fit', exact_match=False):
+            if 'hpo_n_trials' in self.kwargs:
+                return self.kwargs['hpo_n_trials']
+            else:
+                if fit_steps.contains_argument('hpo_n_trials'):
+                    return fit_steps.get_argument_value('hpo_n_trials')
+                else:
+                    return DEFAULT_HPO_TRIALS
+
+        return 0
+
+    def _steps_from_bootstrap(self, fit_steps) -> int:
+        """
+        Check if the pipeline contains a stage called iterative_fit and
+        retrieve the number of iterations.
+
+        Parameters
+        ----------
+        fit_steps: Pipeline
+            The pipeline where looking for the number of trials.
+
+        Returns
+        -------
+        int
+        """
+        num_iterations = 0
+        num_iterative_steps = fit_steps.contains_method(
+            'bootstrap', exact_match=False)
+        if num_iterative_steps > 0:
+            if fit_steps.contains_argument('num_iterations'):
+                all_iterations = fit_steps.all_argument_values(
+                    'num_iterations')
+                if all_iterations != []:
+                    return sum(all_iterations)
+            else:
+                num_iterations += DEFAULT_BOOTSTRAP_TRIALS
+
+        return num_iterations
+
+    def _filter_adjacency_matrix(
+            self,
+            adjacency_matrix: np.ndarray,
+            tolerance: float) -> np.ndarray:
+        """
+        Given an adjacency matrix, return a filtered version of it, where
+        all weights with absolute value less than the tolerance are
+        set to zero.
+
+        Parameters
+        ----------
+        adjacency_matrix : np.ndarray
+            The adjacency matrix.
+        tolerance : float
+            The tolerance value.
+
+        Returns
+        -------
+        np.ndarray
+            The filtered adjacency matrix.
+        """
+        filtered_adjacency = adjacency_matrix.copy()
+        filtered_adjacency[np.abs(filtered_adjacency) < tolerance] = 0
+        return filtered_adjacency
+
+    def _check_model_and_explainer(self, model_type, explainer):
+        """ Check that the explainer is supported for the model type. """
+        if (model_type == "nn" and explainer != "gradient"):
+            if self.verbose:
+                print(
+                    f"WARNING: SHAP '{explainer}' not supported for model "
+                    f"'{model_type}'. Using 'gradient' instead.")
+            self.explainer = "gradient"
+        if (model_type == "gbt" and explainer != "explainer"):
+            if self.verbose:
+                print(
+                    f"WARNING: SHAP '{explainer}' not supported for model "
+                    f"'{model_type}'. Using 'explainer' instead.")
+            self.explainer = "explainer"
+
+    def _more_tags(self):
+        return {
+            'multioutput_only': True,
+            "non_deterministic": True,
+            "no_validation": True,
+            "poor_score": True,
+            "_xfail_checks": {
+                "check_methods_sample_order_invariance": "This test shouldn't be running at all!",
+                "check_methods_subset_invariance": "This test shouldn't be running at all!",
+            }
+        }
+
+    def __str__(self):
+        return utils.stringfy_object(self)
+
+    def _unused_adjust_discrepancy(self, dag: nx.DiGraph):
         """
         Adjusts the discrepancy in the directed acyclic graph (DAG) by adding new
         edges based on the goodness-of-fit (GOF) R2 values calculated from the
@@ -770,7 +1010,7 @@ class Rex(BaseEstimator, ClassifierMixin):
 
         return G_adj
 
-    def dag_from_discrepancy(
+    def _unused_dag_from_discrepancy(
             self,
             discrepancy_upper_threshold: float = 0.99,
             verbose: bool = False) -> nx.DiGraph:
@@ -827,137 +1067,30 @@ class Rex(BaseEstimator, ClassifierMixin):
 
         return self.G_rho
 
-    def get_prior_from_ref_graph(self, input_path) -> List[List[str]]:
+    def _unused_custom_pipeline(self, steps):
         """
-        Get the prior from a reference graph.
-
-        Returns
-        -------
-        List[List[str]]
-            A list of two lists of nodes. The first list contains the root nodes,
-            and the second list contains the rest of the nodes. The root nodes are
-            the nodes with no incoming edges, and the rest of the nodes are the
-            ones with at least one incoming edge.
-        """
-        ref_graph_file = self.name.replace(f"_{self.model_type}", "")
-        ref_graph_file = f"{ref_graph_file}.dot"
-        ref_graph = utils.graph_from_dot_file(os.path.join(
-            input_path, ref_graph_file))
-
-        if ref_graph is None:
-            print(f"WARNING: The reference graph '{ref_graph_file}' was not found.")
-            return None
-
-        root_nodes = [node for node,
-                      degree in ref_graph.in_degree() if degree == 0]
-        return [root_nodes, [node for node in ref_graph.nodes if node not in root_nodes]]
-
-    def _steps_from_hpo(self, fit_steps) -> int:
-        """
-        Update the number of trials for the HPO.
+        Execute a pipeline formed by a list of custom steps previously defined.
 
         Parameters
         ----------
-        fit_steps: Pipeline
-            The pipeline where looking for the number of trials.
+        steps : list
+            A list of tuples with the steps to add to the pipeline.
 
         Returns
         -------
-        int
+        self : object
+            Returns self.
         """
-        if fit_steps.contains_method('tune_fit', exact_match=False):
-            if 'hpo_n_trials' in self.kwargs:
-                return self.kwargs['hpo_n_trials'] - 1
-            else:
-                if fit_steps.contains_argument('hpo_n_trials'):
-                    return fit_steps.get_argument_value('hpo_n_trials')
-                else:
-                    return DEFAULT_HPO_TRIALS
+        # Create the pipeline for the training stages.
+        pipeline = Pipeline(self, description="Custom pipeline", prog_bar=self.prog_bar,
+                            verbose=self.verbose, silent=self.silent, subtask=True)
+        pipeline.from_list(steps)
+        pipeline.run()
+        pipeline.close()
 
-        return 0
+        return self
 
-    def _steps_from_iterations(self, fit_steps) -> int:
-        """
-        Check if the pipeline contains a stage called iterative_fit and
-        retrieve the number of iterations.
-
-        Parameters
-        ----------
-        fit_steps: Pipeline
-            The pipeline where looking for the number of trials.
-
-        Returns
-        -------
-        int
-        """
-        num_iterations = 0
-        num_iterative_steps = fit_steps.contains_method(
-            'iterative_predict', exact_match=False)
-        if num_iterative_steps > 0:
-            if fit_steps.contains_argument('num_iterations'):
-                all_iterations = fit_steps.all_argument_values(
-                    'num_iterations')
-                if all_iterations != []:
-                    return sum(all_iterations)
-            else:
-                num_iterations += DEFAULT_ITERATIVE_TRIALS
-
-        return num_iterations
-
-    def _filter_adjacency_matrix(
-            self,
-            adjacency_matrix: np.ndarray,
-            tolerance: float) -> np.ndarray:
-        """
-        Given an adjacency matrix, return a filtered version of it, where
-        all weights with absolute value less than the tolerance are
-        set to zero.
-
-        Parameters
-        ----------
-        adjacency_matrix : np.ndarray
-            The adjacency matrix.
-        tolerance : float
-            The tolerance value.
-
-        Returns
-        -------
-        np.ndarray
-            The filtered adjacency matrix.
-        """
-        filtered_adjacency = adjacency_matrix.copy()
-        filtered_adjacency[np.abs(filtered_adjacency) < tolerance] = 0
-        return filtered_adjacency
-
-    def _check_model_and_explainer(self, model_type, explainer):
-        """ Check that the explainer is supported for the model type. """
-        if (model_type == "nn" and explainer != "gradient"):
-            print(
-                f"WARNING: SHAP '{explainer}' not supported for model '{model_type}'. "
-                f"Using 'gradient' instead.")
-            self.explainer = "gradient"
-        if (model_type == "gbt" and explainer != "explainer"):
-            print(
-                f"WARNING: SHAP '{explainer}' not supported for model '{model_type}'. "
-                f"Using 'explainer' instead.")
-            self.explainer = "explainer"
-
-    def _more_tags(self):
-        return {
-            'multioutput_only': True,
-            "non_deterministic": True,
-            "no_validation": True,
-            "poor_score": True,
-            "_xfail_checks": {
-                "check_methods_sample_order_invariance": "This test shouldn't be running at all!",
-                "check_methods_subset_invariance": "This test shouldn't be running at all!",
-            }
-        }
-
-    def __str__(self):
-        return utils.stringfy_object(self)
-
-    def verbose_on(self):
+    def _unused_verbose_on(self):
         self.verbose = True
         self.silent = False
         self.prog_bar = False
@@ -970,7 +1103,7 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.models.verbose = True
         self.models.prog_bar = False
 
-    def verbose_off(self):
+    def _unused_verbose_off(self):
         self.verbose = False
         self.prog_bar = True
         self.shaps.verbose = False
@@ -983,18 +1116,17 @@ class Rex(BaseEstimator, ClassifierMixin):
         self.models.prog_bar = True
 
 
-def custom_main(dataset_name,
-                input_path="/Users/renero/phd/data/RC4/",
-                output_path="/Users/renero/phd/output/RC4/",
-                load_model: bool = False,
-                fit_model: bool = True,
-                predict_model: bool = True,
-                iterative_predict: bool = False,
-                scale_data: bool = False,
-                tune_model: bool = False,
-                model_type="nn",
-                explainer="gradient",
-                save=False):
+def main(dataset_name,
+         input_path="/Users/renero/phd/data/RC4/",
+         output_path="/Users/renero/phd/output/RC4/",
+         load_model: bool = False,
+         fit_model: bool = True,
+         predict_model: bool = True,
+         scale_data: bool = False,
+         tune_model: bool = False,
+         model_type="nn",
+         explainer="gradient",
+         save=False):
     """
     Custom main function to run the pipeline with the given dataset.
     Specially useful for testing and debugging.
@@ -1007,30 +1139,20 @@ def custom_main(dataset_name,
         data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)
 
     if load_model:
-        rex: Rex = utils.load_experiment(f"{dataset_name}_{model_type}", output_path)
+        rex: Rex = utils.load_experiment(
+            f"{dataset_name}_{model_type}", output_path)
     else:
         rex = Rex(
             name=dataset_name, tune_model=tune_model,
             model_type=model_type, explainer=explainer, hpo_n_trials=1)
 
-    # Disable progress bar
-    rex.prog_bar = False
-    rex.verbose = True
-    rex.shaps.prog_bar = False
-    rex.shaps.verbose = True
-
     if fit_model:
-        rex.fit(data, pipeline=".fast_fit_pipeline.yaml")
+        rex.fit(data)  # , pipeline=".fast_fit_pipeline.yaml")
 
     if predict_model:
-        prior = rex.get_prior_from_ref_graph(input_path)
-        rex.predict(data, ref_graph, prior=prior,
-                    pipeline=".fast_predict_pipeline.yaml")
-
-    if iterative_predict:
-        prior = rex.get_prior_from_ref_graph(input_path)
-        rex.iterative_predict(
-            data, ref_graph, prior=prior, num_iterations=10, parallel=False)
+        prior = rex._get_prior_from_ref_graph(input_path)
+        rex.predict(data, ref_graph, prior=prior)  # ,
+        # pipeline=".fast_predict_pipeline.yaml")
 
     if save:
         where_to = utils.save_experiment(rex.name, output_path, rex)
@@ -1038,13 +1160,13 @@ def custom_main(dataset_name,
 
 
 if __name__ == "__main__":
-    custom_main('generated_15vars_linear_0',
-                input_path="/Users/renero/phd/data/RC4/",
-                model_type="nn",
-                explainer="gradient",
-                load_model=True,
-                fit_model=False,
-                predict_model=False,
-                iterative_predict=True,
-                tune_model=False,
-                save=False)
+    main('toy_dataset',
+         input_path="/Users/renero/phd/data/",
+         model_type="nn",
+         explainer="gradient",
+         load_model=False,
+         fit_model=True,
+         predict_model=True,
+         scale_data=False,
+         tune_model=True,
+         save=False)
