@@ -26,8 +26,9 @@ from networkx import Graph
 from sklearn.discriminant_analysis import StandardScaler
 from mlforge.progbar import ProgBar                         # type: ignore
 
-from causalgraph.common.utils import (graph_from_adjacency_file,
-                                      graph_from_dot_file)
+# from causalgraph.common.utils import (graph_from_adjacency_file,
+#                                       graph_from_dot_file)
+from ...common import utils
 from causalgraph.estimators.fci.colliders import (get_dsep_combs,
                                                   get_neighbors, init_pag,
                                                   orientEdges)
@@ -205,7 +206,7 @@ class FCI(GraphLearner):
             sk_file = Path(self.output_path, self.final_skeleton)
             ss_file = Path(self.output_path, self.final_sepset)
             if os.path.exists(sk_file) and os.path.exists(ss_file):
-                skeleton = graph_from_adjacency_file(sk_file)
+                skeleton = utils.graph_from_adjacency_file(sk_file)
                 sepset = dsep_set_from_csv(ss_file)
                 if self.log:
                     self.log.info(f"Read {sk_file}")
@@ -375,7 +376,7 @@ def main(dataset_name,
     """
     Create a call to FCI with a sample dataset.
     """
-    ref_graph = graph_from_dot_file(f"{input_path}{dataset_name}.dot")
+    ref_graph = utils.graph_from_dot_file(f"{input_path}{dataset_name}.dot")
     data = pd.read_csv(f"{input_path}{dataset_name}.csv")
     scaler = StandardScaler()
     data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)

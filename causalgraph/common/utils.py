@@ -25,7 +25,8 @@ import pydot
 import pydotplus
 import torch
 
-from causalgraph.independence.edge_orientation import get_edge_orientation
+from ..independence.edge_orientation import get_edge_orientation
+
 
 AnyGraph = Union[nx.Graph, nx.DiGraph]
 
@@ -1201,3 +1202,25 @@ def combine_dags(
         inter, discrepancies, prior)
 
     return union, inter, union_cycles_removed, inter_cycles_removed
+
+
+def list_files(input_pattern: str, where: str) -> list:
+    """
+    List all the files in the input path matching the input pattern
+
+    Parameters:
+    -----------
+    input_pattern : str
+        The pattern to match the files
+    where : str
+        The path to use to look for the files matching the pattern
+    """
+    input_files = glob.glob(os.path.join(
+        where, input_pattern))
+    input_files = sorted([os.path.basename(os.path.splitext(f)[0])
+                         for f in input_files])
+
+    assert len(input_files) > 0, \
+        f"No files found in {where} matching <{input_pattern}>"
+
+    return sorted(list(set(input_files)))

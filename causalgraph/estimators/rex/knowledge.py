@@ -5,7 +5,8 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
 
-from causalgraph.common.utils import graph_from_dot_file, load_experiment
+# from causalgraph.common.utils import graph_from_dot_file, load_experiment
+from ...common import utils
 
 # pylint: disable=E1101:no-member, W0201:attribute-defined-outside-init, W0511:fixme
 # pylint: disable=C0103:invalid_name, C0116:missing-function-docstring
@@ -25,7 +26,7 @@ class Knowledge:
     - is_leaf_node: whether the origin is a leaf node
     - correlation: the correlation between the individual SHAP values and the origin node
     - KS_pval: the p-value of the Kolmogorov-Smirnov test between the origin and the target
-    - shap_edge: whether the edge is in the graph constructed after evaluating mean 
+    - shap_edge: whether the edge is in the graph constructed after evaluating mean
         SHAP values.
     - shap_skedastic_pval: the p-value of the skedastic test for the SHAP values
     - parent_skedastic_pval: the p-value of the skedastic test for the parent values
@@ -35,7 +36,7 @@ class Knowledge:
     - potential_root: whether the origin is a potential root cause
     - regression_err: the regression error of the origin to the target
     - err_contrib: the error contribution of the origin to the target
-    - con_ind_pval: the p-value of the conditional independence test between the origin 
+    - con_ind_pval: the p-value of the conditional independence test between the origin
         and the target
     """
 
@@ -44,7 +45,7 @@ class Knowledge:
         Arguments:
         ----------
             shaps (ShapEstimator): The shap estimator.
-            ref_graph (nx.DiGraph): The reference graph, or ground truth.    
+            ref_graph (nx.DiGraph): The reference graph, or ground truth.
         """
         assert rex is not None, "Rex is None"
         assert rex.hierarchies is not None, "Hierarchies is None"
@@ -143,7 +144,7 @@ if __name__ == "__main__":
     experiment_name = 'custom_rex'
 
     # Read the data
-    reference_graph = graph_from_dot_file(f"{path}{experiment_name}.dot")
+    reference_graph = utils.graph_from_dot_file(f"{path}{experiment_name}.dot")
     data = pd.read_csv(f"{path}{experiment_name}.csv")
     scaler = StandardScaler()
     data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)
@@ -152,7 +153,7 @@ if __name__ == "__main__":
     train = data.sample(frac=0.9, random_state=42)
     test = data.drop(train.index)
 
-    custom = load_experiment(f"{experiment_name}", output_path)
+    custom = utils.load_experiment(f"{experiment_name}", output_path)
     custom.is_fitted_ = True
     print(f"Loaded experiment {experiment_name}")
 

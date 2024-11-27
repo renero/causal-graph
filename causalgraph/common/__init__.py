@@ -1,11 +1,7 @@
-import colorama
-
-RED = colorama.Fore.RED
-GREEN = colorama.Fore.GREEN
-GRAY = colorama.Fore.LIGHTBLACK_EX
-RESET = colorama.Style.RESET_ALL
-
 DEFAULT_HPO_TRIALS: int = 20
 DEFAULT_BOOTSTRAP_TRIALS: int = 20
 DEFAULT_BOOTSTRAP_TOLERANCE: float = 0.3
 DEFAULT_BOOTSTRAP_SAMPLING_SPLIT: float = 0.2
+DEFAULT_SEED: int = 42
+
+DEFAULT_REGRESSORS = ['nn', 'gbt']

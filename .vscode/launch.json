@@ -5,17 +5,36 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "python": "/Users/renero/.pyenv/versions/causality/bin/python",
-            "cwd": "/Users/renero/Documents/Universidades/PhD/code/causal-graph",
             "name": "Debug: Current File",
+            "python": "/Users/renero/.pyenv/versions/causality/bin/python",
+            "cwd": "/Users/renero/Documents/Universidades/PhD/code/causalgraph",
             "type": "debugpy",
             "request": "launch",
             "program": "${file}",
             "purpose": [
                 "debug-test"
             ],
+            "args": [
+                "-d", "/Users/renero/phd/data/RC4/toy_dataset.csv",
+                "-t", "/Users/renero/phd/data/RC4/toy_dataset.dot",
+                "-i", "1",
+                "-b", "1",
+            ],
             "console": "integratedTerminal",
             "justMyCode": false,
-        }
+        },
+        {
+            "name": "Python: Current File with my args",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "args": [
+                "-d", "/Users/renero/phd/data/toy_dataset.csv",
+                "-t", "/Users/renero/phd/data/toy_dataset.dot",
+                "-i", "1",
+                "-b", "5",
+            ],
+            "console": "integratedTerminal",
+        },
     ]
 }

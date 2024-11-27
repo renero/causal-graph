@@ -50,8 +50,7 @@ from causalgraph.estimators.cam.selGamBoost import selGamBoost
 from causalgraph.estimators.cam.updateScoreMat import updateScoreMat
 
 from causalgraph.metrics.compare_graphs import evaluate_graph
-from causalgraph.common import utils
-from causalgraph.common import plot
+from causalgraph.common import plot, utils
 
 
 class CAM:

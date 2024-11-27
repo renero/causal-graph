@@ -10,7 +10,7 @@ Main class for the REX estimator.
 # pylint: disable=R0914:too-many-locals, R0915:too-many-statements
 # pylint: disable=W0106:expression-not-assigned, R1702:too-many-branches
 
-from multiprocessing import Pool, get_context
+from multiprocessing import get_context
 from functools import partial
 import multiprocessing
 import os
@@ -29,15 +29,15 @@ from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.preprocessing import StandardScaler
 from sklearn.utils.validation import check_is_fitted, check_random_state
 
-from causalgraph.common import (
+from ...common import (
     utils, DEFAULT_HPO_TRIALS, DEFAULT_BOOTSTRAP_TRIALS,
     DEFAULT_BOOTSTRAP_TOLERANCE, DEFAULT_BOOTSTRAP_SAMPLING_SPLIT
 )
-from causalgraph.estimators.knowledge import Knowledge
-from causalgraph.explainability.regression_quality import RegQuality
-from causalgraph.explainability.shapley import ShapEstimator
-from causalgraph.metrics.compare_graphs import evaluate_graph
-from causalgraph.models import GBTRegressor, NNRegressor
+from .knowledge import Knowledge
+from ...explainability.regression_quality import RegQuality
+from ...explainability.shapley import ShapEstimator
+from ...metrics.compare_graphs import evaluate_graph
+from ...models import GBTRegressor, NNRegressor
 
 
 np.set_printoptions(precision=4, linewidth=120)
@@ -372,11 +372,7 @@ class Rex(BaseEstimator, ClassifierMixin):
         n_steps = self.predict_pipeline.len()
         n_steps += self._steps_from_hpo(self.predict_pipeline)
         n_steps += 1
-        # If parallelization is ON nr of steps is 1, otherwise the nr of iterations * 2
-        # if self.bootstrap_parallel_jobs != 0:
-        #     n_steps += 1
-        # else:
-        #     n_steps += (self._steps_from_bootstrap(self.predict_pipeline) * 2)
+
         return n_steps
 
     def _set_predict_pipeline(
@@ -571,6 +567,9 @@ class Rex(BaseEstimator, ClassifierMixin):
 
         return iter_adjacency_matrix
 
+    def iterative_predict(self, X, ref_graph=None, **kwargs):
+        return self.bootstrap(X, ref_graph, **kwargs)
+
     def bootstrap(
             self,
             X: pd.DataFrame,
@@ -610,8 +609,11 @@ class Rex(BaseEstimator, ClassifierMixin):
         nx.DiGraph : The best DAG found by the iterative predict method.
         """
         if ref_graph is None and tolerance == 'auto':
-            raise ValueError(
-                "ref_graph must be specified when tolerance set to 'auto'")
+            print(f"Setting tolerance to {DEFAULT_BOOTSTRAP_TOLERANCE}, as no "
+                  f"true_graph was provided.")
+            tolerance = DEFAULT_BOOTSTRAP_TOLERANCE
+            # raise ValueError(
+            #     "ref_graph must be specified when tolerance set to 'auto'")
         if direction != 'maximize' and direction != 'minimize':
             raise ValueError("direction must be 'maximize' or 'minimize'")
 
@@ -810,6 +812,9 @@ class Rex(BaseEstimator, ClassifierMixin):
         """
         return utils.break_cycles_if_present(
             dag, self.shaps.shap_discrepancies, self.prior, verbose=self.verbose)
+
+    def get_prior_from_ref_graph(self, input_path):
+        return self._get_prior_from_ref_graph(input_path)
 
     def _get_prior_from_ref_graph(self, input_path) -> List[List[str]]:
         """

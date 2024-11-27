@@ -63,8 +63,8 @@ from sklearn.ensemble import (GradientBoostingClassifier,
 from sklearn.metrics import f1_score
 from sklearn.preprocessing import StandardScaler
 
-from causalgraph.common import DEFAULT_HPO_TRIALS, utils
-from causalgraph.explainability.hierarchies import Hierarchies
+from ..common import DEFAULT_HPO_TRIALS, utils
+from ..explainability.hierarchies import Hierarchies
 
 
 class GBTRegressor(GradientBoostingRegressor):

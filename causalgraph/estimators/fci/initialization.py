@@ -15,7 +15,8 @@ from typing import Dict, Union
 
 from networkx import DiGraph, Graph
 
-from causalgraph.common.utils import graph_to_adjacency_file, valid_output_name
+# from causalgraph.common.utils import graph_to_adjacency_file, valid_output_name
+from ...common import utils
 from causalgraph.estimators.fci.pag import PAG
 
 
@@ -37,7 +38,7 @@ def get_output_name(
     output_name = f"{name}_{Path(data_file).stem}"
     output_file = f"{str(Path(output_path) / output_name)}.csv"
     if Path(output_file).is_file():
-        output_file = valid_output_name(
+        output_file = utils.valid_output_name(
             output_name, str(Path(output_path)), "csv")
     return output_file
 
@@ -59,7 +60,7 @@ def save_graph(
         log: the logger object to use
     """
     output_file = get_output_name(prefix, data_file, output_path)
-    graph_to_adjacency_file(graph, output_file)
+    utils.graph_to_adjacency_file(graph, output_file)
     if log:
         log.info(output_file)
 

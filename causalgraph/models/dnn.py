@@ -29,11 +29,10 @@ from sklearn.utils.validation import check_is_fitted
 from torch.utils.data import DataLoader
 from mlforge.progbar import ProgBar   # type: ignore
 
-from causalgraph.common import DEFAULT_HPO_TRIALS
-from causalgraph.explainability.hierarchies import Hierarchies
-from causalgraph.models._columnar import ColumnsDataset
-from causalgraph.models._models import MLPModel
-from causalgraph.common import utils
+from ..common import DEFAULT_HPO_TRIALS,  utils
+from ..explainability.hierarchies import Hierarchies
+from ._columnar import ColumnsDataset
+from ._models import MLPModel
 
 warnings.filterwarnings("ignore")
 
