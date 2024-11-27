@@ -268,8 +268,12 @@ def evaluate_graph(
         predicted_graph_array = nx.to_numpy_array(predicted_graph_copy)
     else:
         predicted_graph_array = nx.to_numpy_array(predicted_graph)
-    metrics["SID"] = SID(trueGraph=nx.to_numpy_array(ground_truth),
-                         estGraph=predicted_graph_array)
+    
+    true_adj = utils.graph_to_adjacency(ground_truth, feature_names)
+    true_adj = true_adj.astype(np.int8)
+    est_adj = utils.graph_to_adjacency(predicted_graph, feature_names)
+    est_adj = est_adj.astype(np.int8)
+    metrics["SID"] = SID(trueGraph=true_adj, estGraph=est_adj)
 
     return Metrics(metrics["Tp"], metrics["Tn"], metrics["Fn"], metrics["Fp"],
                    metrics["precision"], metrics["recall"], metrics["aupr"],
