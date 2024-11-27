@@ -16,14 +16,13 @@
 
 import argparse
 import os
+import sys
 
 import pandas as pd
 
-from causalgraph.common import utils
-from causalgraph.common import (
-    DEFAULT_BOOTSTRAP_TOLERANCE, DEFAULT_SEED, DEFAULT_REGRESSORS,
-    DEFAULT_BOOTSTRAP_TRIALS, DEFAULT_HPO_TRIALS
-)
+from causalgraph.common import (DEFAULT_BOOTSTRAP_TOLERANCE,
+                                DEFAULT_BOOTSTRAP_TRIALS, DEFAULT_HPO_TRIALS,
+                                DEFAULT_REGRESSORS, DEFAULT_SEED, utils)
 from causalgraph.common.notebook import Experiment
 
 
@@ -54,7 +53,7 @@ def parse_args():
         help='Threshold to apply to the bootstrapped adjacency matrix.')
     parser.add_argument(
         '-u', '--union', type=str, action=SplitArgs, required=False,
-        help='List of DAGs from regressor to combine. Default is all of them.')
+        help='List of comma-separated DAGs from regressor to combine. Default is all of them.')
     parser.add_argument(
         '-i', '--iterations', type=int, required=False,
         help='Hyper-parameter tuning max. iterations')
@@ -80,7 +79,6 @@ def parse_args():
         'the final DAG will be printed to stdout.')
 
     args = parser.parse_args()
-
     return args
 
 
