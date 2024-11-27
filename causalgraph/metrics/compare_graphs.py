@@ -19,7 +19,7 @@
     >>> predicted.add_weighted_edges_from([\
         ('A', 'B', random()), ('A', 'C', random()), ('E', 'A', random()),\
         ('E', 'B', random()), ('C', 'D', random())])
-        
+
     >>> result = evaluate_graph(target, predicted)
 """
 
@@ -39,6 +39,7 @@ from networkx.linalg import adjacency_matrix
 from sklearn.metrics import auc, precision_recall_curve
 
 from causalgraph.metrics.SID import SID
+from causalgraph.common import utils
 
 # Code for metrics...
 AnyGraph = Union[nx.Graph, nx.DiGraph]
@@ -124,7 +125,7 @@ class Metrics:
 
     def matplotlib_repr(self):
         """
-        Generates a formatted string representation of the metrics for display 
+        Generates a formatted string representation of the metrics for display
         in a matplotlib plot.
 
         Returns:
@@ -184,7 +185,7 @@ def evaluate_graph(
     """
         This method computes metrics between a pair of graphs: the ground truth and
         the predicted graph. To call this method, simply pass the reference graph, and
-        the predicted graph (the one you want to make as much similar to the first one 
+        the predicted graph (the one you want to make as much similar to the first one
         as possible), and all metrics will be computed.
 
         Parameters
@@ -199,7 +200,7 @@ def evaluate_graph(
             The threshold to use for the precision-recall curve, by default 0.0
         absolute : bool, optional
             Whether to use the absolute value of the weights, by default False
-        double_for_anticausal : bool, optional  
+        double_for_anticausal : bool, optional
             Whether to double the weights of anticausal edges, by default True
 
         Returns
@@ -268,8 +269,12 @@ def evaluate_graph(
         predicted_graph_array = nx.to_numpy_array(predicted_graph_copy)
     else:
         predicted_graph_array = nx.to_numpy_array(predicted_graph)
-    metrics["SID"] = SID(trueGraph=nx.to_numpy_array(ground_truth),
-                         estGraph=predicted_graph_array)
+
+    true_adj = utils.graph_to_adjacency(ground_truth, feature_names)
+    true_adj = true_adj.astype(np.int8)
+    est_adj = utils.graph_to_adjacency(predicted_graph, feature_names)
+    est_adj = est_adj.astype(np.int8)
+    metrics["SID"] = SID(trueGraph=true_adj, estGraph=est_adj)
 
     return Metrics(metrics["Tp"], metrics["Tn"], metrics["Fn"], metrics["Fp"],
                    metrics["precision"], metrics["recall"], metrics["aupr"],

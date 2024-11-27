@@ -38,6 +38,7 @@ from causalgraph.estimators.fci.initialization import (dsep_set_from_csv,
 from causalgraph.estimators.fci.pag import PAG
 from causalgraph.independence.hsic import HSIC
 from causalgraph.metrics.compare_graphs import evaluate_graph
+from causalgraph.common import utils
 
 #
 # TODO: No control over max_samples to be used in HSIC `check_independence`
@@ -101,7 +102,7 @@ class FCI(GraphLearner):
         self.final_skeleton = kwargs.get("final_skeleton", None)
         self.final_sepset = kwargs.get("final_sepset", None)
         self.njobs = kwargs.get("njobs", 1)
-        self.verbose = kwargs.get("verbose", False)
+        self.verbose = kwargs.get("verbose", True)
         self.load_base_skeleton = kwargs.get("load_base_skeleton", False)
         self.base_skeleton = kwargs.get("base_skeleton", None)
         self.base_sepset = kwargs.get("base_sepset", None)
@@ -352,8 +353,8 @@ class FCI(GraphLearner):
 
 
 def main(dataset_name,
-         input_path="/Users/renero/phd/data/sachs/",
-         output_path="/Users/renero/phd/output/RC4/sachs/compared/",
+         input_path="/Users/renero/phd/data/RC4/",
+         output_path="/Users/renero/phd/output/RC4/",
          save=False,
          **kwargs):
     """
@@ -361,24 +362,31 @@ def main(dataset_name,
     """
     ref_graph = graph_from_dot_file(f"{input_path}{dataset_name}.dot")
     data = pd.read_csv(f"{input_path}{dataset_name}.csv")
-    scaler = StandardScaler()
-    data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)
+    # scaler = StandardScaler()
+    # data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)
     train = data.sample(frac=0.8, random_state=42)
-    test = data.drop(train.index)
+    # test = data.drop(train.index)
 
     fci = FCI(name=dataset_name, output_path=output_path, **kwargs)
     fci.fit_predict(train=data, test=None, ref_graph=ref_graph)
 
-    if fci.dag:
-        for edge in fci.dag.edges():
-            print(edge)
-    else:
-        for edge in fci.pag.edges():
-            print(edge)
-    if fci.metrics:
-        print(fci.metrics)
-    else:
-        print("No metrics available")
+    # if fci.dag:
+    #     for edge in fci.dag.edges():
+    #         print(edge)
+    # else:
+    #     for edge in fci.pag.edges():
+    #         print(edge)
+    # if fci.metrics:
+    #     print(fci.metrics)
+    # else:
+    #     print("No metrics available")
+
+    utils.graph_to_adjacency_file(
+        fci.dag,
+        os.path.join(output_path, f"{dataset_name}_FCI.adj"),
+        list(data.columns))
+    print(f"DAG saved to {output_path}{dataset_name}_FCI.adj")
+
 
     # if save:
     #     where_to = utils.save_experiment(rex.name, output_path, rex)
@@ -387,5 +395,10 @@ def main(dataset_name,
 
 # Create a call to FCI with a sample dataset.
 if __name__ == "__main__":
-    main("sachs", njobs=1)
+    for nvars in [15, 20, 25]:
+        for family in ['linear', 'polynomial', 'gp_add', 'gp_mix', 'sigmoid_add']:
+            for i in range(0, 5):
+                main(f"generated_{nvars}vars_{family}_{i}", njobs=1)
+
+    # main("sachs", njobs=1)
     # main("rex_generated_linear_1", njobs=1)

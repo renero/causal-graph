@@ -850,9 +850,10 @@ def graph_to_adjacency(
                             graph.get_edge_data(x, y)[y]
                         ]
                     else:
-                        mat[labels.index(x)][labels.index(y)] = graph.get_edge_data(
-                            x, y
-                        )[weight_label]
+                        weight = graph.get_edge_data(x, y)[weight_label]
+                        if weight is None:
+                            weight = 1
+                        mat[labels.index(x)][labels.index(y)] = weight
                 else:
                     mat[labels.index(x)][labels.index(y)] = 1
     mat[np.isnan(mat)] = 0

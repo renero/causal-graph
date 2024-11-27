@@ -10,6 +10,7 @@ The LiNGAM Project: https://sites.google.com/site/sshimizu06/lingam
 # pylint: disable=R0914:too-many-locals, R0915:too-many-statements
 # pylint: disable=W0106:expression-not-assigned, R1702:too-many-branches
 
+import os
 import numpy as np
 import pandas as pd
 import networkx as nx
@@ -350,14 +351,14 @@ def main(dataset_name,
          threshold=0.0,
          inverse=True,
          absolute_values=True,
-         input_path="/Users/renero/phd/data/sachs/",
-         output_path="/Users/renero/phd/output/RC4/sachs/compared/",
+         input_path="/Users/renero/phd/data/RC4/",
+         output_path="/Users/renero/phd/output/RC4/",
          save=False):
 
     ref_graph = utils.graph_from_dot_file(f"{input_path}{dataset_name}.dot")
     data = pd.read_csv(f"{input_path}{dataset_name}.csv")
-    scaler = StandardScaler()
-    data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)
+    # scaler = StandardScaler()
+    # data = pd.DataFrame(scaler.fit_transform(data), columns=data.columns)
     train = data.sample(frac=0.8, random_state=42)
     test = data.drop(train.index)
 
@@ -368,6 +369,16 @@ def main(dataset_name,
         print(edge)
     print(lingam.metrics)
 
+    utils.graph_to_adjacency_file(
+        lingam.dag,
+        os.path.join(output_path, f"{dataset_name}_LINGAM.adj"),
+        list(data.columns))
+    print(f"DAG saved to {output_path}{dataset_name}_LINGAM.adj")
 
-if __name__ == '__main__':
-    main("sachs_long", inverse=False, absolute_values=False)
+
+
+if __name__ == "__main__":
+    for nvars in [15, 20, 25]:
+        for family in ['linear', 'polynomial', 'gp_add', 'gp_mix', 'sigmoid_add']:
+            for i in range(0, 5):
+                main(f"generated_{nvars}vars_{family}_{i}", inverse=False, absolute_values=False)

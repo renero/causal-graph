@@ -497,9 +497,9 @@ class PC(StructureEstimator):
 
 def main(dataset_name, input_path=None, output_path=None, save=False):
     if input_path is None:
-        input_path=os.path.expanduser("~/phd/data/sachs/")
+        input_path=os.path.expanduser("~/phd/data/RC4/")
     if output_path is None:
-        output_path=os.path.expanduser("~/phd/output/RC4/sachs/compared/")
+        output_path=os.path.expanduser("~/phd/output/RC4/")
     ref_graph = utils.graph_from_dot_file(f"{input_path}{dataset_name}.dot")
     data = pd.read_csv(f"{input_path}{dataset_name}.csv")
     scaler = StandardScaler()
@@ -511,9 +511,9 @@ def main(dataset_name, input_path=None, output_path=None, save=False):
             ci_test="pearsonr", max_cond_vars=5)
     pc.fit_predict(train=data, test=None, ref_graph=ref_graph)
 
-    for edge in pc.dag.edges():
-        print(edge)
-    print(pc.metrics)
+    # for edge in pc.dag.edges():
+    #     print(edge)
+    # print(pc.metrics)
 
     utils.graph_to_adjacency_file(
         pc.dag, f"{output_path}{dataset_name}_PC.adj", list(data.columns))
@@ -525,4 +525,7 @@ def main(dataset_name, input_path=None, output_path=None, save=False):
 
 
 if __name__ == "__main__":
-    main("sachs_long")
+    for nvars in [15, 20, 25]:
+        for family in ['linear', 'polynomial', 'gp_add', 'gp_mix', 'sigmoid_add']:
+            for i in range(0, 5):
+                main(f"generated_{nvars}vars_{family}_{i}")

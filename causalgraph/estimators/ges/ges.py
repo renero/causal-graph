@@ -67,6 +67,7 @@ Additional modules / packages:
 
 """
 
+import os
 import numpy as np
 import pandas as pd
 import networkx as nx
@@ -75,7 +76,7 @@ from sklearn.discriminant_analysis import StandardScaler
 
 from causalgraph.estimators.ges.scores import GaussObsL0Pen
 from causalgraph.estimators.ges import utils
-from causalgraph.common.utils import graph_from_adjacency, graph_from_dot_file
+from causalgraph.common.utils import graph_from_adjacency, graph_from_dot_file, graph_to_adjacency_file
 from causalgraph.metrics.compare_graphs import evaluate_graph
 
 
@@ -1057,8 +1058,8 @@ class GES(object):
 
 
 def main(dataset_name,
-         input_path="/Users/renero/phd/data/sachs/",
-         output_path="/Users/renero/phd/output/RC4/sachs/compared",
+         input_path="/Users/renero/phd/data/RC4/",
+         output_path="/Users/renero/phd/output/RC4/",
          save=False):
 
     ref_graph = graph_from_dot_file(f"{input_path}{dataset_name}.dot")
@@ -1071,9 +1072,15 @@ def main(dataset_name,
     ges = GES(dataset_name, phases=["forward", "backward", "turning"], debug=0)
     ges.fit_predict(train=data, test=None, ref_graph=ref_graph)
 
-    for edge in ges.dag.edges():
-        print(edge)
-    print(ges.metrics)
+    # for edge in ges.dag.edges():
+    #     print(edge)
+    # print(ges.metrics)
+
+    graph_to_adjacency_file(
+        ges.dag,
+        os.path.join(output_path, f"{dataset_name}_GES.adj"),
+        list(data.columns))
+    print(f"DAG saved to {output_path}{dataset_name}_GES.adj")
 
     # if save:
     #     where_to = utils.save_experiment(rex.name, output_path, rex)
@@ -1081,4 +1088,7 @@ def main(dataset_name,
 
 
 if __name__ == "__main__":
-    main("sachs_long")
+    for nvars in [15, 20, 25]:
+        for family in ['linear', 'polynomial', 'gp_add', 'gp_mix', 'sigmoid_add']:
+            for i in range(0, 5):
+                main(f"generated_{nvars}vars_{family}_{i}")
