@@ -1,8 +1,9 @@
 """
 FCI algorithm.
 
-This is a modified version of the FCI algorithm to work in parallel and improving
-the performance of the algorithm, as well as the conditional independence tests.
+A graph learner which wraps the implementation of the FCI algorithm
+in the (c) causallearn library (https://github.com/py-why/causal-learn).
+
 """
 
 # pylint: disable=E1101:no-member
@@ -13,31 +14,12 @@ the performance of the algorithm, as well as the conditional independence tests.
 # pylint: disable=R0914:too-many-locals, R0915:too-many-statements
 # pylint: disable=R1702:too-many-branches
 
-import multiprocessing as mp
-import os
-import time
-from collections import defaultdict
-from pathlib import Path
-from typing import Dict, Optional, Tuple, Union
-from causallearn.search.ConstraintBased.FCI import fci
-
-import pandas as pd
 import networkx as nx
 import numpy as np
-from networkx import Graph
-from mlforge.progbar import ProgBar                         # type: ignore
+import pandas as pd
+from causallearn.search.ConstraintBased.FCI import fci
 
 from causalgraph.common import utils
-
-from causalgraph.estimators.fci.colliders import (get_dsep_combs,
-                                                  get_neighbors, init_pag,
-                                                  orientEdges)
-from causalgraph.estimators.fci.debug import DebugFCI
-from causalgraph.estimators.fci.graph_learner import GraphLearner
-from causalgraph.estimators.fci.initialization import (dsep_set_from_csv,
-                                                       save_graph, save_sepset)
-from causalgraph.estimators.fci.pag import PAG
-from causalgraph.independence.hsic import HSIC
 from causalgraph.metrics.compare_graphs import evaluate_graph
 
 
