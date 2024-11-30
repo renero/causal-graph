@@ -15,7 +15,6 @@ import time
 import warnings
 from os import path
 
-import networkx as nx
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
@@ -242,10 +241,14 @@ class Experiment(BaseExperiment):
             model_type = 'nn'
         elif model_type == 'gbt':
             model_type = 'gbt'
+        elif model_type in method_names:
+            model_type = model_type
         else:
             raise ValueError(
                 f"Model type '{model_type}' not supported. "
-                f"Supported options are: 'nn', 'gbt', 'pc', 'fci', 'ges' and 'lingam'.")
+                f"Supported options are: "
+                f"'nn', 'gbt', 'pc', 'fci', 'cam', 'notears', 'ges' and "
+                f"'lingam'.")
 
         return model_type
 

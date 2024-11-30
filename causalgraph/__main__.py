@@ -16,7 +16,6 @@
 
 import argparse
 import os
-import sys
 
 import pandas as pd
 
@@ -127,6 +126,8 @@ def check_args_validity(args):
     # Set default regressors in case ReX is called.
     if args.method == 'rex' and args.regressor is None:
         regressors = DEFAULT_REGRESSORS
+    else:
+        regressors = [args.method]
 
     seed = args.seed if args.seed is not None else DEFAULT_SEED
 
@@ -167,6 +168,12 @@ def check_args_validity(args):
 
 
 def create_experiments(**args):
+    """
+    Create an Experiment object for each regressor.
+
+    Returns:
+        dict: A dictionary of Experiment objects
+    """
     trainer = {}
     for model_type in args['regressors']:
         trainer_name = f"{args['dataset_name']}_{model_type}"
@@ -184,6 +191,13 @@ def create_experiments(**args):
 
 
 def fit_experiments(trainer, run_values):
+    """
+    Fit the Experiment objects.
+
+    Args:
+        trainer (dict): A dictionary of Experiment objects
+        run_values (dict): A dictionary of run values
+    """
     xargs = {
         'verbose': run_values['verbose'],
         'hpo_n_trials': run_values['hpo_iterations'],
@@ -195,6 +209,16 @@ def fit_experiments(trainer, run_values):
 
 
 def retrieve_dag(trainer, run_values):
+    """
+    Retrieve the DAG from the Experiment objects.
+
+    Args:
+        trainer (dict): A dictionary of Experiment objects
+        run_values (dict): A dictionary of run values
+
+    Returns:
+        nx.DiGraph: The combined DAG
+    """
     if run_values['estimator'] != 'rex':
         estimator = getattr(trainer, run_values['estimator'])
         return estimator.dag
@@ -208,6 +232,14 @@ def retrieve_dag(trainer, run_values):
 
 
 def show_run_values(run_values):
+    """
+    Print the run values.
+
+    Args:
+        run_values (dict): A dictionary of run values
+    """
+    print("-----")
+    print("Run values:")
     for k, v in run_values.items():
         if isinstance(v, pd.DataFrame):
             print(f"{k}: {v.shape[0]}x{v.shape[1]} DataFrame")
