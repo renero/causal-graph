@@ -39,6 +39,7 @@ from networkx.linalg import adjacency_matrix
 from sklearn.metrics import auc, precision_recall_curve
 
 from causalgraph.metrics.SID import SID
+from causalgraph.common import utils
 
 # Code for metrics...
 AnyGraph = Union[nx.Graph, nx.DiGraph]
