@@ -57,7 +57,7 @@ estimators = {
     'cam': CAM,
     'notears': NOTEARS
 }
-method_names = ['pc', 'fci', 'ges', 'lingam', 'cam', 'notears']
+method_names = ['pc', 'fci', 'ges', 'lingam', 'cam', 'notears', 'rex']
 metric_columns = ['method', 'data_type', 'f1', 'precision',
                   'recall', 'aupr', 'Tp', 'Tn', 'Fp', 'Fn', 'shd', 'sid',
                   'n_edges', 'ref_n_edges', 'diff_edges', 'name']

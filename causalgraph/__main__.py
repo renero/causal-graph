@@ -23,7 +23,7 @@ from causalgraph.common import (DEFAULT_BOOTSTRAP_TOLERANCE,
                                 DEFAULT_BOOTSTRAP_TRIALS, DEFAULT_HPO_TRIALS,
                                 DEFAULT_REGRESSORS, DEFAULT_SEED, utils)
 from causalgraph.common.notebook import Experiment
-
+from causalgraph.metrics.compare_graphs import evaluate_graph
 
 SUPPORTED_METHODS = ['rex', 'pc', 'fci', 'ges', 'lingam', 'cam', 'notears']
 
@@ -98,13 +98,14 @@ def check_args_validity(args):
         args.method = 'rex'
         run_values['estimator'] = 'rex'
     else:
-        assert args.method in SUPPORTED_METHODS
-        "Method must be one of: rex, pc, fci, ges, lingam, cam, notears"
+        assert args.method in SUPPORTED_METHODS, \
+            "Method must be one of: rex, pc, fci, ges, lingam, cam, notears"
         run_values['estimator'] = str(args.method)
 
     # Check that the dataset file exist, and load it (data)
     assert args.dataset is not None, "Dataset file must be specified"
-    assert os.path.isfile(args.dataset), "Dataset file does not exist"
+    assert os.path.isfile(args.dataset), \
+        f"Dataset file '{args.dataset}' does not exist"
     run_values['data'] = pd.read_csv(args.dataset)
     run_values['dataset_filepath'] = args.dataset
 
@@ -206,7 +207,7 @@ def fit_experiments(trainer, run_values):
         experiment.fit_predict(estimator=run_values['estimator'], **xargs)
 
 
-def retrieve_dag(trainer, run_values):
+def combine_and_evaluate_dags(trainer, run_values):
     """
     Retrieve the DAG from the Experiment objects.
 
@@ -220,14 +221,33 @@ def retrieve_dag(trainer, run_values):
     if run_values['estimator'] != 'rex':
         trainer_key = f"{run_values['dataset_name']}_{run_values['estimator']}"
         estimator = getattr(trainer[trainer_key], run_values['estimator'])
-        return estimator.dag
+        trainer[trainer_key].dag = estimator.dag
+        if run_values['true_dag'] is not None:
+            trainer[trainer_key].metrics = evaluate_graph(
+                run_values['true_dag'], estimator.dag, run_values['data'].columns)
+
+        return trainer[trainer_key]
 
     estimator1 = getattr(trainer[list(trainer.keys())[0]], 'rex')
     estimator2 = getattr(trainer[list(trainer.keys())[1]], 'rex')
     _, _, dag, _ = utils.combine_dags(estimator1.dag, estimator2.dag,
                                       estimator1.shaps.shap_discrepancies)
+    trainer[f"{run_values['dataset_name']}_rex"] = Experiment(
+        experiment_name=f"{run_values['dataset_name']}",
+        model_type='rex',
+        input_path=run_values['dataset_path'],
+        output_path=run_values['output_path'],
+        verbose=False)
 
-    return dag
+    # Create a new trainer with the combined DAG.
+    new_trainer = f"{run_values['dataset_name']}_rex"
+    trainer[new_trainer].ref_graph = run_values['true_dag']
+    trainer[new_trainer].dag = dag
+    if run_values['true_dag'] is not None:
+        trainer[new_trainer].metrics = evaluate_graph(
+            run_values['true_dag'], dag, list(run_values['data'].columns))
+
+    return trainer[new_trainer]
 
 
 def show_run_values(run_values):
@@ -268,8 +288,8 @@ def main():
 
     trainer = create_experiments(**run_values)
     fit_experiments(trainer, run_values)
-    dag = retrieve_dag(trainer, run_values)
-    print(dag)
+    result = combine_and_evaluate_dags(trainer, run_values)
+    print(result.metrics)
 
 
 if __name__ == "__main__":
