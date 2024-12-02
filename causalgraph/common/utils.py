@@ -175,7 +175,7 @@ def graph_from_dictionary(d: Dict[str, List[Union[str, Tuple[str, float]]]]) -> 
     g = nx.DiGraph()
     for node, parents in d.items():
         if len(parents) > 0:
-            if type(parents[0]) == tuple:
+            if isinstance(parents[0], tuple):
                 for parent, weight in parents:
                     g.add_edge(parent, node, weight=weight)
             else:

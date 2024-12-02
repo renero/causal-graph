@@ -52,7 +52,8 @@ class DirectLiNGAM(_BaseLiNGAM):
             measure="pwling",
             th=0.0,
             inverse=False,
-            absolute_values=False
+            absolute_values=False,
+            verbose=False
     ):
         """Construct a DirectLiNGAM model.
 
@@ -84,6 +85,7 @@ class DirectLiNGAM(_BaseLiNGAM):
         self.th = th
         self.inverse = inverse
         self.absolute_values = absolute_values
+        self.verbose = verbose
 
         if self._Aknw is not None:
             self._Aknw = check_array(self._Aknw)
