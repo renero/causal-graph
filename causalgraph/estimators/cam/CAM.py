@@ -3,7 +3,8 @@
 (C) Original Code from R implementation of the Causal Additive Model (CAM)
 
 @article{buhlmann2014cam,
-  title={CAM: Causal additive models, high-dimensional order search and penalized regression},
+  title={CAM: Causal additive models, high-dimensional order search and 
+          penalized regression},
   author={B{\"u}hlmann, Peter and Peters, Jonas and Ernest, Jan},
   journal={The Annals of Statistics},
   volume={42},
@@ -18,24 +19,26 @@
 are defined in separate Python files in the same directory.
 - **Function Definition**: Translated the R function `CAM` to Python.
 - **Variable Initialization**: Initialized variables and handled default values.
-- **Variable Selection**: Used `numpy` and `multiprocessing` for parallel processing.
+- **Variable Selection**: Used `numpy` and `multiprocessing` for parallel 
+    processing.
 - **Edge Inclusion**: Translated the logic for including edges and updating the
 score matrix.
 - **Pruning**: Translated the pruning step.
 - **Output and Return**: Collected and printed the results.
 
-Make sure the corresponding Python files (`computeScoreMat.py`, `updateScoreMat.py`,
-`pruning.py`, `selGamBoost.py`, `selGam.py`) are present in the same directory and
-contain the necessary functions.
+Make sure the corresponding Python files (`computeScoreMat.py`, 
+    `updateScoreMat.py`,
+`pruning.py`, `selGamBoost.py`, `selGam.py`) are present in the same directory 
+and contain the necessary functions.
 """
-# pylint: disable=E1101:no-member, W0201:attribute-defined-outside-init, W0511:fixme
+# pylint: disable=E1101:no-member, W0201:attribute-defined-outside-init
 # pylint: disable=C0103:invalid-name, W0221:arguments-differ
-# pylint: disable=C0116:missing-function-docstring
+# pylint: disable=C0116:missing-function-docstring, W0511:fixme
 # pylint: disable=R0913:too-many-arguments, E0401:import-error
 # pylint: disable=R0914:too-many-locals, R0915:too-many-statements
 # pylint: disable=W0106:expression-not-assigned, R1702:too-many-branches
 
-import sys
+import os
 import time
 from multiprocessing import Pool
 
@@ -43,14 +46,13 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 
+from causalgraph.common import utils
 from causalgraph.estimators.cam.computeScoreMat import computeScoreMat
 from causalgraph.estimators.cam.pruning import pruning
 from causalgraph.estimators.cam.selGam import selGam
 from causalgraph.estimators.cam.selGamBoost import selGamBoost
 from causalgraph.estimators.cam.updateScoreMat import updateScoreMat
-
 from causalgraph.metrics.compare_graphs import evaluate_graph
-from causalgraph.common import plot, utils
 
 
 class CAM:
@@ -311,13 +313,13 @@ class CAM:
 
 
 def main(dataset_name,
-         input_path="/Users/renero/phd/data/",
+         input_path="/Users/renero/phd/data/sachs",
          output_path="/Users/renero/phd/output/",
-         do_plot:bool=False,
          save=False):
 
-    data = pd.read_csv(f"{input_path}{dataset_name}.csv")
-    ref_graph = utils.graph_from_dot_file(f"{input_path}{dataset_name}.dot")
+    data = pd.read_csv(os.path.join(input_path, dataset_name) + ".csv")
+    ref_graph = utils.graph_from_dot_file(
+        os.path.join(input_path, dataset_name) + ".dot")
 
     cam = CAM(name="main_run",
               pruning=True,
@@ -325,9 +327,7 @@ def main(dataset_name,
               verbose=False)
     cam.fit_predict(data, ref_graph=ref_graph)
     print(cam.metrics)
-    if do_plot:
-        plot.dag(cam.dag, reference=ref_graph)
 
 
 if __name__ == "__main__":
-    main("toy_dataset")
+    main("sachs")

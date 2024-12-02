@@ -1,4 +1,4 @@
-causal_learn==0.1.3.3
+causal_learn==0.1.3.8
 colorama==0.4.6
 daft==0.1.2
 Deprecated==1.2.14

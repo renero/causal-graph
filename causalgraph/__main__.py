@@ -16,14 +16,16 @@
 
 import argparse
 import os
-import sys
-
+import networkx as nx
 import pandas as pd
 
 from causalgraph.common import (DEFAULT_BOOTSTRAP_TOLERANCE,
                                 DEFAULT_BOOTSTRAP_TRIALS, DEFAULT_HPO_TRIALS,
                                 DEFAULT_REGRESSORS, DEFAULT_SEED, utils)
 from causalgraph.common.notebook import Experiment
+from causalgraph.metrics.compare_graphs import evaluate_graph
+
+SUPPORTED_METHODS = ['rex', 'pc', 'fci', 'ges', 'lingam', 'cam', 'notears']
 
 
 def parse_args():
@@ -83,90 +85,91 @@ def parse_args():
 
 
 def check_args_validity(args):
+    """
+    Check the validity of the arguments.
+
+    Returns:
+        dict: A dictionary of run values
+    """
+    run_values = {}
+
     # Set model type (estimator)
     if args.method is None:
         args.method = 'rex'
-        estimator = 'rex'
+        run_values['estimator'] = 'rex'
     else:
-        assert args.method in ['rex', 'pc', 'fci',
-                               'ges', 'lingam', 'cam', 'notears']
-        "Method must be one of: 'rex', 'pc', 'fci', 'ges', 'lingam', 'cam', 'notears'"
-        estimator = str(args.method)
+        assert args.method in SUPPORTED_METHODS, \
+            "Method must be one of: rex, pc, fci, ges, lingam, cam, notears"
+        run_values['estimator'] = str(args.method)
 
     # Check that the dataset file exist, and load it (data)
     assert args.dataset is not None, "Dataset file must be specified"
-    assert os.path.isfile(args.dataset), "Dataset file does not exist"
-    data = pd.read_csv(args.dataset)
-    dataset_filepath = args.dataset
+    assert os.path.isfile(args.dataset), \
+        f"Dataset file '{args.dataset}' does not exist"
+    run_values['data'] = pd.read_csv(args.dataset)
+    run_values['dataset_filepath'] = args.dataset
 
     # Extract the path from where the dataset is, dataset basename
-    dataset_path = os.path.dirname(args.dataset)
+    run_values['dataset_path'] = os.path.dirname(args.dataset)
     dataset_name = os.path.basename(args.dataset)
-    dataset_name = dataset_name.replace('.csv', '')
+    run_values['dataset_name'] = dataset_name.replace('.csv', '')
 
     # Load true DAG, if specified (true_dag)
-    true_dag = None
+    run_values['true_dag'] = None
     if args.true_dag is not None:
         assert '.dot' in args.true_dag, "True DAG must be in .dot format"
         assert os.path.isfile(args.true_dag), "True DAG file does not exist"
-        true_dag = utils.graph_from_dot_file(args.true_dag)
+        run_values['true_dag'] = utils.graph_from_dot_file(args.true_dag)
 
     # Determine where to save the model pickle.
     if args.save_model is None or args.save_model == '':
         save_model = f"{args.dataset.replace('.csv', '')}.pickle"
-        save_model = os.path.basename(save_model)
+        run_values['save_model'] = os.path.basename(save_model)
         # Output_path is the current directory
-        output_path = os.getcwd()
-        model_filename = utils.valid_output_name(
-            filename=save_model, path=output_path)
+        run_values['output_path'] = os.getcwd()
+        run_values['model_filename'] = utils.valid_output_name(
+            filename=save_model, path=run_values['output_path'])
     else:
-        save_model = args.save_model
-        output_path = os.path.dirname(save_model)
-        model_filename = args.save_model
+        run_values['save_model'] = args.save_model
+        run_values['output_path'] = os.path.dirname(save_model)
+        run_values['model_filename'] = args.save_model
 
     # Set default regressors in case ReX is called.
     if args.method == 'rex' and args.regressor is None:
-        regressors = DEFAULT_REGRESSORS
-
-    seed = args.seed if args.seed is not None else DEFAULT_SEED
-
-    hpo_iterations = args.iterations if args.iterations is not None \
-        else DEFAULT_HPO_TRIALS
-    bootstrap_iterations = args.bootstrap if args.bootstrap is not None \
-        else DEFAULT_BOOTSTRAP_TRIALS
-    bootstrap_tolerance = args.threshold if args.threshold is not None \
-        else DEFAULT_BOOTSTRAP_TOLERANCE
-
-    verbose = True if args.verbose else False
-    quiet = True if args.quiet else False
-    if args.output is None:
-        output_dag_file = utils.valid_output_name(
-            filename=dataset_name, path=output_path, extension="dot")
+        run_values['regressors'] = DEFAULT_REGRESSORS
+        run_values['seed'] = args.seed if args.seed is not None else DEFAULT_SEED
+        run_values['hpo_iterations'] = args.iterations \
+            if args.iterations is not None else DEFAULT_HPO_TRIALS
+        run_values['bootstrap_iterations'] = args.bootstrap \
+            if args.bootstrap is not None else DEFAULT_BOOTSTRAP_TRIALS
+        run_values['bootstrap_tolerance'] = args.threshold \
+            if args.threshold is not None else DEFAULT_BOOTSTRAP_TOLERANCE
+        run_values['quiet'] = True if args.quiet else False
     else:
-        output_dag_file = args.output
+        run_values['regressors'] = [args.method]
+
+    run_values['verbose'] = True if args.verbose else False
+    if args.output is None:
+        run_values['output_dag_file'] = utils.valid_output_name(
+            filename=run_values['dataset_name'], 
+            path=run_values['output_path'], 
+            extension="dot")
+    else:
+        run_values['output_dag_file'] = args.output
+
+    # show_run_values(run_values)
 
     # return a dictionary with all the new variables created
-    return {
-        'estimator': estimator,
-        'regressors': regressors,
-        'data': data,
-        'dataset_filepath': dataset_filepath,
-        'dataset_name': dataset_name,
-        'dataset_path': dataset_path,
-        'true_dag': true_dag,
-        'model_filename': model_filename,
-        'output_path': output_path,
-        'seed': seed,
-        'hpo_iterations': hpo_iterations,
-        'bootstrap_iterations': bootstrap_iterations,
-        'bootstrap_tolerance': bootstrap_tolerance,
-        'verbose': verbose,
-        'quiet': quiet,
-        'output_dag_file': output_dag_file
-    }
+    return run_values
 
 
 def create_experiments(**args):
+    """
+    Create an Experiment object for each regressor.
+
+    Returns:
+        dict: A dictionary of Experiment objects
+    """
     trainer = {}
     for model_type in args['regressors']:
         trainer_name = f"{args['dataset_name']}_{model_type}"
@@ -177,68 +180,162 @@ def create_experiments(**args):
             output_path=args['output_path'],
             verbose=False)
         trainer[trainer_name].ref_graph = args['true_dag']
-        print(
-            f"Created experiment named '{trainer_name}'", flush=True)
+        # print(f"Created experiment named '{trainer_name}'", flush=True)
 
     return trainer
 
 
 def fit_experiments(trainer, run_values):
-    xargs = {
-        'verbose': run_values['verbose'],
-        'hpo_n_trials': run_values['hpo_iterations'],
-        'bootstrap_trials': run_values['bootstrap_iterations']
-    }
+    """
+    Fit the Experiment objects.
+
+    Args:
+        trainer (dict): A dictionary of Experiment objects
+        run_values (dict): A dictionary of run values
+    """
+    if run_values['estimator'] == 'rex':
+        xargs = {
+            'verbose': run_values['verbose'],
+            'hpo_n_trials': run_values['hpo_iterations'],
+            'bootstrap_trials': run_values['bootstrap_iterations']
+        }
+    else:
+        xargs = {
+            'verbose': run_values['verbose']
+        }
 
     for trainer_name, experiment in trainer.items():
         experiment.fit_predict(estimator=run_values['estimator'], **xargs)
 
 
-def retrieve_dag(trainer, run_values):
+def combine_and_evaluate_dags(trainer, run_values):
+    """
+    Retrieve the DAG from the Experiment objects.
+
+    Args:
+        trainer (dict): A dictionary of Experiment objects
+        run_values (dict): A dictionary of run values
+
+    Returns:
+        nx.DiGraph: The combined DAG
+    """
     if run_values['estimator'] != 'rex':
-        estimator = getattr(trainer, run_values['estimator'])
-        return estimator.dag
+        trainer_key = f"{run_values['dataset_name']}_{run_values['estimator']}"
+        estimator = getattr(trainer[trainer_key], run_values['estimator'])
+        trainer[trainer_key].dag = estimator.dag
+        if run_values['true_dag'] is not None:
+            trainer[trainer_key].metrics = evaluate_graph(
+                run_values['true_dag'], estimator.dag, 
+                list(run_values['data'].columns))
+        else:
+            trainer[trainer_key].metrics = None
+
+        return trainer[trainer_key]
 
     estimator1 = getattr(trainer[list(trainer.keys())[0]], 'rex')
     estimator2 = getattr(trainer[list(trainer.keys())[1]], 'rex')
     _, _, dag, _ = utils.combine_dags(estimator1.dag, estimator2.dag,
                                       estimator1.shaps.shap_discrepancies)
+    trainer[f"{run_values['dataset_name']}_rex"] = Experiment(
+        experiment_name=f"{run_values['dataset_name']}",
+        model_type='rex',
+        input_path=run_values['dataset_path'],
+        output_path=run_values['output_path'],
+        verbose=False)
 
-    return dag
+    # Create a new trainer with the combined DAG.
+    new_trainer = f"{run_values['dataset_name']}_rex"
+    trainer[new_trainer].ref_graph = run_values['true_dag']
+    trainer[new_trainer].dag = dag
+    if run_values['true_dag'] is not None:
+        trainer[new_trainer].metrics = evaluate_graph(
+            run_values['true_dag'], dag, list(run_values['data'].columns))
+    else:
+        trainer[new_trainer].metrics = None
+
+    return trainer[new_trainer]
 
 
 def show_run_values(run_values):
+    """
+    Print the run values.
+
+    Args:
+        run_values (dict): A dictionary of run values
+    """
+    print("-----")
+    print("Run values:")
     for k, v in run_values.items():
         if isinstance(v, pd.DataFrame):
-            print(f"{k}: {v.shape[0]}x{v.shape[1]} DataFrame")
+            print(f"- {k}: {v.shape[0]}x{v.shape[1]} DataFrame")
             continue
-        print(f"{k}: {v}")
+        print(f"- {k}: {v}")
 
     print("-----")
 
 
+def printout_results(graph, metrics):
+    """
+    This method prints the DAG to stdout in hierarchical order.
+
+    Parameters:
+    -----------
+    dag : nx.DiGraph
+        The DAG to be printed.
+    """
+    if len(graph.edges()) == 0:
+        print("Empty graph")
+        return
+
+    print("Resulting Graph:\n---------------")
+
+    def dfs(node, visited, indent=""):
+        if node in visited:
+            return  # Avoid revisiting nodes
+        visited.add(node)
+        
+        # Print edges for this node
+        for neighbor in graph.successors(node):
+            print(f"{indent}{node} -> {neighbor}")
+            dfs(neighbor, visited, indent + "  ")
+        
+    visited = set()
+    
+    # Start traversal from all nodes without predecessors (roots)
+    for node in graph.nodes:
+        if graph.in_degree(node) == 0:
+            dfs(node, visited)
+
+    # Handle disconnected components (not reachable from any "root")
+    for node in graph.nodes:
+        if node not in visited:
+            dfs(node, visited)
+
+    if metrics is not None:
+        print("\nGraph Metrics:\n-------------")
+        print(metrics)
+
+
+
 def header_():
     print(
-        """
-   ____                      _  ____                 _
+"""   ____                      _  ____                 _
   / ___|__ _ _   _ ___  __ _| |/ ___|_ __ __ _ _ __ | |__
  | |   / _` | | | / __|/ _` | | |  _| '__/ _` | '_ \| '_ \\
  | |__| (_| | |_| \__ \ (_| | | |_| | | | (_| | |_) | | | |
   \____\__,_|\__,_|___/\__,_|_|\____|_|  \__,_| .__/|_| |_|
-                                              |_|
-""")
+                                              |_|""")
 
 
 def main():
     header_()
     args = parse_args()
     run_values = check_args_validity(args)
-    show_run_values(run_values)
 
     trainer = create_experiments(**run_values)
     fit_experiments(trainer, run_values)
-    dag = retrieve_dag(trainer, run_values)
-    print(dag)
+    result = combine_and_evaluate_dags(trainer, run_values)
+    printout_results(result.dag, result.metrics)
 
 
 if __name__ == "__main__":

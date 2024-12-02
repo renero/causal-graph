@@ -15,7 +15,6 @@ import time
 import warnings
 from os import path
 
-import networkx as nx
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
@@ -58,7 +57,7 @@ estimators = {
     'cam': CAM,
     'notears': NOTEARS
 }
-method_names = ['pc', 'fci', 'ges', 'lingam', 'cam', 'notears']
+method_names = ['pc', 'fci', 'ges', 'lingam', 'cam', 'notears', 'rex']
 metric_columns = ['method', 'data_type', 'f1', 'precision',
                   'recall', 'aupr', 'Tp', 'Tn', 'Fp', 'Fn', 'shd', 'sid',
                   'n_edges', 'ref_n_edges', 'diff_edges', 'name']
@@ -167,8 +166,8 @@ class BaseExperiment:
             print(f"Estimator '{estimator_name}' not found.")
             return None
 
-        # Special case: when estimator is ReX, model_type needs also to be passed to
-        # the constructor
+        # Special case: when estimator is ReX, model_type needs also to be 
+        # passed to the constructor
         if estimator_name == 'rex':
             kwargs['model_type'] = self.model_type
 
@@ -242,10 +241,14 @@ class Experiment(BaseExperiment):
             model_type = 'nn'
         elif model_type == 'gbt':
             model_type = 'gbt'
+        elif model_type in method_names:
+            model_type = model_type
         else:
             raise ValueError(
                 f"Model type '{model_type}' not supported. "
-                f"Supported options are: 'nn', 'gbt', 'pc', 'fci', 'ges' and 'lingam'.")
+                f"Supported options are: "
+                f"'nn', 'gbt', 'pc', 'fci', 'cam', 'notears', 'ges' and "
+                f"'lingam'.")
 
         return model_type
 
