@@ -16,7 +16,7 @@
 
 import argparse
 import os
-
+import networkx as nx
 import pandas as pd
 
 from causalgraph.common import (DEFAULT_BOOTSTRAP_TOLERANCE,
@@ -227,6 +227,8 @@ def combine_and_evaluate_dags(trainer, run_values):
             trainer[trainer_key].metrics = evaluate_graph(
                 run_values['true_dag'], estimator.dag, 
                 list(run_values['data'].columns))
+        else:
+            trainer[trainer_key].metrics = None
 
         return trainer[trainer_key]
 
@@ -248,6 +250,8 @@ def combine_and_evaluate_dags(trainer, run_values):
     if run_values['true_dag'] is not None:
         trainer[new_trainer].metrics = evaluate_graph(
             run_values['true_dag'], dag, list(run_values['data'].columns))
+    else:
+        trainer[new_trainer].metrics = None
 
     return trainer[new_trainer]
 
@@ -270,6 +274,49 @@ def show_run_values(run_values):
     print("-----")
 
 
+def printout_dag(graph, metrics):
+    """
+    This method prints the DAG to stdout in hierarchical order.
+
+    Parameters:
+    -----------
+    dag : nx.DiGraph
+        The DAG to be printed.
+    """
+    if len(graph.edges()) == 0:
+        print("Empty graph")
+        return
+
+    print("Resulting Graph:\n---------------")
+
+    def dfs(node, visited, indent=""):
+        if node in visited:
+            return  # Avoid revisiting nodes
+        visited.add(node)
+        
+        # Print edges for this node
+        for neighbor in graph.successors(node):
+            print(f"{indent}{node} -> {neighbor}")
+            dfs(neighbor, visited, indent + "  ")
+        
+    visited = set()
+    
+    # Start traversal from all nodes without predecessors (roots)
+    for node in graph.nodes:
+        if graph.in_degree(node) == 0:
+            dfs(node, visited)
+
+    # Handle disconnected components (not reachable from any "root")
+    for node in graph.nodes:
+        if node not in visited:
+            dfs(node, visited)
+
+    if metrics is not None:
+        print("\nGraph Metrics:\n-------------")
+        print(metrics)
+
+
+
 def header_():
     print(
 """   ____                      _  ____                 _
@@ -288,7 +335,7 @@ def main():
     trainer = create_experiments(**run_values)
     fit_experiments(trainer, run_values)
     result = combine_and_evaluate_dags(trainer, run_values)
-    print(result.metrics)
+    printout_dag(result.dag, result.metrics)
 
 
 if __name__ == "__main__":

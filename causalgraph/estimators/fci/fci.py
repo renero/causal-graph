@@ -117,7 +117,8 @@ class FCI:
             alpha=self.alpha,
             depth=self.depth,
             max_path_length=self.max_path_length,
-            verbose=self.verbose,
+            verbose=False,
+            show_progress=False,
             background_knowledge=self.background_knowledge,
             node_names=self.node_names
         )
