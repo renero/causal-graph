@@ -31,6 +31,7 @@ class FCI:
 
     def __init__(
             self,
+            name: str,
             independence_test_method: str = "fisherz",
             alpha: float = 0.05,
             depth: int = -1,
@@ -38,12 +39,14 @@ class FCI:
             verbose: bool = False,
             background_knowledge=None,
             show_progress: bool = True,
-            node_names=None):
+            node_names=None,
+            causes_only=True):
         """
         Initialize the FCI algorithm creating an FCI learner.
 
         Parameters
         ----------
+        name: str, name of the experiment
         independence_test_method: str, name of the function of the independence 
             test method being used: [fisherz, chisq, gsq, kci]
             - fisherz: Fisher's Z conditional independence test
@@ -57,8 +60,12 @@ class FCI:
             or -1 if unlimited.
         verbose: True is verbose output should be printed or logged
         background_knowledge: background knowledge
+        causes_only: bool, if True, only causes are returned
+            (default: True), by filtering the CPDAG and considering only
+            the edges indicating a causal relationship.
         """
         super().__init__()
+        self.name = name
         self.independence_test_method = independence_test_method
         self.alpha = alpha
         self.depth = depth
@@ -67,17 +74,19 @@ class FCI:
         self.background_knowledge = background_knowledge
         self.prog_bar = show_progress
         self.node_names = node_names
+        self.causes_only = causes_only
 
     def fit_predict(self,
                     X: pd.DataFrame,
-                    ref_graph: nx.DiGraph = None,
-                    causes_only=True):
+                    X_test: pd.DataFrame = None,
+                    ref_graph: nx.DiGraph = None):
         """
         Fits the model to the data and returns predictions.
 
         Parameters
         ----------
         X (pd.DataFrame): The input data to fit the model on.
+        X_test (pd.DataFrame): The input data to fit the model on.
         ref_graph (nx.DiGraph): The reference graph, or ground truth.
         causes_only: bool, if True, only causes are returned
             (default: True), by filtering the CPDAG and considering only
@@ -113,7 +122,7 @@ class FCI:
             node_names=self.node_names
         )
 
-        if causes_only:
+        if self.causes_only:
             adjacency_matrix = self.filter_causes_only(
                 adj_matrix=graph.graph)
             self.dag = utils.graph_from_adjacency(
@@ -151,7 +160,7 @@ class FCI:
             for j in range(adj_matrix.shape[1]):
                 # If G[i, j] = -1 and G[j, i] = 1, set result_matrix[i, j] to 1
                 if (adj_matrix[i, j] == -1 and adj_matrix[j, i] == 1) \
-                    or (adj_matrix[i, j] == 2 and adj_matrix[j, i] == 1):
+                        or (adj_matrix[i, j] == 2 and adj_matrix[j, i] == 1):
                     result_matrix[i, j] = 1
 
         return result_matrix
@@ -168,7 +177,7 @@ def main(dataset_name,
     data = pd.read_csv(f"{input_path}{dataset_name}.csv")
     ref_graph = utils.graph_from_dot_file(f"{input_path}{dataset_name}.dot")
 
-    fci = FCI(**kwargs)
+    fci = FCI(name=dataset_name, **kwargs)
     fci.fit_predict(X=data, ref_graph=ref_graph)
 
     if fci.dag:

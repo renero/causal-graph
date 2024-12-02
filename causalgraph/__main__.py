@@ -157,6 +157,8 @@ def check_args_validity(args):
     else:
         run_values['output_dag_file'] = args.output
 
+    # show_run_values(run_values)
+
     # return a dictionary with all the new variables created
     return run_values
 
@@ -178,8 +180,7 @@ def create_experiments(**args):
             output_path=args['output_path'],
             verbose=False)
         trainer[trainer_name].ref_graph = args['true_dag']
-        print(
-            f"Created experiment named '{trainer_name}'", flush=True)
+        # print(f"Created experiment named '{trainer_name}'", flush=True)
 
     return trainer
 
@@ -224,7 +225,8 @@ def combine_and_evaluate_dags(trainer, run_values):
         trainer[trainer_key].dag = estimator.dag
         if run_values['true_dag'] is not None:
             trainer[trainer_key].metrics = evaluate_graph(
-                run_values['true_dag'], estimator.dag, run_values['data'].columns)
+                run_values['true_dag'], estimator.dag, 
+                list(run_values['data'].columns))
 
         return trainer[trainer_key]
 
@@ -270,21 +272,18 @@ def show_run_values(run_values):
 
 def header_():
     print(
-        """
-   ____                      _  ____                 _
+"""   ____                      _  ____                 _
   / ___|__ _ _   _ ___  __ _| |/ ___|_ __ __ _ _ __ | |__
  | |   / _` | | | / __|/ _` | | |  _| '__/ _` | '_ \| '_ \\
  | |__| (_| | |_| \__ \ (_| | | |_| | | | (_| | |_) | | | |
   \____\__,_|\__,_|___/\__,_|_|\____|_|  \__,_| .__/|_| |_|
-                                              |_|
-""")
+                                              |_|""")
 
 
 def main():
     header_()
     args = parse_args()
     run_values = check_args_validity(args)
-    show_run_values(run_values)
 
     trainer = create_experiments(**run_values)
     fit_experiments(trainer, run_values)

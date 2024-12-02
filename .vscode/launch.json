@@ -17,9 +17,9 @@
             "args": [
                 "-d", "/Users/renero/phd/data/toy_dataset.csv",
                 "-t", "/Users/renero/phd/data/toy_dataset.dot",
-                // "-m", "cam",
-                "-i", "1",
-                "-b", "1",
+                "-m", "fci",
+                // "-i", "1",
+                // "-b", "1",
             ],
             "console": "integratedTerminal",
             "justMyCode": false,
