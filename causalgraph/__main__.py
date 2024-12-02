@@ -274,7 +274,7 @@ def show_run_values(run_values):
     print("-----")
 
 
-def printout_dag(graph, metrics):
+def printout_results(graph, metrics):
     """
     This method prints the DAG to stdout in hierarchical order.
 
@@ -335,7 +335,7 @@ def main():
     trainer = create_experiments(**run_values)
     fit_experiments(trainer, run_values)
     result = combine_and_evaluate_dags(trainer, run_values)
-    printout_dag(result.dag, result.metrics)
+    printout_results(result.dag, result.metrics)
 
 
 if __name__ == "__main__":
