@@ -1,4 +1,4 @@
-# causalgraph - A library to infer causal-effect relationships from continuous tabular data
+# `causalgraph` - A library to infer causal-effect relationships from tabular data
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/downloads/release/python-31012/)
 [![Travis](https://travis-ci.org/scikit-learn-contrib/project-template.svg?branch=master)](https://travis-ci.org/scikit-learn-contrib/project-template)
@@ -9,30 +9,27 @@
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
 
-**causalgraph** is a library that implements methods to extract the causal graph,
-from continuous tabular data, specifically the **ReX** method, and other compared methods
+**`causalgraph`** is a library that implements methods to extract the causal graph,
+from tabular data, specifically the **ReX** method, and other compared methods
 like GES, PC, FCI, LiNGAM, CAM, and NOTEARS.
 
-ReX isa causal discovery method that leverages machine learning (ML) models 
+ReX is a causal discovery method that leverages machine learning (ML) models 
 coupled with explainability techniques, specifically Shapley values, to 
 identify and interpret significant causal relationships among variables. 
-Comparative evaluations on synthetic datasets comprising continuous tabular 
-data reveal that **ReX** outperforms state-of-the-art causal discovery methods 
-across diverse data generation processes, including non-linear and additive 
-noise models. Moreover, ReX was tested on the Sachs single-cell 
-protein-signaling dataset, achieving a precision of 0.952 and recovering 
+Comparative evaluations on synthetic datasets comprising tabular data reveal that 
+ReX outperforms state-of-the-art causal discovery methods across diverse data 
+generation processes, including non-linear and additive noise models. Moreover, 
+ReX was tested on the Sachs single-cell protein-signaling dataset, achieving a 
+precision of 0.952 and recovering 
 key causal relationships with no incorrect edges. Taking together, these 
-results showcase ReX’s effectiveness in accurately recovering true causal 
+results showcase **ReX**’s effectiveness in accurately recovering true causal 
 structures while minimizing false positive pre- dictions, its robustness 
 across diverse datasets, and its applicability to real-world problems. 
 By combining ML and explainability techniques with causal discovery, **ReX** 
 bridges the gap between predictive modeling and causal inference, offering an 
 effective tool for understanding complex causal structures.
 
-<p align="center">
-    <img src="https://github.com/renero/causalgraph/blob/main/REX.png" 
-    alt="ReX Schema" width="700">
-</p>
+![ReX Schema](./REX.png)
 
 It is built using SKLearn estimators, so that it can be used in scikit-learn 
 pipelines and (hyper)parameter search, while facilitating testing (including 
@@ -46,25 +43,58 @@ the datasets in the `data` folder.
 
 ## Prerequisites without Docker
 
-WIP
+- Operating System: Linux or macOS
+- Environment Manager: PyEnv or Conda
+- Programming Language: Python 3.10.12 or higher
+- Hardware: CPU
 
 ## Installation
 
-At the moment, the library is not available in PyPI. You can install it from the source code:
+In the comming days the library will be made available in PyPI. 
+In the meantime, you can install it from the source code:
 
 ```bash
-git clone
-cd causalgraph
-pip install .
+$ git clone
+$ cd causalgraph
+$ pip install .
 ```
 
 ## Data
 
-WIP
+The datasets used to reproduce the results presented in the manuscript are 
+available under the `data` folder. The datasets were generated using the
+`generators` module.
 
 ## Executing `causalgraph`
 
-WIP
+To run `causalgraph` on your data, you can use the `causalgraph` command:
+
+```bash
+$ python -m causalgraph
+   ____                      _  ____                 _
+  / ___|__ _ _   _ ___  __ _| |/ ___|_ __ __ _ _ __ | |__
+ | |   / _` | | | / __|/ _` | | |  _| '__/ _` | '_ \| '_ \
+ | |__| (_| | |_| \__ \ (_| | | |_| | | | (_| | |_) | | | |
+  \____\__,_|\__,_|___/\__,_|_|\____|_|  \__,_| .__/|_| |_|
+                                              |_|
+usage: causalgraph [-h] -d DATASET [-m {rex,pc,fci,ges,lingam,cam,notears}] 
+                   [-t TRUE_DAG] [-l LOAD_MODEL] [-T THRESHOLD] [-u UNION] 
+                   [-i ITERATIONS] [-b BOOTSTRAP] [-r REGRESSOR] [-S SEED] 
+                   [-s [SAVE_MODEL]] [-v] [-q] [-o OUTPUT]
+```
+
+that will present you with a menu to choose the dataset you want to use, the 
+method you want to use to infer the causal graph, and the hyperparameters you
+want to use.
+
+The minimum required to run `causalgraph` is a dataset file in CSV format,
+with the first row containing the names of the variables, and the rest of
+the rows containing the values of the variables. The method selected by default
+is ReX, but you can also choose between PC, FCI, GES, LiNGAM, CAM, NOTEARS. 
+At the end of the execution, the edges of the plausible causal graph will be 
+displayed along with the metrics obtained, if the true dag is provided 
+(argument `-t`).
+
 
 ## Example commands
 
