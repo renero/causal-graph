@@ -98,7 +98,19 @@ displayed along with the metrics obtained, if the true dag is provided
 
 ## Example commands
 
-WIP
+The following command illustrates how to run `causalgraph` on the Sachs dataset
+using the ReX method:
+
+```bash
+$ python -m causalgraph -d /path/to/sachs.csv -t /path/to/sachs.dot
+```
+
+The same command can be used to run `causalgraph` on the Sachs dataset using the
+CAM method:
+
+```bash
+$ python -m causalgraph -d /path/to/sachs.csv -m cam -t /path/to/sachs.dot
+```
 
 ## Input Arguments Information
 
