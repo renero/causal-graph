@@ -25,6 +25,9 @@ from causalgraph.common import (DEFAULT_BOOTSTRAP_TOLERANCE,
 from causalgraph.common.notebook import Experiment
 
 
+SUPPORTED_METHODS = ['rex', 'pc', 'fci', 'ges', 'lingam', 'cam', 'notears']
+
+
 def parse_args():
     class SplitArgs(argparse.Action):
         def __call__(self, parser, namespace, values, option_string=None):
@@ -82,89 +85,79 @@ def parse_args():
 
 
 def check_args_validity(args):
+    """
+    Check the validity of the arguments.
+
+    Returns:
+        dict: A dictionary of run values
+    """
+    run_values = {}
+
     # Set model type (estimator)
     if args.method is None:
         args.method = 'rex'
-        estimator = 'rex'
+        run_values['estimator'] = 'rex'
     else:
-        assert args.method in ['rex', 'pc', 'fci',
-                               'ges', 'lingam', 'cam', 'notears']
-        "Method must be one of: 'rex', 'pc', 'fci', 'ges', 'lingam', 'cam', 'notears'"
-        estimator = str(args.method)
+        assert args.method in SUPPORTED_METHODS
+        "Method must be one of: rex, pc, fci, ges, lingam, cam, notears"
+        run_values['estimator'] = str(args.method)
 
     # Check that the dataset file exist, and load it (data)
     assert args.dataset is not None, "Dataset file must be specified"
     assert os.path.isfile(args.dataset), "Dataset file does not exist"
-    data = pd.read_csv(args.dataset)
-    dataset_filepath = args.dataset
+    run_values['data'] = pd.read_csv(args.dataset)
+    run_values['dataset_filepath'] = args.dataset
 
     # Extract the path from where the dataset is, dataset basename
-    dataset_path = os.path.dirname(args.dataset)
+    run_values['dataset_path'] = os.path.dirname(args.dataset)
     dataset_name = os.path.basename(args.dataset)
-    dataset_name = dataset_name.replace('.csv', '')
+    run_values['dataset_name'] = dataset_name.replace('.csv', '')
 
     # Load true DAG, if specified (true_dag)
-    true_dag = None
+    run_values['true_dag'] = None
     if args.true_dag is not None:
         assert '.dot' in args.true_dag, "True DAG must be in .dot format"
         assert os.path.isfile(args.true_dag), "True DAG file does not exist"
-        true_dag = utils.graph_from_dot_file(args.true_dag)
+        run_values['true_dag'] = utils.graph_from_dot_file(args.true_dag)
 
     # Determine where to save the model pickle.
     if args.save_model is None or args.save_model == '':
         save_model = f"{args.dataset.replace('.csv', '')}.pickle"
-        save_model = os.path.basename(save_model)
+        run_values['save_model'] = os.path.basename(save_model)
         # Output_path is the current directory
-        output_path = os.getcwd()
-        model_filename = utils.valid_output_name(
-            filename=save_model, path=output_path)
+        run_values['output_path'] = os.getcwd()
+        run_values['model_filename'] = utils.valid_output_name(
+            filename=save_model, path=run_values['output_path'])
     else:
-        save_model = args.save_model
-        output_path = os.path.dirname(save_model)
-        model_filename = args.save_model
+        run_values['save_model'] = args.save_model
+        run_values['output_path'] = os.path.dirname(save_model)
+        run_values['model_filename'] = args.save_model
 
     # Set default regressors in case ReX is called.
     if args.method == 'rex' and args.regressor is None:
-        regressors = DEFAULT_REGRESSORS
+        run_values['regressors'] = DEFAULT_REGRESSORS
+        run_values['seed'] = args.seed if args.seed is not None else DEFAULT_SEED
+        run_values['hpo_iterations'] = args.iterations \
+            if args.iterations is not None else DEFAULT_HPO_TRIALS
+        run_values['bootstrap_iterations'] = args.bootstrap \
+            if args.bootstrap is not None else DEFAULT_BOOTSTRAP_TRIALS
+        run_values['bootstrap_tolerance'] = args.threshold \
+            if args.threshold is not None else DEFAULT_BOOTSTRAP_TOLERANCE
+        run_values['quiet'] = True if args.quiet else False
     else:
-        regressors = [args.method]
+        run_values['regressors'] = [args.method]
 
-    seed = args.seed if args.seed is not None else DEFAULT_SEED
-
-    hpo_iterations = args.iterations if args.iterations is not None \
-        else DEFAULT_HPO_TRIALS
-    bootstrap_iterations = args.bootstrap if args.bootstrap is not None \
-        else DEFAULT_BOOTSTRAP_TRIALS
-    bootstrap_tolerance = args.threshold if args.threshold is not None \
-        else DEFAULT_BOOTSTRAP_TOLERANCE
-
-    verbose = True if args.verbose else False
-    quiet = True if args.quiet else False
+    run_values['verbose'] = True if args.verbose else False
     if args.output is None:
-        output_dag_file = utils.valid_output_name(
-            filename=dataset_name, path=output_path, extension="dot")
+        run_values['output_dag_file'] = utils.valid_output_name(
+            filename=run_values['dataset_name'], 
+            path=run_values['output_path'], 
+            extension="dot")
     else:
-        output_dag_file = args.output
+        run_values['output_dag_file'] = args.output
 
     # return a dictionary with all the new variables created
-    return {
-        'estimator': estimator,
-        'regressors': regressors,
-        'data': data,
-        'dataset_filepath': dataset_filepath,
-        'dataset_name': dataset_name,
-        'dataset_path': dataset_path,
-        'true_dag': true_dag,
-        'model_filename': model_filename,
-        'output_path': output_path,
-        'seed': seed,
-        'hpo_iterations': hpo_iterations,
-        'bootstrap_iterations': bootstrap_iterations,
-        'bootstrap_tolerance': bootstrap_tolerance,
-        'verbose': verbose,
-        'quiet': quiet,
-        'output_dag_file': output_dag_file
-    }
+    return run_values
 
 
 def create_experiments(**args):
@@ -198,11 +191,16 @@ def fit_experiments(trainer, run_values):
         trainer (dict): A dictionary of Experiment objects
         run_values (dict): A dictionary of run values
     """
-    xargs = {
-        'verbose': run_values['verbose'],
-        'hpo_n_trials': run_values['hpo_iterations'],
-        'bootstrap_trials': run_values['bootstrap_iterations']
-    }
+    if run_values['estimator'] == 'rex':
+        xargs = {
+            'verbose': run_values['verbose'],
+            'hpo_n_trials': run_values['hpo_iterations'],
+            'bootstrap_trials': run_values['bootstrap_iterations']
+        }
+    else:
+        xargs = {
+            'verbose': run_values['verbose']
+        }
 
     for trainer_name, experiment in trainer.items():
         experiment.fit_predict(estimator=run_values['estimator'], **xargs)
@@ -220,7 +218,8 @@ def retrieve_dag(trainer, run_values):
         nx.DiGraph: The combined DAG
     """
     if run_values['estimator'] != 'rex':
-        estimator = getattr(trainer, run_values['estimator'])
+        trainer_key = f"{run_values['dataset_name']}_{run_values['estimator']}"
+        estimator = getattr(trainer[trainer_key], run_values['estimator'])
         return estimator.dag
 
     estimator1 = getattr(trainer[list(trainer.keys())[0]], 'rex')
@@ -242,9 +241,9 @@ def show_run_values(run_values):
     print("Run values:")
     for k, v in run_values.items():
         if isinstance(v, pd.DataFrame):
-            print(f"{k}: {v.shape[0]}x{v.shape[1]} DataFrame")
+            print(f"- {k}: {v.shape[0]}x{v.shape[1]} DataFrame")
             continue
-        print(f"{k}: {v}")
+        print(f"- {k}: {v}")
 
     print("-----")
 

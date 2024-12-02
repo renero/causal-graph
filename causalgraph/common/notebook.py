@@ -166,8 +166,8 @@ class BaseExperiment:
             print(f"Estimator '{estimator_name}' not found.")
             return None
 
-        # Special case: when estimator is ReX, model_type needs also to be passed to
-        # the constructor
+        # Special case: when estimator is ReX, model_type needs also to be 
+        # passed to the constructor
         if estimator_name == 'rex':
             kwargs['model_type'] = self.model_type
 
