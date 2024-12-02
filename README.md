@@ -1,3 +1,5 @@
+# causalgraph - A library to infer causal-effect relationships from continuous tabular data
+
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/downloads/release/python-31012/)
 [![Travis](https://travis-ci.org/scikit-learn-contrib/project-template.svg?branch=master)](https://travis-ci.org/scikit-learn-contrib/project-template)
 [![AppVeyor](https://ci.appveyor.com/api/projects/status/coy2qqaqr1rnnt5y/branch/master?svg=true)](https://ci.appveyor.com/project/glemaitre/project-template)
@@ -6,7 +8,6 @@
 [![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20macOS-lightgrey.svg)](#)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
-# causalgraph - A library to infer causal-effect relationships from continuous tabular data
 
 **causalgraph** is a library that implements methods to extract the causal graph,
 from continuous tabular data, specifically the **ReX** method, and other compared methods
@@ -28,7 +29,7 @@ By combining ML and explainability techniques with causal discovery, **ReX**
 bridges the gap between predictive modeling and causal inference, offering an 
 effective tool for understanding complex causal structures.
 
-![ReX](https://raw.githubusercontent.com/renero/causalgraph/main/docs/_static/rex.png)
+![ReX](https://github.com/renero/causalgraph/main/docs/_static/rex.png)
 
 It is built using SKLearn estimators, so that it can be used in scikit-learn 
 pipelines and (hyper)parameter search, while facilitating testing (including 
@@ -40,6 +41,10 @@ module, which is also part of this library. But in case you want to
 reproduce results from the articles that we used as reference, you can find 
 the datasets in the `data` folder.
 
+## Prerequisites without Docker
+
+WIP
+
 ## Installation
 
 At the moment, the library is not available in PyPI. You can install it from the source code:
@@ -50,3 +55,22 @@ cd causalgraph
 pip install .
 ```
 
+## Data
+
+WIP
+
+## Executing `causalgraph`
+
+WIP
+
+## Example commands
+
+WIP
+
+## Input Arguments Information
+
+WIP
+
+## Additional Information
+
+WIP
