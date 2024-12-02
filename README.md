@@ -29,7 +29,10 @@ By combining ML and explainability techniques with causal discovery, **ReX**
 bridges the gap between predictive modeling and causal inference, offering an 
 effective tool for understanding complex causal structures.
 
-![ReX](https://github.com/renero/causalgraph/main/docs/_static/rex.png)
+<p align="center">
+    <img src="https://github.com/renero/causalgraph/blob/main/REX.png" 
+    alt="ReX Schema" width="700">
+</p>
 
 It is built using SKLearn estimators, so that it can be used in scikit-learn 
 pipelines and (hyper)parameter search, while facilitating testing (including 
