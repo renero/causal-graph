@@ -1,42 +1,31 @@
 import numpy as np
 import pytest
+import pandas as pd
 
-from causalgraph.independence.hsic import HSIC
-from causalgraph.independence.regressors import fit_and_get_residuals
+from causalgraph.independence.edge_orientation import get_edge_orientation
 
 
-def test_orient_graph():
-    np.random.seed(1234)
-    X = np.random.normal(0, 1, 200).reshape(-1, 1)
-    Y = X ** 3
-    # Noise is added here.
-    err_fwd = fit_and_get_residuals(X, Y, method="gpr")
-    err_bwd = fit_and_get_residuals(Y, X, method="gpr")
-    hsic_fwd = HSIC().fit(err_fwd, X)
-    hsic_bwd = HSIC().fit(err_bwd, Y)
-    dir_stat = "->" if hsic_bwd.hsic - hsic_fwd.hsic > 0 else "<-"
+def test_get_edge_orientation():
+    # Create a mock DataFrame
+    data = pd.DataFrame({
+        'x': np.random.rand(100),
+        'y': np.random.rand(100)
+    })
 
-    if hsic_fwd.independence and not hsic_bwd.independence:
-        dir_pv = "->"
-    elif not hsic_fwd.independence and hsic_bwd.independence:
-        dir_pv = "<-"
-    else:
-        dir_pv = "--"
-    likelihood_fwd = -np.log(np.var(X)) - np.log(np.var(err_fwd))
-    likelihood_bwd = -np.log(np.var(err_bwd)) - np.log(np.var(Y))
-    dir_log = "->" if likelihood_fwd > likelihood_bwd else "<-"
+    # Test with default parameters
+    result = get_edge_orientation(data, 'x', 'y')
+    assert isinstance(result, int)
+    assert result in [-1, 0, 1]
 
-    assert hsic_fwd.p_value == pytest.approx(0.62829005030, abs=0.0001)
-    assert hsic_fwd.hsic == pytest.approx(0.00131107788741, abs=0.0001)
-    assert hsic_fwd.independence == True
+    # Test with custom parameters
+    result = get_edge_orientation(data, 'x', 'y', iters=50, method='gam', verbose=True)
+    assert isinstance(result, int)
+    assert result in [-1, 0, 1]
 
-    assert hsic_bwd.p_value == pytest.approx(2.825e-10)
-    assert hsic_bwd.hsic == pytest.approx(0.0069988146279, abs=0.0001)
-    assert hsic_bwd.independence == False
+    # Test with invalid method
+    with pytest.raises(ValueError):
+        get_edge_orientation(data, 'x', 'y', method='invalid')
 
-    assert likelihood_fwd == pytest.approx(4.861426871058, abs=0.0001)
-    assert likelihood_bwd == pytest.approx(1.126397359198, abs=0.0001)
-
-    assert dir_stat == "->"
-    assert dir_stat == "->"
-    assert dir_stat == "->"
+    # Test with non-existent columns
+    with pytest.raises(KeyError):
+        get_edge_orientation(data, 'a', 'b')

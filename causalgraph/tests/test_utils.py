@@ -5,8 +5,8 @@ import pytest
 import torch
 
 from causalgraph.common import utils
-from causalgraph.estimators.knowledge import Knowledge
-from causalgraph.estimators.rex import Rex
+from causalgraph.estimators.rex.knowledge import Knowledge
+from causalgraph.estimators.rex.rex import Rex
 from causalgraph.explainability.hierarchies import Hierarchies
 from causalgraph.explainability.perm_importance import PermutationImportance
 from causalgraph.models.dnn import NNRegressor

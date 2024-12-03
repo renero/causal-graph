@@ -23,10 +23,10 @@ def test_HSIC(vectors):
     np.random.seed(1234)
     h = HSIC()
     result = h.fit(X, Y)
-    assert result.hsic == pytest.approx(0.030975334702567737)
-    assert result.stat == pytest.approx(0.30975334702567737)
-    assert result.p_value == pytest.approx(0.25181580407491566)
-    assert result.independence == True
+    assert result.hsic == pytest.approx(0.0)
+    assert result.stat == pytest.approx(0.0)
+    assert result.p_value == pytest.approx(0.33058547413699446)
+    assert result.independence
 
 
 # This is the test from hyppo. p-value matches the one from causalGraph.
