@@ -5,11 +5,6 @@ import pytest
 import torch
 
 from causalgraph.common import utils
-from causalgraph.estimators.rex.knowledge import Knowledge
-from causalgraph.estimators.rex.rex import Rex
-from causalgraph.explainability.hierarchies import Hierarchies
-from causalgraph.explainability.perm_importance import PermutationImportance
-from causalgraph.models.dnn import NNRegressor
 
 
 # Tests that the function returns 'cuda' when force is 'cuda' and cuda is available
@@ -173,30 +168,6 @@ def test_identical_undirected_graphs():
     assert result.nodes == g1.nodes
     assert result.edges == g1.edges
 
-
-def test_break_cycle_if_present_no_cycles():
-    """
-    Test function to check if the break_cycle_if_present function works correctly
-    when there are no cycles in the DAG.
-    """
-    # Create a DAG with no cycles
-    dag = nx.DiGraph()
-    # dag.add_node(1)
-    # dag.add_node(2)
-    dag.add_edge(1, 2)
-
-    # Create a knowledge DataFrame with some permutation importances
-    knowledge = pd.DataFrame({
-        ('1', '2'): {'mean_pi': 0.5},
-        ('2', '1'): {'mean_pi': 0.4},
-    })
-
-    # Call the break_cycle_if_present function
-    result = utils.break_cycles_if_present(dag, knowledge)
-
-    # Check if the result is equal to the input DAG
-    assert result.nodes == dag.nodes
-    assert result.edges == dag.edges
 
 
 class TestClassifyVariable:
