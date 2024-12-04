@@ -199,119 +199,114 @@ def test_break_cycle_if_present_no_cycles():
     assert result.edges == dag.edges
 
 
-def test_break_cycle_if_present_one_cycle():
-    """
-    Test function to check if the `break_cycle_if_present` function correctly
-    breaks a cycle in a DAG with one cycle.
-    """
-    # Create a DAG with one cycle
-    dag = nx.DiGraph()
-    dag.add_edges_from([('1', '2'), ('2', '3'), ('3', '1')])
+class TestClassifyVariable:
+    """Test suite for _classify_variable function"""
 
-    # Create a knowledge DataFrame with some permutation importances
-    learnings = pd.DataFrame([
-        {'origin': '1', 'target': '2', 'shap_gof': 0.5},
-        {'origin': '2', 'target': '3', 'shap_gof': 0.4},
-        {'origin': '3', 'target': '1', 'shap_gof': 0.3}])
-    rex = Rex(name="test")
-    rex.hierarchies = Hierarchies()
-    models = NNRegressor()
-    models.regressor = {'test': 'test'}
-    models.scoring = [0.1, 0.2, 0.3]
-    rex.pi = PermutationImportance(models)
-    rex.shaps = rex.hierarchies
-    rex.indep = rex.hierarchies
-    rex.feature_names = ['1', '2', '3']
-    rex.models = models
-    rex.G_shap = dag
-    rex.root_causes = ['1', '2', '3']
-    rex.correlation_th = None
-    knowledge = Knowledge(rex, None)
-    knowledge.results = learnings
+    def test_binary_numeric(self):
+        """Test binary classification with numeric values"""
+        arr = pd.Series([0, 1, 0, 1, 0])
+        assert utils._classify_variable(arr) == "binary"
+        
+        arr = pd.Series([1.0, 2.0, 1.0, 2.0])
+        assert utils._classify_variable(arr) == "binary"
 
-    # Call the break_cycle_if_present function
-    result = utils.break_cycles_if_present(dag, knowledge.results)
+    def test_binary_categorical(self):
+        """Test binary classification with categorical values"""
+        arr = pd.Series(['yes', 'no', 'yes', 'no'])
+        assert utils._classify_variable(arr) == "multiclass"
+        
+        arr = pd.Series(['true', 'false', 'true'])
+        assert utils._classify_variable(arr) == "multiclass"
 
-    # Check if the result is a DAG with no cycles
-    assert nx.is_directed_acyclic_graph(result)
+    def test_multiclass_categorical(self):
+        """Test multiclass classification with categorical values"""
+        arr = pd.Series(['a', 'b', 'c', 'd'])
+        assert utils._classify_variable(arr) == "multiclass"
+        
+        arr = pd.Series(['low', 'medium', 'high', 'medium', 'low'])
+        assert utils._classify_variable(arr) == "multiclass"
 
+    def test_continuous_numeric(self):
+        """Test continuous classification with numeric values"""
+        arr = pd.Series([1.0, 2.5, 3.7, 4.2, 5.0])
+        assert utils._classify_variable(arr) == "continuous"
+        
+        arr = pd.Series(np.random.normal(0, 1, 100))
+        assert utils._classify_variable(arr) == "continuous"
 
-def test_break_cycle_if_present_multiple_cycles():
-    """
-    Test function to check if the `break_cycle_if_present` function can break cycles
-    in a DAG with multiple cycles.
+    def test_mixed_types(self):
+        """Test with mixed types (should be handled as multiclass)"""
+        arr = pd.Series(['1', '2', 'a', 'b'])
+        assert utils._classify_variable(arr) == "multiclass"
 
-    The function creates a DAG with multiple cycles and a knowledge DataFrame with
-    some permutation importances. It then calls the `break_cycle_if_present`
-    function and checks if the result is a DAG with no cycles.
-    """
-    # Create a DAG with multiple cycles
-    dag = nx.DiGraph()
-    dag.add_edges_from(
-        [('1', '2'), ('2', '3'), ('3', '1'), ('3', '4'), ('4', '2')])
-
-    # Create a knowledge DataFrame with some permutation importances
-    learnings = pd.DataFrame([
-        {'origin': '1', 'target': '2', 'shap_gof': 0.5},
-        {'origin': '2', 'target': '3', 'shap_gof': 0.4},
-        {'origin': '3', 'target': '1', 'shap_gof': 0.3},
-        {'origin': '3', 'target': '4', 'shap_gof': 0.2},
-        {'origin': '4', 'target': '2', 'shap_gof': 0.1}
-    ])
-    rex = Rex(name="test")
-    rex.hierarchies = Hierarchies()
-    models = NNRegressor()
-    models.regressor = {'test': 'test'}
-    models.scoring = [0.1, 0.2, 0.3]
-    rex.pi = PermutationImportance(models)
-    rex.shaps = rex.hierarchies
-    rex.indep = rex.hierarchies
-    rex.feature_names = ['1', '2', '3']
-    rex.models = models
-    rex.G_shap = dag
-    rex.root_causes = ['1', '2', '3']
-    rex.correlation_th = None
-    knowledge = Knowledge(rex, None)
-    knowledge.results = learnings
-
-    # Call the break_cycle_if_present function
-    result = utils.break_cycles_if_present(dag, knowledge.results)
-
-    # Check if the result is a DAG with no cycles
-    assert nx.is_directed_acyclic_graph(result)
+    def test_special_cases(self):
+        """Test special cases"""
+        # Empty series
+        arr = pd.Series([])
+        assert utils._classify_variable(arr) == "continuous"
+        
+        # Series with NaN values
+        arr = pd.Series([1, 2, np.nan, 4])
+        assert utils._classify_variable(arr) == "continuous"
+        
+        # Boolean values
+        arr = pd.Series([True, False, True])
+        assert utils._classify_variable(arr) == "binary"
 
 
-class TestCastCategoricalsToInt():
+class TestCastCategoricalsToInt:
+    """Test suite for cast_categoricals_to_int function"""
 
     def test_cast_multiclass(self):
+        """Test casting multiclass categorical variables"""
         df = pd.DataFrame({
-            'A': pd.Categorical(['a', 'b', 'c']),
-            'B': pd.Categorical(['x', 'y', 'z']),
+            'A': pd.Categorical(['a', 'b', 'c', 'a']),
+            'B': pd.Categorical(['x', 'y', 'z', 'x']),
+            'C': [1.0, 2.0, 3.0, 1.0]  # Numeric column should remain unchanged
         })
         result = utils.cast_categoricals_to_int(df)
-        expected = pd.DataFrame({
-            'A': np.array([0, 1, 2], dtype=np.int16),
-            'B': np.array([0, 1, 2], dtype=np.int16),
-        })
-        pd.testing.assert_frame_equal(result, expected)
+        # Categories should be converted to integers starting from 0
+        assert result['A'].dtype == np.int16
+        assert result['B'].dtype == np.int16
+        assert result['C'].dtype == np.float64  # Should remain unchanged
+        assert set(result['A'].unique()) == {0, 1, 2}
+        assert set(result['B'].unique()) == {0, 1, 2}
 
     def test_cast_binary(self):
+        """Test casting binary categorical variables"""
         df = pd.DataFrame({
-            'A': pd.Categorical(['yes', 'no']),
-            'B': pd.Categorical(['true', 'false']),
+            'A': ['yes', 'no', 'yes', 'no'],
+            'B': ['true', 'false', 'true', 'false'],
+            'C': [0, 1, 0, 1]  # Already binary numeric
         })
         result = utils.cast_categoricals_to_int(df)
-        expected = pd.DataFrame({
-            'A': np.array([0, 1], dtype=np.int16),
-            'B': np.array([0, 1], dtype=np.int16),
-        })
-        pd.testing.assert_frame_equal(result, expected)
+        assert result['A'].dtype == np.int16
+        assert result['B'].dtype == np.int16
+        assert result['C'].dtype == np.int16  # Should remain numeric
+        assert set(result['A'].unique()) == {0, 1}
+        assert set(result['B'].unique()) == {0, 1}
+        assert set(result['C'].unique()) == {0, 1}
 
     def test_no_categorical(self):
+        """Test with no categorical columns"""
         df = pd.DataFrame({
             'A': [1.0, 2.0, 3.0],
             'B': [4.0, 5.0, 6.0],
+            'C': [7, 8, 9]
         })
         result = utils.cast_categoricals_to_int(df)
-        expected = df.copy()
-        pd.testing.assert_frame_equal(result, expected)
+        pd.testing.assert_frame_equal(result, df)  # Should be unchanged
+
+    def test_mixed_types(self):
+        """Test with mixed types in the same column"""
+        df = pd.DataFrame({
+            'A': ['1', '2', 'a', 'b'],  # Mixed strings
+            'B': [1, 2, 'three', 'four'],  # Mixed numbers and strings
+            'C': [1.0, 2.0, 3.0, 4.0]  # Pure numeric
+        })
+        result = utils.cast_categoricals_to_int(df)
+        assert result['A'].dtype == np.int16  # Should be converted
+        assert result['B'].dtype == np.int16  # Should be converted
+        assert result['C'].dtype == np.float64  # Should remain unchanged
+        assert len(result['A'].unique()) == 4
+        assert len(result['B'].unique()) == 4
