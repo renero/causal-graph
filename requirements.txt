@@ -17,7 +17,6 @@ pydot
 pydotplus
 pygam
 pytest
-pytest
 python_igraph
 pytorch_lightning
 scikit_learn
@@ -32,4 +31,3 @@ statsmodels
 timeout_decorator
 torch
 tqdm
-sphinx_galler
