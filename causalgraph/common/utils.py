@@ -666,7 +666,8 @@ def break_cycles_if_present(
     cycles_info = []
     while len(cycles) > 0:
         cycle = cycles.pop(0)
-        # For every pair of consecutive nodes in the cycle, store its SHAP discrepancy
+        # For every pair of consecutive nodes in the cycle, store its SHAP 
+        # discrepancy
         cycle_edges = {}
         for node in cycle:
             if node == cycle[-1]:
@@ -683,7 +684,8 @@ def break_cycles_if_present(
                     min_gof][0]
 
         # Check if any of the edges in the loop is potentially misoriented.
-        # If so, change the orientation of the edge with the lowest SHAP discrepancy
+        # If so, change the orientation of the edge with the lowest SHAP 
+        # discrepancy
         potential_misoriented = potential_misoriented_edges(
             cycle, discrepancies, verbose)
         if len(potential_misoriented) > 0:
@@ -691,7 +693,8 @@ def break_cycles_if_present(
                 print("Potential misoriented edges in the cycle:")
                 for edge in potential_misoriented:
                     print(f"  {edge[0]} --> {edge[1]} ({edge[2]:.3f})")
-            # Check if changing the orientation of the edge would break the cycle
+            # Check if changing the orientation of the edge would break 
+            # the cycle
             test_dag = new_dag.copy()
 
             # Check if the edge is yet in the test_dag
@@ -738,10 +741,10 @@ def graph_from_adjacency(
         node_labels: an array of same length as nr of columns in the adjacency
             matrix containing the labels to use with every node.
         th: (float) weight threshold to be considered a valid edge.
-        inverse (bool): Set to true if rows in adjacency reflects where edges are
-            comming from, instead of where are they going to.
-        absolute_values: Take absolute value of weight label to check if its greater
-            than the threshold.
+        inverse (bool): Set to true if rows in adjacency reflects where edges 
+            are comming from, instead of where are they going to.
+        absolute_values: Take absolute value of weight label to check if 
+            its greater than the threshold.
 
     Returns:
          The Graph (DiGraph)
@@ -789,12 +792,12 @@ def graph_from_adjacency_file(
     Args:
         file: (str) the full path of the file to read
         labels: (List[str]) the list of node names to be used. If None, the
-            node names are extracted from the adj file. The names must be already
-            sorted in the same order as the adjacency matrix.
+            node names are extracted from the adj file. The names must be 
+            already sorted in the same order as the adjacency matrix.
         th: (float) weight threshold to be considered a valid edge.
         sep: (str) the separator used in the file
-        header: (bool) whether the file has a header. If True, then 'infer' is used
-            to read the header.
+        header: (bool) whether the file has a header. If True, then 'infer' 
+        is used to read the header.
     Returns:
         DiGraph, DataFrame
     """
@@ -861,7 +864,10 @@ def graph_to_adjacency(
     return mat
 
 
-def graph_to_adjacency_file(graph: AnyGraph, output_file: Union[Path, str], labels):
+def graph_to_adjacency_file(
+        graph: AnyGraph, 
+        output_file: Union[Path, str], 
+        labels):
     """
     A method to write the adjacency matrix of the graph to a file. If graph has
     weights, these are the values stored in the adjacency matrix.
@@ -869,6 +875,7 @@ def graph_to_adjacency_file(graph: AnyGraph, output_file: Union[Path, str], labe
     Args:
         graph: (Union[Graph, DiGraph] the graph to be saved
         output_file: (str) The full path where graph is to be saved
+        labels: (List[str]) the list of node names to be used.
     """
     mat = graph_to_adjacency(graph, labels)
     with open(output_file, "w", encoding="utf-8") as f:
@@ -957,35 +964,27 @@ def get_feature_names(X: Union[pd.DataFrame, np.ndarray, list]) -> List[str]:
     return feature_names
 
 
-def _classify_variable(arr):
+def _classify_variable(arr:pd.Series) -> str:
     """
-    Classify the type of variable in the array. The classification is done
-    based on the number of unique values in the array. If the array has only
-    two unique values, then the variable is classified as binary. If the
-    unique values are integers, then the variable is classified as multiclass.
-    Otherwise, the variable is classified as continuous.
+    This method inspect the contents of the array and returns the type of the
+    variable. If the variables are NOT numbers, then it returns multiclass. If
+    the variable is a number, then it returns binary if it has only two unique
+    values. If the number of unique values is greater than two, then it returns
+    continuous.
 
-    Parameters:
-    -----------
-    arr (numpy.ndarray): The array to be classified.
+    Args:
+        arr (pd.Series): The array to be inspected.
 
     Returns:
-    --------
-    str: The classification of the variable
-
-    Example:
-    --------
-    >>> arr = np.array([1, 2, 3, 4, 5])
-    >>> classify_variable(arr)
-    'multiclass'
+        str: The type of the variable. Can be binary, multiclass or continuous.
     """
-    unique_values = np.unique(arr)
-    num_unique = len(unique_values)
-
-    if num_unique == 2:
-        return "binary"
-    elif np.all(unique_values.astype(np.int64) == unique_values):
+    unique_values = arr.unique()
+    # Check if the variable is not a number
+    if unique_values.dtype.kind not in "biufc":
         return "multiclass"
+    # Check if the variable has only two unique values
+    elif len(unique_values) == 2:
+        return "binary"
     else:
         return "continuous"
 
@@ -1047,9 +1046,13 @@ def cast_categoricals_to_int(X: pd.DataFrame) -> pd.DataFrame:
     """
     X = X.copy()
     for feature in X.columns:
-        feature_dtype = _classify_variable(X[feature].values)
+        feature_dtype = _classify_variable(X[feature])
         if feature_dtype == "multiclass" or feature_dtype == "binary":
-            X[feature] = X[feature].astype(np.int16)
+            # Convert all the values to integers. For example, 'a' -> 0, 'b' ->
+            # 1, 'c' -> 2, respecting the order of the unique values.abs
+            X[feature] = X[feature].astype("category")
+            X[feature] = X[feature].cat.codes
+            X[feature] = X[feature].astype("int16")
 
     return X
 
