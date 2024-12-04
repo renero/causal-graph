@@ -165,10 +165,15 @@ def get_backdoor_paths(dag: nx.DiGraph, x: str, y: str):
     # Check if x or y are not in the graph
     if x not in dag.nodes() or y not in dag.nodes():
         return []
+    
+    # If x and y are the same node, return empty list
+    if x == y:
+        return []
+        
     undirected_graph = dag.to_undirected()
     # list all paths between 'x' and 'y'
     paths = (p for p in nx.all_simple_paths(
-        undirected_graph, source=x, target=y) if dag.has_edge(p[1], x))
+        undirected_graph, source=x, target=y) if len(p) > 1 and dag.has_edge(p[1], x))
     return list(paths)
 
 
@@ -189,10 +194,12 @@ def get_paths(graph: nx.DiGraph, x: str, y: str):
     # Check if x or y are not in the graph
     if x not in graph.nodes() or y not in graph.nodes():
         return []
-    undirected_graph = graph.to_undirected()
-    # list all paths between 'x' and 'y'
-    paths = list(nx.all_simple_paths(undirected_graph, source=x, target=y))
-    return paths
+    
+    # If x and y are the same node, return empty list
+    if x == y:
+        return []
+        
+    return list(nx.all_simple_paths(graph, source=x, target=y))
 
 
 def find_colliders_in_path(dag: nx.DiGraph, path: List[str]):
@@ -276,12 +283,12 @@ def get_sufficient_sets_for_pair(dag, x, y, verbose=False):
         if len(colliders) > 0:
             if verbose:
                 print(
-                    f"        🚫 {sufficient_set} contains a collider: {colliders}")
+                    f"        {sufficient_set} contains a collider: {colliders}")
             continue
         all_conditions = True
         for path in backdoor_paths:
             if verbose:
-                print(f"      ↳ Checking path {path}")
+                print(f"      Checking path {path}")
             # Check that this path can be blocked by any node in the sufficient set
             # The path is blocked if any of the nodes in the sufficient set
             # is in the path
@@ -305,27 +312,27 @@ def get_sufficient_sets_for_pair(dag, x, y, verbose=False):
                     if verbose:
                         print(
                             f"          Path {path} blocked by nodes in "
-                            f"{sufficient_set} ✅")
+                            f"{sufficient_set} ")
                 elif len(nodes_in_path) == len(colliders):
                     if verbose:
                         print(f"      ALL nodes in {sufficient_set} are colliders "
-                              f"in {path} ❌\n"
+                              f"in {path} \n"
                               f"      => {nodes_in_path.intersection(colliders)} == "
                               f"{colliders}")
                     all_conditions = False
                 else:
                     if verbose:
                         print(f"      Some nodes in {sufficient_set} are NOT colliders "
-                              f"in {path} ✅")
+                              f"in {path} ")
             else:
                 if verbose:
                     print(f"        No nodes in {sufficient_set} are in {path}, "
-                          f"so they do not block this path ❌")
+                          f"so they do not block this path ")
                 all_conditions = False
         if all_conditions:
             if verbose:
                 print(
-                    f"          👍 {sufficient_set} blocks all backdoor paths "
+                    f"          {sufficient_set} blocks all backdoor paths "
                     f"between x and y")
             final_suff_set.append(sufficient_set)
 
@@ -404,7 +411,7 @@ def get_conditional_independencies(dag, verbose=False):
                             cond_indeps.add(x, y, tuple(blockers))
                             if verbose:
                                 print(f"    (no colliders on path {path})\n"
-                                      f"     ✅ {x} ⊥ {y} | {blockers}")
+                                      f"     {x} ⊥ {y} | {blockers}")
                         else:
                             if verbose:
                                 print(f"    The set of blockers is the entire graph. ")
@@ -417,17 +424,17 @@ def get_conditional_independencies(dag, verbose=False):
                         if blocker not in colliders:
                             cond_indeps.add(x, y, blocker)
                             if verbose:
-                                print(f"       ✅ {x} ⊥ {y} | {blocker}")
+                                print(f"       {x} ⊥ {y} | {blocker}")
                         else:
                             if verbose:
                                 print(
-                                    f"    🚫 Blocking on {blocker} is Collider: "
+                                    f"    Blocking on {blocker} is Collider: "
                                     f"{colliders}")
         else:
             cond_indeps.add(x, y)
             if verbose:
                 print(f"Pair ({x}, {y})\n"
-                      f"   ✅ {x} ⊥ {y} | ∅")
+                      f"   {x} ⊥ {y} | ∅")
 
     return cond_indeps
 

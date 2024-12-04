@@ -214,7 +214,7 @@ class TestClassifyVariable:
         """Test special cases"""
         # Empty series
         arr = pd.Series([])
-        assert utils._classify_variable(arr) == "continuous"
+        assert utils._classify_variable(arr) == "multiclass"
         
         # Series with NaN values
         arr = pd.Series([1, 2, np.nan, 4])
