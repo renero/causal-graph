@@ -1,12 +1,11 @@
 # `causalgraph` - A library to infer causal-effect relationships from tabular data
 
-[![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/downloads/release/python-31012/)
-[![Travis](https://travis-ci.org/scikit-learn-contrib/project-template.svg?branch=master)](https://travis-ci.org/scikit-learn-contrib/project-template)
-[![AppVeyor](https://ci.appveyor.com/api/projects/status/coy2qqaqr1rnnt5y/branch/master?svg=true)](https://ci.appveyor.com/project/glemaitre/project-template)
-[![Codecov](https://codecov.io/gh/renero/causalgraph/graph/badge.svg?token=HCV0IJDFLQ)](https://codecov.io/gh/renero/causalgraph)
-[![ReadTheDocs](https://readthedocs.org/projects/sklearn-template/badge/?version=latest)](https://sklearn-template.readthedocs.io/en/latest/?badge=latest)
-[![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20macOS-lightgrey.svg)](#)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
+[![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/downloads/release/python-31012/)
+[![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20macOS-lightgrey.svg)](#)
+[![Build Status](https://github.com/renero/causalgraph/actions/workflows/codecov.yaml/badge.svg)](https://github.com/renero/causalgraph/actions/workflows/codecov.yaml)
+[![codecov](https://codecov.io/gh/renero/causalgraph/graph/badge.svg?token=HCV0IJDFLQ)](https://codecov.io/gh/renero/causalgraph)
+[![ReadTheDocs](https://readthedocs.org/projects/sklearn-template/badge/?version=latest)](https://sklearn-template.readthedocs.io/en/latest/?badge=latest)
 
 
 **`causalgraph`** is a library that implements methods to extract the causal graph,
