@@ -23,8 +23,14 @@ pydotplus
 pygam==0.9.0
 pytest
 python_igraph
+rich
 scikit-learn
 seaborn
 statsmodels
+tensorboardX
 torch
 tqdm
+sphinx
+sphinx_rtd_theme
+myst-parser
+numpydoc

@@ -3,8 +3,8 @@ Utility functions for causalgraph
 (C) J. Renero, 2022, 2023
 """
 
-# pylint: disable=E1101:no-member, W0201:attribute-defined-outside-init, W0511:fixme
-# pylint: disable=C0103:invalid-name
+# pylint: disable=E1101:no-member, W0201:attribute-defined-outside-init
+# pylint: disable=C0103:invalid-name, W0511:fixme
 # pylint: disable=C0116:missing-function-docstring
 # pylint: disable=R0913:too-many-arguments
 # pylint: disable=R0914:too-many-locals, R0915:too-many-statements
@@ -46,8 +46,8 @@ def save_experiment(
         obj_name (str): the name to be given to the pickle file to be saved. If
             a file already exists with that name, a file with same name and a
             extension will be generated.
-        folder (str): a full path to the folder where the experiment is to be saved.
-            If the folder does not exist it will be created.
+        folder (str): a full path to the folder where the experiment is to 
+            be saved. If the folder does not exist it will be created.
         results (obj): the object to be saved as experiment. This is typically a
             dictionary with different items representing different parts of the
             experiment.
@@ -962,7 +962,7 @@ def get_feature_names(X: Union[pd.DataFrame, np.ndarray, list]) -> List[str]:
     return feature_names
 
 
-def _classify_variable(arr:pd.Series) -> str:
+def _classify_variable(arr):
     """
     This method inspect the contents of the array and returns the type of the
     variable. If the variables are NOT numbers, then it returns multiclass. If
@@ -971,12 +971,16 @@ def _classify_variable(arr:pd.Series) -> str:
     continuous.
 
     Args:
-        arr (pd.Series): The array to be inspected.
+        arr (Union[pd.Series, np.ndarray]): The array to be inspected.
 
     Returns:
         str: The type of the variable. Can be binary, multiclass or continuous.
     """
-    unique_values = arr.unique()
+    # Convert numpy array to pandas Series if needed
+    if isinstance(arr, np.ndarray):
+        unique_values = np.unique(arr)
+    else:
+        unique_values = arr.unique()
     
     # Handle empty series
     if len(unique_values) == 0:
