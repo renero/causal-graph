@@ -7,7 +7,6 @@ hyppo
 joblib
 kneed
 matplotlib
-minepy
 mlforge
 networkx
 numpy
