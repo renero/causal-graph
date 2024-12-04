@@ -27,6 +27,16 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 html_theme = 'sphinx_rtd_theme'
 html_static_path = ['_static']
 
+# GitHub Pages specific settings
+html_baseurl = 'https://renero.github.io/causalgraph/'
+html_context = {
+    'display_github': True,
+    'github_user': 'renero',
+    'github_repo': 'causalgraph',
+    'github_version': 'main',
+    'conf_py_path': '/docs/',
+}
+
 # Napoleon settings
 napoleon_google_docstring = False
 napoleon_numpy_docstring = True

@@ -5,7 +5,7 @@
 [![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20macOS-lightgrey.svg)](#)
 [![Build Status](https://github.com/renero/causalgraph/actions/workflows/codecov.yaml/badge.svg)](https://github.com/renero/causalgraph/actions/workflows/codecov.yaml)
 [![codecov](https://codecov.io/gh/renero/causalgraph/graph/badge.svg?token=HCV0IJDFLQ)](https://codecov.io/gh/renero/causalgraph)
-[![ReadTheDocs](https://readthedocs.org/projects/sklearn-template/badge/?version=latest)](https://sklearn-template.readthedocs.io/en/latest/?badge=latest)
+[![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue.svg)](https://renero.github.io/causalgraph/)
 
 
 **`causalgraph`** is a library that implements methods to extract the causal graph,
