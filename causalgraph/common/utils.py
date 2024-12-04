@@ -811,6 +811,81 @@ def graph_from_adjacency_file(
     return G, df
 
 
+def graph_to_adjacency(
+        graph: AnyGraph,
+        labels: List[str],
+        weight_label: str = "weight") -> np.ndarray:
+    """
+    A method to generate the adjacency matrix of the graph. Labels are
+    sorted for better readability.
+
+    Args:
+        graph: (Union[Graph, DiGraph]) the graph to be converted.
+        node_names: (List[str]) the list of node names to be used. If None, the
+            node names are extracted from the graph. The names must be already
+            sorted in the same order as the adjacency matrix.
+        weight_label: the label used to identify the weights.
+
+    Return:
+        graph: (numpy.ndarray) A 2d array containing the adjacency matrix of
+            the graph.
+    """
+    symbol_map = {"o": 1, ">": 2, "-": 3}
+    # labels = list(graph.nodes)
+
+    # # Double check if all nodes are in the graph
+    # if node_names is not None:
+    #     for n in list(node_names):
+    #         if n not in set(labels):
+    #             labels.append(n)
+    #     labels = sorted(labels)
+
+    # Fix for the case where an empty node is parsed from the .dot file
+    if '\\n' in labels:
+        labels.remove('\\n')
+
+    mat = np.zeros((len(labels), (len(labels))))
+    for x in labels:
+        for y in labels:
+            if graph.has_edge(x, y):
+                if bool(graph.get_edge_data(x, y)):
+                    if y in graph.get_edge_data(x, y).keys():
+                        mat[labels.index(x)][labels.index(y)] = symbol_map[
+                            graph.get_edge_data(x, y)[y]
+                        ]
+                    else:
+                        weight = graph.get_edge_data(x, y)[weight_label]
+                        if weight is None:
+                            weight = 1
+                        mat[labels.index(x)][labels.index(y)] = weight
+                else:
+                    mat[labels.index(x)][labels.index(y)] = 1
+    mat[np.isnan(mat)] = 0
+    return mat
+
+
+def graph_to_adjacency_file(graph: AnyGraph, output_file: Union[Path, str], labels):
+    """
+    A method to write the adjacency matrix of the graph to a file. If graph has
+    weights, these are the values stored in the adjacency matrix.
+
+    Args:
+        graph: (Union[Graph, DiGraph] the graph to be saved
+        output_file: (str) The full path where graph is to be saved
+    """
+    mat = graph_to_adjacency(graph, labels)
+    with open(output_file, "w", encoding="utf-8") as f:
+        f.write(",".join([f"{label}" for label in labels]))
+        f.write("\n")
+        for i, label in enumerate(labels):
+            f.write(f"{label}")
+            f.write(",")
+            f.write(",".join([str(point) for point in mat[i]]))
+            f.write("\n")
+
+    return
+
+
 def stringfy_object(object_: object) -> str:
     """
     Convert an object into a string representation, including its attributes.
