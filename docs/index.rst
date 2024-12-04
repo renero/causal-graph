@@ -1,7 +1,7 @@
 Welcome to CausalGraph's documentation!
 ===================================
 
-CausalGraph is a Python library for causal discovery and inference.
+CausalGraph is a Python library for causal discovery based on explainability techniques.
 
 .. toctree::
    :maxdepth: 2
