@@ -2,6 +2,8 @@ causal_learn
 colorama
 daft
 Deprecated
+dowhy
+future
 gadjid
 hyppo
 joblib
