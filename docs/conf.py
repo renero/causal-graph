@@ -14,6 +14,7 @@ extensions = [
     'sphinx.ext.napoleon',
     'sphinx.ext.viewcode',
     'sphinx.ext.githubpages',
+    'sphinx_rtd_theme',
     'myst_parser',
     'numpydoc',
     'sphinx.ext.autosummary',
