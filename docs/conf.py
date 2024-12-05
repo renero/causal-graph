@@ -6,7 +6,7 @@ sys.path.insert(0, os.path.abspath('..'))
 project = 'CausalGraph'
 copyright = '2024, J. Renero'
 author = 'J. Renero'
-release = '0.5'
+release = '0.5.0'
 
 # Add any Sphinx extension module names here
 extensions = [
