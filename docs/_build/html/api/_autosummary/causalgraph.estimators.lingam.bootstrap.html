@@ -1,0 +1,657 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>causalgraph.estimators.lingam.bootstrap &#8212; CausalGraph 0.5 documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!-- 
+    this give us a css class that will be invisible only if js is disabled 
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../_static/styles/theme.css?digest=26a4bc78f4c0ddb94549" rel="stylesheet" />
+<link href="../../_static/styles/pydata-sphinx-theme.css?digest=26a4bc78f4c0ddb94549" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=a746c00c" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../../_static/scripts/fontawesome.js?digest=26a4bc78f4c0ddb94549"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../_static/scripts/bootstrap.js?digest=26a4bc78f4c0ddb94549" />
+<link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=26a4bc78f4c0ddb94549" />
+
+    <script src="../../_static/documentation_options.js?v=db78e746"></script>
+    <script src="../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'api/_autosummary/causalgraph.estimators.lingam.bootstrap';</script>
+    <link rel="canonical" href="https://renero.github.io/causalgraph/api/_autosummary/causalgraph.estimators.lingam.bootstrap.html" />
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="causalgraph.estimators.lingam.lingam" href="causalgraph.estimators.lingam.lingam.html" />
+    <link rel="prev" title="causalgraph.estimators.lingam.base" href="causalgraph.estimators.lingam.base.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class="col-lg-3 navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">CausalGraph 0.5 documentation</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class="col-lg-9 navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../quickstart.html">
+    Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="../modules.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../changelog.html">
+    Changelog
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/renero/causalgraph" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-square-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/renero/causalgraph" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-github-square fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../quickstart.html">
+    Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="../modules.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../changelog.html">
+    Changelog
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/renero/causalgraph" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-square-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/renero/causalgraph" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-github-square fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"><ul class="current nav bd-sidenav">
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="../causalgraph.html">causalgraph package</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2 has-children"><a class="reference internal" href="causalgraph.common.html">causalgraph.common</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="causalgraph.common.notebook.html">causalgraph.common.notebook</a></li>
+<li class="toctree-l3"><a class="reference internal" href="causalgraph.common.plot.html">causalgraph.common.plot</a></li>
+<li class="toctree-l3"><a class="reference internal" href="causalgraph.common.utils.html">causalgraph.common.utils</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 current active has-children"><a class="reference internal" href="causalgraph.estimators.html">causalgraph.estimators</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l3 has-children"><a class="reference internal" href="causalgraph.estimators.cam.html">causalgraph.estimators.cam</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="causalgraph.estimators.cam.cam.html">causalgraph.estimators.cam.cam</a></li>
+<li class="toctree-l4"><a class="reference internal" href="causalgraph.estimators.cam.computeScoreMat.html">causalgraph.estimators.cam.computeScoreMat</a></li>
+<li class="toctree-l4"><a class="reference internal" href="causalgraph.estimators.cam.computeScoreMatParallel.html">causalgraph.estimators.cam.computeScoreMatParallel</a></li>
+<li class="toctree-l4"><a class="reference internal" href="causalgraph.estimators.cam.pruning.html">causalgraph.estimators.cam.pruning</a></li>
+<li class="toctree-l4"><a class="reference internal" href="causalgraph.estimators.cam.selGam.html">causalgraph.estimators.cam.selGam</a></li>
+<li class="toctree-l4"><a class="reference internal" href="causalgraph.estimators.cam.selGamBoost.html">causalgraph.estimators.cam.selGamBoost</a></li>
+<li class="toctree-l4"><a class="reference internal" href="causalgraph.estimators.cam.selLasso.html">causalgraph.estimators.cam.selLasso</a></li>
+<li class="toctree-l4"><a class="reference internal" href="causalgraph.estimators.cam.selLm.html">causalgraph.estimators.cam.selLm</a></li>
+<li class="toctree-l4"><a class="reference internal" href="causalgraph.estimators.cam.train_GAMboost.html">causalgraph.estimators.cam.train_GAMboost</a></li>
+<li class="toctree-l4"><a class="reference internal" href="causalgraph.estimators.cam.train_LMboost.html">causalgraph.estimators.cam.train_LMboost</a></li>
+<li class="toctree-l4"><a class="reference internal" href="causalgraph.estimators.cam.train_gam.html">causalgraph.estimators.cam.train_gam</a></li>
+<li class="toctree-l4"><a class="reference internal" href="causalgraph.estimators.cam.train_gp.html">causalgraph.estimators.cam.train_gp</a></li>
+<li class="toctree-l4"><a class="reference internal" href="causalgraph.estimators.cam.train_lasso.html">causalgraph.estimators.cam.train_lasso</a></li>
+<li class="toctree-l4"><a class="reference internal" href="causalgraph.estimators.cam.train_linear.html">causalgraph.estimators.cam.train_linear</a></li>
+<li class="toctree-l4"><a class="reference internal" href="causalgraph.estimators.cam.updateScoreMat.html">causalgraph.estimators.cam.updateScoreMat</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="causalgraph.estimators.fci.html">causalgraph.estimators.fci</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="causalgraph.estimators.fci.fci.html">causalgraph.estimators.fci.fci</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="causalgraph.estimators.ges.html">causalgraph.estimators.ges</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="causalgraph.estimators.ges.decomposable_score.html">causalgraph.estimators.ges.decomposable_score</a></li>
+<li class="toctree-l4"><a class="reference internal" href="causalgraph.estimators.ges.ges.html">causalgraph.estimators.ges.ges</a></li>
+<li class="toctree-l4"><a class="reference internal" href="causalgraph.estimators.ges.scores.html">causalgraph.estimators.ges.scores</a></li>
+<li class="toctree-l4"><a class="reference internal" href="causalgraph.estimators.ges.utils.html">causalgraph.estimators.ges.utils</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 current active has-children"><a class="reference internal" href="causalgraph.estimators.lingam.html">causalgraph.estimators.lingam</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="causalgraph.estimators.lingam.base.html">causalgraph.estimators.lingam.base</a></li>
+<li class="toctree-l4 current active"><a class="current reference internal" href="#">causalgraph.estimators.lingam.bootstrap</a></li>
+<li class="toctree-l4"><a class="reference internal" href="causalgraph.estimators.lingam.lingam.html">causalgraph.estimators.lingam.lingam</a></li>
+<li class="toctree-l4"><a class="reference internal" href="causalgraph.estimators.lingam.utils.html">causalgraph.estimators.lingam.utils</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="causalgraph.estimators.notears.html">causalgraph.estimators.notears</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="causalgraph.estimators.notears.lbfgsb_scipy.html">causalgraph.estimators.notears.lbfgsb_scipy</a></li>
+<li class="toctree-l4"><a class="reference internal" href="causalgraph.estimators.notears.linear.html">causalgraph.estimators.notears.linear</a></li>
+<li class="toctree-l4"><a class="reference internal" href="causalgraph.estimators.notears.locally_connected.html">causalgraph.estimators.notears.locally_connected</a></li>
+<li class="toctree-l4"><a class="reference internal" href="causalgraph.estimators.notears.loss.html">causalgraph.estimators.notears.loss</a></li>
+<li class="toctree-l4"><a class="reference internal" href="causalgraph.estimators.notears.main.html">causalgraph.estimators.notears.main</a></li>
+<li class="toctree-l4"><a class="reference internal" href="causalgraph.estimators.notears.notears.html">causalgraph.estimators.notears.notears</a></li>
+<li class="toctree-l4"><a class="reference internal" href="causalgraph.estimators.notears.trace_expm.html">causalgraph.estimators.notears.trace_expm</a></li>
+<li class="toctree-l4"><a class="reference internal" href="causalgraph.estimators.notears.utils.html">causalgraph.estimators.notears.utils</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="causalgraph.estimators.pc.html">causalgraph.estimators.pc</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="causalgraph.estimators.pc.ci_tests.html">causalgraph.estimators.pc.ci_tests</a></li>
+<li class="toctree-l4"><a class="reference internal" href="causalgraph.estimators.pc.dag.html">causalgraph.estimators.pc.dag</a></li>
+<li class="toctree-l4"><a class="reference internal" href="causalgraph.estimators.pc.estimators.html">causalgraph.estimators.pc.estimators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="causalgraph.estimators.pc.independencies.html">causalgraph.estimators.pc.independencies</a></li>
+<li class="toctree-l4"><a class="reference internal" href="causalgraph.estimators.pc.pc.html">causalgraph.estimators.pc.pc</a></li>
+<li class="toctree-l4"><a class="reference internal" href="causalgraph.estimators.pc.pdag.html">causalgraph.estimators.pc.pdag</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="causalgraph.explainability.html">causalgraph.explainability</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="causalgraph.explainability.hierarchies.html">causalgraph.explainability.hierarchies</a></li>
+<li class="toctree-l3"><a class="reference internal" href="causalgraph.explainability.perm_importance.html">causalgraph.explainability.perm_importance</a></li>
+<li class="toctree-l3"><a class="reference internal" href="causalgraph.explainability.regression_quality.html">causalgraph.explainability.regression_quality</a></li>
+<li class="toctree-l3"><a class="reference internal" href="causalgraph.explainability.shapley.html">causalgraph.explainability.shapley</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="causalgraph.generators.html">causalgraph.generators</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="causalgraph.generators.generators.html">causalgraph.generators.generators</a></li>
+<li class="toctree-l3"><a class="reference internal" href="causalgraph.generators.mechanisms.html">causalgraph.generators.mechanisms</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="causalgraph.independence.html">causalgraph.independence</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="causalgraph.independence.cond_indep.html">causalgraph.independence.cond_indep</a></li>
+<li class="toctree-l3"><a class="reference internal" href="causalgraph.independence.edge_orientation.html">causalgraph.independence.edge_orientation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="causalgraph.independence.effect.html">causalgraph.independence.effect</a></li>
+<li class="toctree-l3"><a class="reference internal" href="causalgraph.independence.feature_selection.html">causalgraph.independence.feature_selection</a></li>
+<li class="toctree-l3"><a class="reference internal" href="causalgraph.independence.graph_independence.html">causalgraph.independence.graph_independence</a></li>
+<li class="toctree-l3"><a class="reference internal" href="causalgraph.independence.hsic.html">causalgraph.independence.hsic</a></li>
+<li class="toctree-l3"><a class="reference internal" href="causalgraph.independence.kernels.html">causalgraph.independence.kernels</a></li>
+<li class="toctree-l3"><a class="reference internal" href="causalgraph.independence.mic.html">causalgraph.independence.mic</a></li>
+<li class="toctree-l3"><a class="reference internal" href="causalgraph.independence.regressors.html">causalgraph.independence.regressors</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="causalgraph.metrics.html">causalgraph.metrics</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="causalgraph.metrics.SID.html">causalgraph.metrics.SID</a></li>
+<li class="toctree-l3"><a class="reference internal" href="causalgraph.metrics.compare_graphs.html">causalgraph.metrics.compare_graphs</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="causalgraph.models.html">causalgraph.models</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="causalgraph.models.dnn.html">causalgraph.models.dnn</a></li>
+<li class="toctree-l3"><a class="reference internal" href="causalgraph.models.gbt.html">causalgraph.models.gbt</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../modules.html" class="nav-link">API Reference</a></li>
+    
+    
+    <li class="breadcrumb-item"><a href="../causalgraph.html" class="nav-link">causalgraph package</a></li>
+    
+    
+    <li class="breadcrumb-item"><a href="causalgraph.estimators.html" class="nav-link">causalgraph.estimators</a></li>
+    
+    
+    <li class="breadcrumb-item"><a href="causalgraph.estimators.lingam.html" class="nav-link">causalgraph.estimators.lingam</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">causalgraph.estimators.lingam.bootstrap</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="module-causalgraph.estimators.lingam.bootstrap">
+<span id="causalgraph-estimators-lingam-bootstrap"></span><h1>causalgraph.estimators.lingam.bootstrap<a class="headerlink" href="#module-causalgraph.estimators.lingam.bootstrap" title="Link to this heading">#</a></h1>
+<p>Python implementation of the LiNGAM algorithms.
+The LiNGAM Project: <a class="reference external" href="https://sites.google.com/site/sshimizu06/lingam">https://sites.google.com/site/sshimizu06/lingam</a></p>
+<p class="rubric">Classes</p>
+<div class="pst-scrollable-table-container"><table class="autosummary longtable table autosummary">
+<tbody>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">BootstrapMixin</span></code>()</p></td>
+<td><p>Mixin class for all LiNGAM algorithms that implement the method of bootstrapping.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">BootstrapResult</span></code>(adjacency_matrices, ...)</p></td>
+<td><p>The result of bootstrapping.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="causalgraph.estimators.lingam.base.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">causalgraph.estimators.lingam.base</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="causalgraph.estimators.lingam.lingam.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">causalgraph.estimators.lingam.lingam</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <dialog id="pst-secondary-sidebar-modal"></dialog>
+                <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+
+  
+  <div class="tocsection editthispage">
+    <a href="https://github.com/renero/causalgraph/edit/main/api/_autosummary/causalgraph.estimators.lingam.bootstrap.rst">
+      <i class="fa-solid fa-pencil"></i>
+      
+      
+        
+          Edit on GitHub
+        
+      
+    </a>
+  </div>
+</div>
+
+  <div class="sidebar-secondary-item">
+
+  <div class="tocsection sourcelink">
+    <a href="../../_sources/api/_autosummary/causalgraph.estimators.lingam.bootstrap.rst.txt">
+      <i class="fa-solid fa-file-lines"></i> Show Source
+    </a>
+  </div>
+</div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../../_static/scripts/bootstrap.js?digest=26a4bc78f4c0ddb94549"></script>
+<script defer src="../../_static/scripts/pydata-sphinx-theme.js?digest=26a4bc78f4c0ddb94549"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2024, J. Renero.
+      <br/>
+    
+  </p>
+</div>
+      
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
+    <br/>
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+    <div class="footer-items__end">
+      
+        <div class="footer-item">
+<p class="theme-version">
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.16.0.
+</p></div>
+      
+    </div>
+  
+</div>
+
+  </footer>
+  </body>
+</html>

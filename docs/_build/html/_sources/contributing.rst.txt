@@ -1,12 +1,13 @@
 Contributing
 ============
 
-We love your input! We want to make contributing to CausalGraph as easy and transparent as possible.
+We want to make contributing to CausalGraph as easy and transparent as possible.
 
 Development Process
 -----------------
 
-We use GitHub to host code, to track issues and feature requests, as well as accept pull requests.
+We use GitHub to host code, to track issues and feature requests, as well 
+as accept pull requests.
 
 1. Fork the repo and create your branch from `master`.
 2. If you've added code that should be tested, add tests.
@@ -25,4 +26,6 @@ Pull Request Process
 Any contributions you make will be under the MIT Software License
 --------------------------------------------------------------
 
-In short, when you submit code changes, your submissions are understood to be under the same [MIT License](http://choosealicense.com/licenses/mit/) that covers the project. Feel free to contact the maintainers if that's a concern.
+In short, when you submit code changes, your submissions are understood to be 
+under the same [MIT License](http://choosealicense.com/licenses/mit/) that 
+covers the project. Feel free to contact the maintainers if that's a concern.
