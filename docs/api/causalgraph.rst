@@ -1,7 +1,7 @@
 causalgraph package
-=================
+================
 
-Submodules
+Subpackages
 ----------
 
 .. toctree::
@@ -9,7 +9,11 @@ Submodules
 
    causalgraph.common
    causalgraph.estimators
-   causalgraph.visualization
+   causalgraph.explainability
+   causalgraph.generators
+   causalgraph.independence
+   causalgraph.metrics
+   causalgraph.models
 
 Module contents
 --------------
@@ -18,3 +22,15 @@ Module contents
    :members:
    :undoc-members:
    :show-inheritance:
+
+.. autosummary::
+   :toctree: _autosummary
+   :recursive:
+   
+   causalgraph.common
+   causalgraph.estimators
+   causalgraph.explainability
+   causalgraph.generators
+   causalgraph.independence
+   causalgraph.metrics
+   causalgraph.models

@@ -4,9 +4,9 @@ sys.path.insert(0, os.path.abspath('..'))
 
 # Configuration file for the Sphinx documentation builder.
 project = 'CausalGraph'
-copyright = '2023, J. Renero'
+copyright = '2024, J. Renero'
 author = 'J. Renero'
-release = '0.1'
+release = '0.5'
 
 # Add any Sphinx extension module names here
 extensions = [
@@ -14,18 +14,36 @@ extensions = [
     'sphinx.ext.napoleon',
     'sphinx.ext.viewcode',
     'sphinx.ext.githubpages',
-    'sphinx_rtd_theme',
     'myst_parser',
     'numpydoc',
+    'sphinx.ext.autosummary',
 ]
+
+# Autosummary settings
+autosummary_generate = True
+add_module_names = False
 
 # Add any paths that contain templates here
 templates_path = ['_templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
 # The theme to use for HTML and HTML Help pages
-html_theme = 'sphinx_rtd_theme'
+html_theme = 'pydata_sphinx_theme'
 html_static_path = ['_static']
+
+# PyData theme options
+html_theme_options = {
+    "github_url": "https://github.com/renero/causalgraph",
+    "icon_links": [
+        {
+            "name": "GitHub",
+            "url": "https://github.com/renero/causalgraph",
+            "icon": "fab fa-github-square",
+        },
+    ],
+    "use_edit_page_button": True,
+    "show_toc_level": 2,
+}
 
 # GitHub Pages specific settings
 html_baseurl = 'https://renero.github.io/causalgraph/'
