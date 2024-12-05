@@ -16,7 +16,6 @@
 
 import argparse
 import os
-import networkx as nx
 import pandas as pd
 
 from causalgraph.common import (DEFAULT_BOOTSTRAP_TOLERANCE,

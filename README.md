@@ -68,7 +68,7 @@ available under the `data` folder. The datasets were generated using the
 
 To run `causalgraph` on your data, you can use the `causalgraph` command:
 
-```bash
+```
 $ python -m causalgraph
    ____                      _  ____                 _
   / ___|__ _ _   _ ___  __ _| |/ ___|_ __ __ _ _ __ | |__
