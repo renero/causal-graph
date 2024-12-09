@@ -59,10 +59,12 @@ jobs:
           make html
           touch _build/html/.nojekyll  # Prevent GitHub Pages from using Jekyll
 
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v1
+        uses: actions/upload-pages-artifact@v3
         with:
-          name: github-pages
           path: docs/_build/html
 
   deploy:
