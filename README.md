@@ -8,6 +8,8 @@
 [![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue.svg)](https://renero.github.io/causalgraph/)
 
 
+![](./_static/logo-light.png)
+
 **`causalgraph`** is a library that implements methods to extract the causal graph,
 from tabular data, specifically the **ReX** method, and other compared methods
 like GES, PC, FCI, LiNGAM, CAM, and NOTEARS.
@@ -28,7 +30,7 @@ By combining ML and explainability techniques with causal discovery, **ReX**
 bridges the gap between predictive modeling and causal inference, offering an 
 effective tool for understanding complex causal structures.
 
-![ReX Schema](./REX.png)
+![ReX Schema](./_static/REX.png)
 
 It is built using SKLearn estimators, so that it can be used in scikit-learn 
 pipelines and (hyper)parameter search, while facilitating testing (including 

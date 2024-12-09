@@ -12,20 +12,20 @@ including:
 - PC (Peter-Clark algorithm)
 """
 
+from . import rex
 from . import cam
 from . import fci
 from . import ges
 from . import lingam
 from . import notears
 from . import pc
-from . import rex
 
 __all__ = [
+    'rex',
     'cam',
     'fci',
     'ges',
     'lingam',
     'notears',
     'pc',
-    'rex'
 ]
