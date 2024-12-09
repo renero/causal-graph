@@ -78,17 +78,39 @@ jobs:
           
           .. toctree::
              :maxdepth: 2
-             :caption: Modules:
+             :caption: Contents:
           
-             modules
+             causalgraph
           EOL
           
           # Generate new API documentation with better options
-          sphinx-apidoc --module-first --separate --full -f -o api ../causalgraph ../causalgraph/tests/*
+          sphinx-apidoc --module-first --separate --no-toc --implicit-namespaces -f -o api ../causalgraph ../causalgraph/tests/*
           
-          # Update modules.rst to improve hierarchy
-          sed -i.bak '1s/.*/API Modules/' api/modules.rst
-          sed -i.bak '2s/.*/==========/' api/modules.rst
+          # Rename the main module file
+          mv api/causalgraph.rst api/causalgraph.rst.bak
+          cat > api/causalgraph.rst << EOL
+          CausalGraph Package
+          ==================
+          
+          .. automodule:: causalgraph
+             :members:
+             :undoc-members:
+             :show-inheritance:
+          
+          Submodules
+          ----------
+          
+          .. toctree::
+             :maxdepth: 4
+          
+             causalgraph.common
+             causalgraph.estimators
+             causalgraph.explainability
+             causalgraph.generators
+             causalgraph.independence
+             causalgraph.metrics
+             causalgraph.models
+          EOL
           
           python generate_api_rst.py
 
