@@ -1,6 +1,11 @@
 import os
 import sys
-sys.path.insert(0, os.path.abspath('..'))
+
+
+# Add the parent directory to the Python path
+# This allows Sphinx to find and import the package for documentation
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, project_root)
 
 # Configuration file for the Sphinx documentation builder.
 project = 'CausalGraph'
@@ -14,47 +19,18 @@ extensions = [
     'sphinx.ext.napoleon',
     'sphinx.ext.viewcode',
     'sphinx.ext.githubpages',
-    'sphinx_rtd_theme',
+    'sphinx.ext.intersphinx',
+    'sphinx.ext.todo',
+    'sphinx.ext.coverage',
+    'sphinx.ext.mathjax',
+    'sphinx.ext.ifconfig',
+    'sphinx.ext.autosummary',
+    'sphinx.ext.autodoc.typehints',
     'myst_parser',
     'numpydoc',
-    'sphinx.ext.autosummary',
+    'sphinx_copybutton',
+    'sphinx_design',
 ]
-
-# Autosummary settings
-autosummary_generate = True
-add_module_names = False
-
-# Add any paths that contain templates here
-templates_path = ['_templates']
-exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
-
-# The theme to use for HTML and HTML Help pages
-html_theme = 'pydata_sphinx_theme'
-html_static_path = ['_static']
-
-# PyData theme options
-html_theme_options = {
-    "github_url": "https://github.com/renero/causalgraph",
-    "icon_links": [
-        {
-            "name": "GitHub",
-            "url": "https://github.com/renero/causalgraph",
-            "icon": "fab fa-github-square",
-        },
-    ],
-    "use_edit_page_button": True,
-    "show_toc_level": 2,
-}
-
-# GitHub Pages specific settings
-html_baseurl = 'https://renero.github.io/causalgraph/'
-html_context = {
-    'display_github': True,
-    'github_user': 'renero',
-    'github_repo': 'causalgraph',
-    'github_version': 'main',
-    'conf_py_path': '/docs/',
-}
 
 # Autodoc settings
 autodoc_default_options = {
@@ -62,8 +38,15 @@ autodoc_default_options = {
     'member-order': 'bysource',
     'special-members': '__init__',
     'undoc-members': True,
-    'exclude-members': '__weakref__'
+    'exclude-members': '__weakref__',
+    'show-inheritance': True,
+    'inherited-members': True
 }
+
+# Autodoc type hints settings
+autodoc_typehints = 'description'
+autodoc_typehints_description_target = 'documented'
+autodoc_type_aliases = {}
 
 # Napoleon settings
 napoleon_google_docstring = True
@@ -77,4 +60,65 @@ napoleon_use_admonition_for_references = True
 napoleon_use_ivar = True
 napoleon_use_param = True
 napoleon_use_rtype = True
-napoleon_type_aliases = None
+
+# Autosummary settings
+autosummary_generate = True
+autosummary_imported_members = True
+add_module_names = False
+
+# Intersphinx configuration
+intersphinx_mapping = {
+    'python': ('https://docs.python.org/3', None),
+    'numpy': ('https://numpy.org/doc/stable/', None),
+    'pandas': ('https://pandas.pydata.org/pandas-docs/stable/', None),
+    'scipy': ('https://docs.scipy.org/doc/scipy/', None),
+}
+
+# Add any paths that contain templates here
+templates_path = ['_templates']
+exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
+
+# The theme to use for HTML and HTML Help pages
+html_theme = 'pydata_sphinx_theme'
+html_static_path = ['_static']
+
+# PyData theme options
+html_theme_options = {
+    "github_url": "https://github.com/renero/causalgraph",
+    "navbar_end": ["theme-switcher", "navbar-icon-links"],
+    "icon_links": [
+        {
+            "name": "GitHub",
+            "url": "https://github.com/renero/causalgraph",
+            "icon": "fab fa-github-square",
+            "type": "fontawesome",
+        },
+    ],
+    "use_edit_page_button": True,
+    "show_toc_level": 2,
+    "navbar_align": "left",
+    "logo": {
+        "image_light": "_static/logo-light.png",
+        "image_dark": "_static/logo-dark.png",
+        "text": "CausalGraph",  # Fallback if no logo images
+    },
+    "announcement": "This is the development version of CausalGraph.",
+    "navigation_with_keys": True,
+    "show_nav_level": 2,
+    "show_prev_next": True,
+}
+
+# Theme-specific sidebars
+html_sidebars = {
+    "**": ["search-field", "sidebar-nav-bs", "sidebar-ethical-ads"]
+}
+
+# GitHub Pages specific settings
+html_baseurl = 'https://renero.github.io/causalgraph/'
+html_context = {
+    'display_github': True,
+    'github_user': 'renero',
+    'github_repo': 'causalgraph',
+    'github_version': 'main',
+    'conf_py_path': '/docs/',
+}

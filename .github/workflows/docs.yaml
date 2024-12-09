@@ -51,7 +51,25 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install sphinx pydata-sphinx-theme myst-parser numpydoc
+          pip install sphinx pydata-sphinx-theme myst-parser numpydoc sphinx-autodoc-typehints
+          pip install sphinx-copybutton sphinx-design
+          pip install -e .
+
+      - name: Setup static files
+        run: |
+          cd docs
+          mkdir -p _static
+          # If you have logo files, you would copy them here
+          # cp ../logo-light.png _static/
+          # cp ../logo-dark.png _static/
+
+      - name: Generate API Documentation
+        run: |
+          cd docs
+          rm -rf api/
+          mkdir -p api/
+          sphinx-apidoc -f -M -o api ../causalgraph ../causalgraph/tests/*
+          python generate_api_rst.py
 
       - name: Build documentation
         run: |
