@@ -79,7 +79,6 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
 # The theme to use for HTML and HTML Help pages
 html_theme = 'pydata_sphinx_theme'
-html_static_path = ['_static']
 
 # PyData theme options
 html_theme_options = {
@@ -98,27 +97,35 @@ html_theme_options = {
     "navbar_align": "left",
     "navigation_with_keys": True,
     "navigation_depth": 4,
-    "show_nav_level": 2,
+    "show_nav_level": 1,
+    "collapse_navigation": False,
     "logo": {
         "image_light": "_static/logo-light.png",
         "image_dark": "_static/logo-dark.png",
-        "text": "CausalGraph",  # Fallback if no logo images
+        "text": "CausalGraph",
     },
-    "navbar_start": ["navbar-logo"],
-    "navbar_center": ["navbar-nav"],
-    "navbar_persistent": ["search-button"],
-    "primary_sidebar_end": ["indices"],
+    "navbar_links": [
+        ("Installation", "installation"),
+        ("Quickstart", "quickstart"),
+        ("Modules", "api/modules"),
+        ("Contributing", "contributing"),
+        ("Changelog", "changelog"),
+    ],
 }
 
 html_sidebars = {
-    "**": ["search-field", "sidebar-nav-bs", "sidebar-ethical-ads"]
+    "**": ["sidebar-nav-bs", "sidebar-search-bs"]
 }
 
 html_context = {
-    "default_mode": "light"
+    "default_mode": "light",
+    "doc_path": "docs",
+    "github_user": "renero",
+    "github_repo": "causalgraph",
+    "github_version": "main",
 }
 
-# These paths are either relative to html_static_path or fully qualified paths (eg. https://...)
+html_static_path = ['_static']
 html_css_files = [
     'css/custom.css',
 ]
@@ -127,17 +134,5 @@ html_js_files = [
     'js/custom.js',
 ]
 
-# Add any paths that contain custom static files (such as style sheets) here,
-# relative to this directory. They are copied after the builtin static files,
-# so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ['_static']
-
 # GitHub Pages specific settings
 html_baseurl = 'https://renero.github.io/causalgraph/'
-html_context = {
-    'display_github': True,
-    'github_user': 'renero',
-    'github_repo': 'causalgraph',
-    'github_version': 'main',
-    'conf_py_path': '/docs/',
-}
