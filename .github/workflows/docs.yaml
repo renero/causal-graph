@@ -66,9 +66,19 @@ jobs:
       - name: Generate API Documentation
         run: |
           cd docs
+          # Clean up previous API documentation
           rm -rf api/
           mkdir -p api/
-          sphinx-apidoc -f -M -o api ../causalgraph ../causalgraph/tests/*
+          # Generate new API documentation with better options
+          sphinx-apidoc --module-first --separate --no-toc -f -o api ../causalgraph ../causalgraph/tests/*
+          # Create the modules index
+          echo "API Reference" > api/modules.rst
+          echo "=============" >> api/modules.rst
+          echo "" >> api/modules.rst
+          echo ".. toctree::" >> api/modules.rst
+          echo "   :maxdepth: 4" >> api/modules.rst
+          echo "" >> api/modules.rst
+          echo "   causalgraph" >> api/modules.rst
           python generate_api_rst.py
 
       - name: Build documentation

@@ -1,3 +1,26 @@
-from ._version import __version__
+"""
+CausalGraph: A Python package for causal discovery and inference.
 
-__all__ = ['__version__']
+This package provides tools for discovering and analyzing causal relationships
+in data using various methods and algorithms.
+"""
+
+from . import common
+from . import estimators
+from . import explainability
+from . import generators
+from . import independence
+from . import metrics
+from . import models
+
+__all__ = [
+    'common',
+    'estimators',
+    'explainability',
+    'generators',
+    'independence',
+    'metrics',
+    'models',
+]
+
+from ._version import __version__
