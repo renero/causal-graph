@@ -80,44 +80,22 @@ jobs:
              :maxdepth: 2
              :caption: Contents:
           
-             causalgraph
+             modules
           EOL
           
-          # Generate new API documentation with better options
-          sphinx-apidoc --module-first --separate --no-toc --implicit-namespaces -f -o api ../causalgraph ../causalgraph/tests/*
+          # Generate new API documentation
+          sphinx-apidoc -f -o api ../causalgraph ../causalgraph/tests/* \
+            --tocfile modules \
+            --full \
+            --private \
+            --no-headings \
+            --maxdepth 4
           
-          # Rename the main module file
-          mv api/causalgraph.rst api/causalgraph.rst.bak
-          cat > api/causalgraph.rst << EOL
-          CausalGraph Package
-          ==================
-          
-          .. automodule:: causalgraph
-             :members:
-             :undoc-members:
-             :show-inheritance:
-          
-          Submodules
-          ----------
-          
-          .. toctree::
-             :maxdepth: 4
-          
-             causalgraph.common
-             causalgraph.estimators
-             causalgraph.explainability
-             causalgraph.generators
-             causalgraph.independence
-             causalgraph.metrics
-             causalgraph.models
-          EOL
-          
-          python generate_api_rst.py
+          make html
 
       - name: Build documentation
         run: |
           cd docs
-          make html
           touch _build/html/.nojekyll  # Prevent GitHub Pages from using Jekyll
 
       - name: Setup Pages
