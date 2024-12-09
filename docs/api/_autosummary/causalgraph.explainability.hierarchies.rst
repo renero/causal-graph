@@ -1,8 +1,13 @@
-causalgraph.explainability.hierarchies
+﻿causalgraph.explainability.hierarchies
 ======================================
 
 .. automodule:: causalgraph.explainability.hierarchies
 
+   
+   
+   
+
+   
    
    .. rubric:: Functions
 
@@ -12,9 +17,21 @@ causalgraph.explainability.hierarchies
       connect_isolated_nodes
       plot_dendogram_correlations
    
+   
+
+   
+   
    .. rubric:: Classes
 
    .. autosummary::
    
       Hierarchies
    
+   
+
+   
+   
+   
+
+
+

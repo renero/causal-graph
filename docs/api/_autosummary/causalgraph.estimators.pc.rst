@@ -1,18 +1,36 @@
-causalgraph.estimators.pc
+﻿causalgraph.estimators.pc
 =========================
 
 .. automodule:: causalgraph.estimators.pc
 
    
+   
+   
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   
+
+
+
 .. rubric:: Modules
 
 .. autosummary::
    :toctree:
    :recursive:
 
-   ci_tests
-   dag
-   estimators
-   independencies
-   pc
-   pdag
+   causalgraph.estimators.pc.ci_tests
+   causalgraph.estimators.pc.dag
+   causalgraph.estimators.pc.estimators
+   causalgraph.estimators.pc.independencies
+   causalgraph.estimators.pc.pc
+   causalgraph.estimators.pc.pdag
+

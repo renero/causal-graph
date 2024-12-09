@@ -1,13 +1,31 @@
-causalgraph.estimators.fci
+﻿causalgraph.estimators.fci
 ==========================
 
 .. automodule:: causalgraph.estimators.fci
 
    
+   
+   
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   
+
+
+
 .. rubric:: Modules
 
 .. autosummary::
    :toctree:
    :recursive:
 
-   fci
+   causalgraph.estimators.fci.fci
+

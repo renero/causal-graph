@@ -1,8 +1,13 @@
-causalgraph.independence.feature\_selection
+﻿causalgraph.independence.feature\_selection
 ===========================================
 
 .. automodule:: causalgraph.independence.feature_selection
 
+   
+   
+   
+
+   
    
    .. rubric:: Functions
 
@@ -13,3 +18,15 @@ causalgraph.independence.feature\_selection
       select_features
       test
    
+   
+
+   
+   
+   
+
+   
+   
+   
+
+
+

@@ -1,8 +1,17 @@
-causalgraph.independence.hsic
+﻿causalgraph.independence.hsic
 =============================
 
 .. automodule:: causalgraph.independence.hsic
 
+   
+   
+   
+
+   
+   
+   
+
+   
    
    .. rubric:: Classes
 
@@ -11,3 +20,11 @@ causalgraph.independence.hsic
       HSIC
       HSIC_Values
    
+   
+
+   
+   
+   
+
+
+

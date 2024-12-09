@@ -4,11 +4,20 @@ causalgraph.estimators.ges.ges
 .. automodule:: causalgraph.estimators.ges.ges
 
    
+   
+   
+
+   
+   
    .. rubric:: Functions
 
    .. autosummary::
    
       main
+   
+   
+
+   
    
    .. rubric:: Classes
 
@@ -16,3 +25,11 @@ causalgraph.estimators.ges.ges
    
       GES
    
+   
+
+   
+   
+   
+
+
+

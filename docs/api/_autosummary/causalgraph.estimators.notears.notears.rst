@@ -4,11 +4,20 @@ causalgraph.estimators.notears.notears
 .. automodule:: causalgraph.estimators.notears.notears
 
    
+   
+   
+
+   
+   
    .. rubric:: Functions
 
    .. autosummary::
    
       main
+   
+   
+
+   
    
    .. rubric:: Classes
 
@@ -16,3 +25,11 @@ causalgraph.estimators.notears.notears
    
       NOTEARS
    
+   
+
+   
+   
+   
+
+
+

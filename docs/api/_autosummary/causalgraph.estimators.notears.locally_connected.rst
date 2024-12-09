@@ -4,11 +4,20 @@ causalgraph.estimators.notears.locally\_connected
 .. automodule:: causalgraph.estimators.notears.locally_connected
 
    
+   
+   
+
+   
+   
    .. rubric:: Functions
 
    .. autosummary::
    
       main
+   
+   
+
+   
    
    .. rubric:: Classes
 
@@ -16,3 +25,11 @@ causalgraph.estimators.notears.locally\_connected
    
       LocallyConnected
    
+   
+
+   
+   
+   
+
+
+

@@ -1,8 +1,13 @@
-causalgraph.independence.cond\_indep
+﻿causalgraph.independence.cond\_indep
 ====================================
 
 .. automodule:: causalgraph.independence.cond_indep
 
+   
+   
+   
+
+   
    
    .. rubric:: Functions
 
@@ -18,6 +23,10 @@ causalgraph.independence.cond\_indep
       get_sufficient_sets_for_pair
       main
    
+   
+
+   
+   
    .. rubric:: Classes
 
    .. autosummary::
@@ -25,3 +34,11 @@ causalgraph.independence.cond\_indep
       ConditionalIndependencies
       SufficientSets
    
+   
+
+   
+   
+   
+
+
+

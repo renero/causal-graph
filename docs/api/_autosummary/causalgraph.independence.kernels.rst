@@ -1,8 +1,13 @@
-causalgraph.independence.kernels
+﻿causalgraph.independence.kernels
 ================================
 
 .. automodule:: causalgraph.independence.kernels
 
+   
+   
+   
+
+   
    
    .. rubric:: Functions
 
@@ -13,3 +18,15 @@ causalgraph.independence.kernels
       kernel_Gaussian
       rbf_dot
    
+   
+
+   
+   
+   
+
+   
+   
+   
+
+
+

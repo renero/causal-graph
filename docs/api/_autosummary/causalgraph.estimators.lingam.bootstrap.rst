@@ -4,6 +4,15 @@ causalgraph.estimators.lingam.bootstrap
 .. automodule:: causalgraph.estimators.lingam.bootstrap
 
    
+   
+   
+
+   
+   
+   
+
+   
+   
    .. rubric:: Classes
 
    .. autosummary::
@@ -11,3 +20,11 @@ causalgraph.estimators.lingam.bootstrap
       BootstrapMixin
       BootstrapResult
    
+   
+
+   
+   
+   
+
+
+

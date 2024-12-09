@@ -1,8 +1,13 @@
-causalgraph.generators.mechanisms
+﻿causalgraph.generators.mechanisms
 =================================
 
 .. automodule:: causalgraph.generators.mechanisms
 
+   
+   
+   
+
+   
    
    .. rubric:: Functions
 
@@ -12,6 +17,10 @@ causalgraph.generators.mechanisms
       gaussian_cause
       gmm_cause
       noise
+   
+   
+
+   
    
    .. rubric:: Classes
 
@@ -24,3 +33,11 @@ causalgraph.generators.mechanisms
       SigmoidAM_Mechanism
       SigmoidMix_Mechanism
    
+   
+
+   
+   
+   
+
+
+

@@ -1,8 +1,13 @@
-causalgraph.independence.mic
+﻿causalgraph.independence.mic
 ============================
 
 .. automodule:: causalgraph.independence.mic
 
+   
+   
+   
+
+   
    
    .. rubric:: Functions
 
@@ -10,3 +15,15 @@ causalgraph.independence.mic
    
       pairwise_mic
    
+   
+
+   
+   
+   
+
+   
+   
+   
+
+
+

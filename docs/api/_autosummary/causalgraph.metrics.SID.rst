@@ -1,8 +1,13 @@
-causalgraph.metrics.SID
+﻿causalgraph.metrics.SID
 =======================
 
 .. automodule:: causalgraph.metrics.SID
 
+   
+   
+   
+
+   
    
    .. rubric:: Functions
 
@@ -23,3 +28,15 @@ causalgraph.metrics.SID
       pm_
       unique_rows
    
+   
+
+   
+   
+   
+
+   
+   
+   
+
+
+

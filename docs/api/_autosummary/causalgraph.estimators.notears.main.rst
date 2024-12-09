@@ -4,6 +4,11 @@ causalgraph.estimators.notears.main
 .. automodule:: causalgraph.estimators.notears.main
 
    
+   
+   
+
+   
+   
    .. rubric:: Functions
 
    .. autosummary::
@@ -11,3 +16,15 @@ causalgraph.estimators.notears.main
       notears_standard
       run
    
+   
+
+   
+   
+   
+
+   
+   
+   
+
+
+

@@ -1,8 +1,13 @@
-causalgraph.independence.edge\_orientation
+﻿causalgraph.independence.edge\_orientation
 ==========================================
 
 .. automodule:: causalgraph.independence.edge_orientation
 
+   
+   
+   
+
+   
    
    .. rubric:: Functions
 
@@ -10,3 +15,15 @@ causalgraph.independence.edge\_orientation
    
       get_edge_orientation
    
+   
+
+   
+   
+   
+
+   
+   
+   
+
+
+

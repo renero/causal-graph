@@ -1,8 +1,17 @@
-causalgraph.explainability.regression\_quality
+﻿causalgraph.explainability.regression\_quality
 ==============================================
 
 .. automodule:: causalgraph.explainability.regression_quality
 
+   
+   
+   
+
+   
+   
+   
+
+   
    
    .. rubric:: Classes
 
@@ -10,3 +19,11 @@ causalgraph.explainability.regression\_quality
    
       RegQuality
    
+   
+
+   
+   
+   
+
+
+

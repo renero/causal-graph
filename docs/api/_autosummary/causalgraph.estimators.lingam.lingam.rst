@@ -4,11 +4,20 @@ causalgraph.estimators.lingam.lingam
 .. automodule:: causalgraph.estimators.lingam.lingam
 
    
+   
+   
+
+   
+   
    .. rubric:: Functions
 
    .. autosummary::
    
       main
+   
+   
+
+   
    
    .. rubric:: Classes
 
@@ -16,3 +25,11 @@ causalgraph.estimators.lingam.lingam
    
       DirectLiNGAM
    
+   
+
+   
+   
+   
+
+
+

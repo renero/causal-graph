@@ -1,8 +1,17 @@
-causalgraph.explainability.perm\_importance
+﻿causalgraph.explainability.perm\_importance
 ===========================================
 
 .. automodule:: causalgraph.explainability.perm_importance
 
+   
+   
+   
+
+   
+   
+   
+
+   
    
    .. rubric:: Classes
 
@@ -10,3 +19,11 @@ causalgraph.explainability.perm\_importance
    
       PermutationImportance
    
+   
+
+   
+   
+   
+
+
+

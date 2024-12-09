@@ -1,8 +1,13 @@
-causalgraph.independence.effect
+﻿causalgraph.independence.effect
 ===============================
 
 .. automodule:: causalgraph.independence.effect
 
+   
+   
+   
+
+   
    
    .. rubric:: Functions
 
@@ -12,3 +17,15 @@ causalgraph.independence.effect
       estimate_edge
       main
    
+   
+
+   
+   
+   
+
+   
+   
+   
+
+
+

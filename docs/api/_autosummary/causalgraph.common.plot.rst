@@ -1,8 +1,13 @@
-causalgraph.common.plot
+﻿causalgraph.common.plot
 =======================
 
 .. automodule:: causalgraph.common.plot
 
+   
+   
+   
+
+   
    
    .. rubric:: Functions
 
@@ -31,3 +36,15 @@ causalgraph.common.plot
       subplots
       values_distribution
    
+   
+
+   
+   
+   
+
+   
+   
+   
+
+
+

@@ -1,8 +1,13 @@
-causalgraph.models.gbt
+﻿causalgraph.models.gbt
 ======================
 
 .. automodule:: causalgraph.models.gbt
 
+   
+   
+   
+
+   
    
    .. rubric:: Functions
 
@@ -10,9 +15,21 @@ causalgraph.models.gbt
    
       custom_main
    
+   
+
+   
+   
    .. rubric:: Classes
 
    .. autosummary::
    
       GBTRegressor
    
+   
+
+   
+   
+   
+
+
+

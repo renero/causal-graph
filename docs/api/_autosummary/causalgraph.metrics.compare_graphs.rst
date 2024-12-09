@@ -1,8 +1,13 @@
-causalgraph.metrics.compare\_graphs
+﻿causalgraph.metrics.compare\_graphs
 ===================================
 
 .. automodule:: causalgraph.metrics.compare_graphs
 
+   
+   
+   
+
+   
    
    .. rubric:: Functions
 
@@ -10,9 +15,21 @@ causalgraph.metrics.compare\_graphs
    
       evaluate_graph
    
+   
+
+   
+   
    .. rubric:: Classes
 
    .. autosummary::
    
       Metrics
    
+   
+
+   
+   
+   
+
+
+

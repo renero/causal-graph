@@ -1,8 +1,13 @@
-causalgraph.models.dnn
+﻿causalgraph.models.dnn
 ======================
 
 .. automodule:: causalgraph.models.dnn
 
+   
+   
+   
+
+   
    
    .. rubric:: Functions
 
@@ -10,9 +15,21 @@ causalgraph.models.dnn
    
       custom_main
    
+   
+
+   
+   
    .. rubric:: Classes
 
    .. autosummary::
    
       NNRegressor
    
+   
+
+   
+   
+   
+
+
+

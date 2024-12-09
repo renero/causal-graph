@@ -1,8 +1,17 @@
-causalgraph.independence.graph\_independence
+﻿causalgraph.independence.graph\_independence
 ============================================
 
 .. automodule:: causalgraph.independence.graph_independence
 
+   
+   
+   
+
+   
+   
+   
+
+   
    
    .. rubric:: Classes
 
@@ -10,3 +19,11 @@ causalgraph.independence.graph\_independence
    
       GraphIndependence
    
+   
+
+   
+   
+   
+
+
+
