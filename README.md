@@ -1,4 +1,4 @@
-# `causalgraph` - A library to infer causal-effect relationships from tabular data
+<img src="./_static/logo-light.png" alt="logo" width="300">
 
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/downloads/release/python-31012/)
@@ -8,9 +8,9 @@
 [![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue.svg)](https://renero.github.io/causalgraph/)
 
 
-![](./_static/logo-light.png)
+# causalgraph - A library to infer causal-effect relationships from tabular data
 
-**`causalgraph`** is a library that implements methods to extract the causal graph,
+'**causalgraph**' is a library that implements methods to extract the causal graph,
 from tabular data, specifically the **ReX** method, and other compared methods
 like GES, PC, FCI, LiNGAM, CAM, and NOTEARS.
 
