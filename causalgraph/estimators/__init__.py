@@ -3,6 +3,7 @@ Estimators module for causal discovery.
 
 This module provides various estimators and algorithms for causal discovery,
 including:
+- REX
 - CAM (Causal Additive Models)
 - FCI (Fast Causal Inference)
 - GES (Greedy Equivalence Search)
@@ -17,6 +18,7 @@ from . import ges
 from . import lingam
 from . import notears
 from . import pc
+from . import rex
 
 __all__ = [
     'cam',
@@ -25,4 +27,5 @@ __all__ = [
     'lingam',
     'notears',
     'pc',
+    'rex'
 ]

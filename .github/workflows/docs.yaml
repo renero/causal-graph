@@ -69,16 +69,27 @@ jobs:
           # Clean up previous API documentation
           rm -rf api/
           mkdir -p api/
+          
+          # Create the main API reference file
+          cat > api/index.rst << EOL
+          =============
+          API Reference
+          =============
+          
+          .. toctree::
+             :maxdepth: 2
+             :caption: Modules:
+          
+             modules
+          EOL
+          
           # Generate new API documentation with better options
-          sphinx-apidoc --module-first --separate --no-toc -f -o api ../causalgraph ../causalgraph/tests/*
-          # Create the modules index
-          echo "API Reference" > api/modules.rst
-          echo "=============" >> api/modules.rst
-          echo "" >> api/modules.rst
-          echo ".. toctree::" >> api/modules.rst
-          echo "   :maxdepth: 4" >> api/modules.rst
-          echo "" >> api/modules.rst
-          echo "   causalgraph" >> api/modules.rst
+          sphinx-apidoc --module-first --separate --full -f -o api ../causalgraph ../causalgraph/tests/*
+          
+          # Update modules.rst to improve hierarchy
+          sed -i.bak '1s/.*/API Modules/' api/modules.rst
+          sed -i.bak '2s/.*/==========/' api/modules.rst
+          
           python generate_api_rst.py
 
       - name: Build documentation
