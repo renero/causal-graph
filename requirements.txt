@@ -26,6 +26,7 @@ python_igraph
 rich
 scikit-learn
 seaborn
+shap
 statsmodels
 tensorboardX
 torch
