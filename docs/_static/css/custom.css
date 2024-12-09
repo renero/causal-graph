@@ -1,0 +1,23 @@
+/* Custom CSS for CausalGraph documentation */
+
+/* Logo styling */
+.navbar-brand img {
+    max-height: 50px;
+    width: auto;
+}
+
+/* Navigation menu styling */
+.bd-sidebar-primary {
+    border-right: 1px solid #dee2e6;
+}
+
+/* Module section styling */
+.toctree-wrapper {
+    margin-top: 2em;
+}
+
+/* Improve readability */
+.bd-content {
+    max-width: 1000px;
+    margin: auto;
+}

@@ -38,6 +38,7 @@ autodoc_default_options = {
     'member-order': 'bysource',
     'special-members': '__init__',
     'undoc-members': True,
+    'private-members': False,
     'exclude-members': '__weakref__'
 }
 
@@ -95,21 +96,41 @@ html_theme_options = {
     "use_edit_page_button": True,
     "show_toc_level": 2,
     "navbar_align": "left",
+    "navigation_with_keys": True,
+    "navigation_depth": 4,
+    "show_nav_level": 2,
     "logo": {
         "image_light": "_static/logo-light.png",
         "image_dark": "_static/logo-dark.png",
         "text": "CausalGraph",  # Fallback if no logo images
     },
-    "announcement": "This is the development version of CausalGraph.",
-    "navigation_with_keys": True,
-    "show_nav_level": 2,
-    "show_prev_next": True,
+    "navbar_start": ["navbar-logo"],
+    "navbar_center": ["navbar-nav"],
+    "navbar_persistent": ["search-button"],
+    "primary_sidebar_end": ["indices"],
 }
 
-# Theme-specific sidebars
 html_sidebars = {
     "**": ["search-field", "sidebar-nav-bs", "sidebar-ethical-ads"]
 }
+
+html_context = {
+    "default_mode": "light"
+}
+
+# These paths are either relative to html_static_path or fully qualified paths (eg. https://...)
+html_css_files = [
+    'css/custom.css',
+]
+
+html_js_files = [
+    'js/custom.js',
+]
+
+# Add any paths that contain custom static files (such as style sheets) here,
+# relative to this directory. They are copied after the builtin static files,
+# so a file named "default.css" will overwrite the builtin "default.css".
+html_static_path = ['_static']
 
 # GitHub Pages specific settings
 html_baseurl = 'https://renero.github.io/causalgraph/'
