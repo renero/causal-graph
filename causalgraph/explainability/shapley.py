@@ -330,6 +330,14 @@ class ShapEstimator(BaseEstimator):
             self.shap_values[target_name] = shap_values_target
             self.feature_order[target_name] = feature_order_target
             self.shap_mean_values[target_name] = shap_mean_values_target
+
+            # If dimensions of all_mean_shap_values is not (m, 1), reshape it
+            if len(self.all_mean_shap_values.shape) == 1:
+                self.all_mean_shap_values = self.all_mean_shap_values.reshape(-1, 1)
+
+            if len(shap_mean_values_target.shape) == 1:
+                shap_mean_values_target = shap_mean_values_target.reshape(-1, 1)
+
             self.all_mean_shap_values = np.concatenate(
                 (self.all_mean_shap_values, shap_mean_values_target)
             )
@@ -449,6 +457,12 @@ class ShapEstimator(BaseEstimator):
             pbar = ProgBar().start_subtask(pbar_name, 4 + len(self.feature_names))
         else:
             pbar = None
+
+        # Reshape SHAP values if necessary
+        for feature in self.feature_names:
+            if self.shap_values[feature].shape[-1] == 1:
+                self.shap_values[feature] = self.shap_values[feature]\
+                    .reshape(self.shap_values[feature].shape[:-1])
 
         # Compute error contribution at this stage, since it needs the individual
         # SHAP values
@@ -825,9 +839,11 @@ class ShapEstimator(BaseEstimator):
                 columns=[c for c in self.feature_names if c != target])
             error_contribution[target] = self._individual_error_contribution(
                 shap_values, y_true[target], y_hat[target])
-            #  Add a 0.0 value at index target in the error contribution series
-            error_contribution[target] = error_contribution[target].append(
-                pd.Series(0.0, index=[target]))
+            # Add a 0.0 value at index target in the error contribution series
+            error_contribution[target] = pd.concat([
+                error_contribution[target],
+                pd.Series({target: 0.0})
+            ])
             # Sort the series by index
             error_contribution[target] = error_contribution[target].sort_index()
 

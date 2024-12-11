@@ -30,7 +30,7 @@ By combining ML and explainability techniques with causal discovery, **ReX**
 bridges the gap between predictive modeling and causal inference, offering an 
 effective tool for understanding complex causal structures.
 
-![ReX Schema](./_static/REX.png)
+![ReX Schema](./docs/_static/REX.png)
 
 It is built using SKLearn estimators, so that it can be used in scikit-learn 
 pipelines and (hyper)parameter search, while facilitating testing (including 
@@ -135,7 +135,8 @@ the method without taking into account the true DAG.
 DAG.
 
 In those cases where training or running a method takes a long time, `causalgraph` 
-allows you to save the model (`-s` or `--save_model`) trained in a file and load it later. To load the model, use the `-l` or `--load_model` option.
+allows you to save the model (`-s` or `--save_model`) trained in a file and 
+load it later. To load the model, use the `-l` or `--load_model` option.
 
 The option `-b` or `--bootstrap` allows you to specify the number of iterations
 for bootstrap in the ReX method. 
