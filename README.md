@@ -1,4 +1,4 @@
-<img src="./_static/logo-light.png" alt="logo" width="300">
+<img src="./docs/_static/logo-light.png" alt="logo" width="300">
 
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/downloads/release/python-31012/)
