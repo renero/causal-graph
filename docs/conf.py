@@ -83,7 +83,11 @@ html_theme = 'pydata_sphinx_theme'
 # PyData theme options
 html_theme_options = {
     "github_url": "https://github.com/renero/causalgraph",
-    "navbar_end": ["theme-switcher", "navbar-icon-links"],
+    "use_edit_page_button": True,
+    "show_toc_level": 2,
+    "navigation_depth": 4,
+    "show_nav_level": 1,
+    "collapse_navigation": False,
     "icon_links": [
         {
             "name": "GitHub",
@@ -91,25 +95,6 @@ html_theme_options = {
             "icon": "fab fa-github-square",
             "type": "fontawesome",
         },
-    ],
-    "use_edit_page_button": True,
-    "show_toc_level": 2,
-    "navbar_align": "left",
-    "navigation_with_keys": True,
-    "navigation_depth": 4,
-    "show_nav_level": 1,
-    "collapse_navigation": False,
-    "logo": {
-        "image_light": "_static/logo-light.png",
-        "image_dark": "_static/logo-dark.png",
-        "text": "CausalGraph",
-    },
-    "navbar_links": [
-        ("Installation", "installation"),
-        ("Quickstart", "quickstart"),
-        ("Modules", "api/modules"),
-        ("Contributing", "contributing"),
-        ("Changelog", "changelog"),
     ],
 }
 

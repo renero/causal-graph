@@ -34,4 +34,12 @@ That will generate the ReX model and run the model on the dataset, and print
 the results to the terminal, like this:
 
 .. code-block:: bash
-   
+
+   Resulting Graph:
+   ---------------
+   X1 -> X2
+     X2 -> X4
+     X2 -> X3
+   X1 -> X4
+
+which is the true graph expected.
