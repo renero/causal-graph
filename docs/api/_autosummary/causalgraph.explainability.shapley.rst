@@ -1,8 +1,13 @@
-causalgraph.explainability.shapley
+﻿causalgraph.explainability.shapley
 ==================================
 
 .. automodule:: causalgraph.explainability.shapley
 
+   
+   
+   
+
+   
    
    .. rubric:: Functions
 
@@ -11,6 +16,10 @@ causalgraph.explainability.shapley
       custom_main
       sachs_main
    
+   
+
+   
+   
    .. rubric:: Classes
 
    .. autosummary::
@@ -18,3 +27,11 @@ causalgraph.explainability.shapley
       ShapDiscrepancy
       ShapEstimator
    
+   
+
+   
+   
+   
+
+
+

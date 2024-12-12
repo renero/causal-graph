@@ -88,6 +88,7 @@ html_theme_options = {
     "navigation_depth": 4,
     "show_nav_level": 1,
     "collapse_navigation": False,
+    "search_bar_position": "navbar",  # or "sidebar"
     "icon_links": [
         {
             "name": "GitHub",
@@ -99,7 +100,7 @@ html_theme_options = {
 }
 
 html_sidebars = {
-    "**": ["sidebar-nav-bs", "sidebar-search-bs"]
+    "**": ["search-field", "sidebar-nav-bs", "sidebar-ethical-ads"]
 }
 
 html_context = {

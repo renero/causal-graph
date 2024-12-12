@@ -1,8 +1,17 @@
-causalgraph.common.notebook
+﻿causalgraph.common.notebook
 ===========================
 
 .. automodule:: causalgraph.common.notebook
 
+   
+   
+   
+
+   
+   
+   
+
+   
    
    .. rubric:: Classes
 
@@ -11,3 +20,11 @@ causalgraph.common.notebook
       BaseExperiment
       Experiment
    
+   
+
+   
+   
+   
+
+
+

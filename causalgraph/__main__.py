@@ -30,7 +30,13 @@ SUPPORTED_METHODS = ['rex', 'pc', 'fci', 'ges', 'lingam', 'cam', 'notears']
 def parse_args():
     class SplitArgs(argparse.Action):
         def __call__(self, parser, namespace, values, option_string=None):
-            setattr(namespace, self.dest, values.split(','))
+            """Split a comma-separated list of values."""
+            if values is None:
+                setattr(namespace, self.dest, [])
+            elif isinstance(values, str):
+                setattr(namespace, self.dest, values.split(','))
+            else:
+                setattr(namespace, self.dest, list(values))
 
     parser = argparse.ArgumentParser(
         description="Causal Graph Learning with ReX and other compared methods.",
@@ -130,7 +136,7 @@ def check_args_validity(args):
             filename=save_model, path=run_values['output_path'])
     else:
         run_values['save_model'] = args.save_model
-        run_values['output_path'] = os.path.dirname(save_model)
+        run_values['output_path'] = os.path.dirname(args.save_model)
         run_values['model_filename'] = args.save_model
 
     # Set default regressors in case ReX is called.
