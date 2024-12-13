@@ -8,9 +8,9 @@
 [![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue.svg)](https://renero.github.io/causalgraph/)
 
 
-# causalgraph - A library to infer causal-effect relationships from tabular data
+# causalexplain - A library to infer causal-effect relationships from tabular data
 
-'**causalgraph**' is a library that implements methods to extract the causal graph,
+'**causalexplain**' is a library that implements methods to extract the causal graph,
 from tabular data, specifically the **ReX** method, and other compared methods
 like GES, PC, FCI, LiNGAM, CAM, and NOTEARS.
 
@@ -51,13 +51,10 @@ the datasets in the `data` folder.
 
 ## Installation
 
-In the comming days the library will be made available in PyPI. 
-In the meantime, you can install it from the source code:
+The project can be installed using pip:
 
 ```bash
-$ git clone
-$ cd causalgraph
-$ pip install .
+$ pip install causalexplain
 ```
 
 ## Data
@@ -66,19 +63,19 @@ The datasets used to reproduce the results presented in the manuscript are
 available under the `data` folder. The datasets were generated using the
 `generators` module.
 
-## Executing `causalgraph`
+## Executing `causalexplain`
 
-To run `causalgraph` on your data, you can use the `causalgraph` command:
+To run `causalexplain` on your data, you can use the `causalexplain` command:
 
 ```
-$ python -m causalgraph
-   ____                      _  ____                 _
-  / ___|__ _ _   _ ___  __ _| |/ ___|_ __ __ _ _ __ | |__
- | |   / _` | | | / __|/ _` | | |  _| '__/ _` | '_ \| '_ \
- | |__| (_| | |_| \__ \ (_| | | |_| | | | (_| | |_) | | | |
-  \____\__,_|\__,_|___/\__,_|_|\____|_|  \__,_| .__/|_| |_|
-                                              |_|
-usage: causalgraph [-h] -d DATASET [-m {rex,pc,fci,ges,lingam,cam,notears}] 
+$ python -m causalexplain
+   ___                      _                 _       _       
+  / __\__ _ _   _ ___  __ _| | _____  ___ __ | | __ _(_)_ __  
+ / /  / _` | | | / __|/ _` | |/ _ \ \/ / '_ \| |/ _` | | '_ \ 
+/ /__| (_| | |_| \__ \ (_| | |  __/>  <| |_) | | (_| | | | | |
+\____/\__,_|\__,_|___/\__,_|_|\___/_/\_\ .__/|_|\__,_|_|_| |_|
+                                       |_|                                        
+usage: causalexplain [-h] -d DATASET [-m {rex,pc,fci,ges,lingam,cam,notears}] 
                    [-t TRUE_DAG] [-l LOAD_MODEL] [-T THRESHOLD] [-u UNION] 
                    [-i ITERATIONS] [-b BOOTSTRAP] [-r REGRESSOR] [-S SEED] 
                    [-s [SAVE_MODEL]] [-v] [-q] [-o OUTPUT]
@@ -88,7 +85,7 @@ that will present you with a menu to choose the dataset you want to use, the
 method you want to use to infer the causal graph, and the hyperparameters you
 want to use.
 
-The minimum required to run `causalgraph` is a dataset file in CSV format,
+The minimum required to run `causalexplain` is a dataset file in CSV format,
 with the first row containing the names of the variables, and the rest of
 the rows containing the values of the variables. The method selected by default
 is ReX, but you can also choose between PC, FCI, GES, LiNGAM, CAM, NOTEARS. 
@@ -99,21 +96,21 @@ displayed along with the metrics obtained, if the true dag is provided
 
 ## Example commands
 
-The following command illustrates how to run `causalgraph` on the toy dataset
+The following command illustrates how to run `causalexplain` on the toy dataset
 using the ReX method:
 
 ```bash
-$ python -m causalgraph -d /path/to/toy_dataset.csv -t /path/to/toy_dataset.dot
+$ python -m causalexplain -d /path/to/toy_dataset.csv -t /path/to/toy_dataset.dot
 ```
 
-The same command can be used to run `causalgraph` on the toy dataset using the
+The same command can be used to run `causalexplain` on the toy dataset using the
 CAM method:
 
 ```bash
-$ python -m causalgraph -d /path/to/toy_dataset.csv -m cam -t /path/to/toy_dataset.dot
+$ python -m causalexplain -d /path/to/toy_dataset.csv -m cam -t /path/to/toy_dataset.dot
 ```
 
-For more information on command line options, run `causalgraph -h` or go to 
+For more information on command line options, run `causalexplain -h` or go to 
 the [Quickstart](https://renero.github.io/causalgraph/quickstart.html) section in the documentation.
 
 ## Additional Information
