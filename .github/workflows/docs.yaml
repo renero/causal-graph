@@ -84,7 +84,7 @@ jobs:
           EOL
           
           # Generate new API documentation
-          sphinx-apidoc -f -o api ../causalgraph ../causalgraph/tests/* \
+          sphinx-apidoc -f -o api ../causalexplain ../causalexplain/tests/* \
             --tocfile modules \
             --full \
             --private \

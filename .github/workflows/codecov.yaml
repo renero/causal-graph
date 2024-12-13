@@ -1,4 +1,4 @@
-name: Causal graph repo
+name: Causalexplain repo
 
 on:
   push:
