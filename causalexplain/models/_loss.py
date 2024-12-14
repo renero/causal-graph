@@ -20,6 +20,9 @@ class RBF(nn.Module):
         self.bandwidth = bandwidth
 
     def get_bandwidth(self, L2_distances):
+        """
+        Get the bandwidth of the RBF kernel.
+        """
         if self.bandwidth is None:
             n_samples = L2_distances.shape[0]
             return L2_distances.data.sum() / (n_samples ** 2 - n_samples)
