@@ -1,4 +1,4 @@
-# CausalGraph Documentation
+# CausalExplain Documentation
 
 ```{include} ../README.md
 :relative-docs: docs/

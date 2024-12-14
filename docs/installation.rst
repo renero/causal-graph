@@ -1,16 +1,16 @@
 Installation
 ============
 
-You can install CausalGraph using pip:
+You can install CausalExplain using pip:
 
 .. code-block:: bash
 
-   pip install causalgraph
+   pip install causalexplain
 
 Requirements
 -----------
 
-CausalGraph requires Python 3.7 or later. The main dependencies are:
+CausalExplain requires Python 3.7 or later. The main dependencies are:
 
 * numpy
 * pandas
@@ -18,6 +18,5 @@ CausalGraph requires Python 3.7 or later. The main dependencies are:
 * scikit-learn
 * torch
 * matplotlib
-* seaborn
 
 For a complete list of dependencies, see the ``requirements.txt`` file in the repository.

@@ -1,34 +1,34 @@
 Quickstart
 ==========
 
-This guide will help you get started with CausalGraph.
+This guide will help you get started with CausalExplain.
 
 Basic Usage
 ----------
 
-Here's a simple example of how to get CausalGraph help from the command line:
+Here's a simple example of how to get CausalExplain help from the command line:
 
 .. code-block:: bash
 
-   python -m causalgraph --help
+   python -m causalexplain --help
 
-In order to run CausalGraph from the command line, you need to have Python 3.10
-or later installed on your system. To install CausalGraph, run the following
+In order to run CausalExplain from the command line, you need to have Python 3.10
+or later installed on your system. To install CausalExplain, run the following
 command:
 
 .. code-block:: bash
 
-   pip install causalgraph
+   pip install causalexplain
 
-Once CausalGraph is installed, you can run it from the command line by typing
-``python -m causalgraph``.
+Once CausalExplain is installed, you can run it from the command line by typing
+``python -m causalexplain``.
 
 To run a simple case with a ``toy_dataset.csv`` file using ReX model, you can 
 use the following command, assuming default parameters:
 
 .. code-block:: bash
 
-   python -m causalgraph -d /path/to/toy_dataset.csv
+   python -m causalexplain -d /path/to/toy_dataset.csv
 
 That will generate the ReX model and run the model on the dataset, and print
 the results to the terminal, like this:
@@ -59,7 +59,7 @@ In case you don't have a true DAG, the result is the plausible causal graph,
 which is the causal graph that is inferred by the method without taking into
 account the true DAG.
 
-Regarding the output of the ``causalgraph`` command, the following information is 
+Regarding the output of the ``causalexplain`` command, the following information is 
 provided:
 
 - The plausible causal graph, which is the causal graph that is inferred by
@@ -67,7 +67,7 @@ the method without taking into account the true DAG.
 - The metrics obtained from the evaluation of the causal graph against the true
 DAG.
 
-In those cases where training or running a method takes a long time, ``causalgraph`` 
+In those cases where training or running a method takes a long time, ``causalexplain`` 
 allows you to save the model (``-s`` or ```--save_model```) trained in a file and 
 load it later. To load the model, use the ``-l`` or ``--load_model`` option.
 

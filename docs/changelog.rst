@@ -3,15 +3,13 @@ Changelog
 
 All notable changes to this project will be documented in this file.
 
-[0.1.0] - 2024
+[0.5.0] - 2024
 --------------
 
-Initial release of CausalGraph
+Initial public release of CausalExplain, after three years of research.
 
 Added
 ~~~~~
-* Basic causal discovery functionality
 * Support for various causal inference methods
-* Visualization tools for causal graphs
 * Command-line interface
 * Basic documentation

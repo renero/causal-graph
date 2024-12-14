@@ -33,15 +33,15 @@ def main():
 .. toctree::
    :maxdepth: 4
 
-   causalgraph
+   causalexplain
 """)
     
     # Generate the main package RST
-    with open(os.path.join(api_dir, "causalgraph.rst"), "w") as f:
-        f.write("""causalgraph
+    with open(os.path.join(api_dir, "causalexplain.rst"), "w") as f:
+        f.write("""causalexplain
 ==========
 
-.. automodule:: causalgraph
+.. automodule:: causalexplain
    :members:
    :undoc-members:
    :show-inheritance:
@@ -52,24 +52,24 @@ Submodules
 .. toctree::
    :maxdepth: 4
 
-   causalgraph.common
-   causalgraph.estimators
-   causalgraph.explainability
-   causalgraph.generators
-   causalgraph.independence
-   causalgraph.metrics
-   causalgraph.models
+   causalexplain.common
+   causalexplain.estimators
+   causalexplain.explainability
+   causalexplain.generators
+   causalexplain.independence
+   causalexplain.metrics
+   causalexplain.models
 """)
     
     # Generate RST files for each submodule
     submodules = [
-        "causalgraph.common",
-        "causalgraph.estimators",
-        "causalgraph.explainability",
-        "causalgraph.generators",
-        "causalgraph.independence",
-        "causalgraph.metrics",
-        "causalgraph.models"
+        "causalexplain.common",
+        "causalexplain.estimators",
+        "causalexplain.explainability",
+        "causalexplain.generators",
+        "causalexplain.independence",
+        "causalexplain.metrics",
+        "causalexplain.models"
     ]
     
     for submodule in submodules:

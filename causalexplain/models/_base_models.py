@@ -99,7 +99,7 @@ class MLP(pl.LightningModule):
 
         if isinstance(self.dropout, float):
             dropouts = [self.dropout] * len(layers_dimensions)
-        assert len(layers_dimensions) == len(dropouts)
+            assert len(layers_dimensions) == len(dropouts)
         self.net = nn.Sequential(
             *[
                 MLP.Block(
