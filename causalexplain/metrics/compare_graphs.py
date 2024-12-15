@@ -303,34 +303,38 @@ def _binary_adj_matrix(
 ) -> np.ndarray:
     """
     Returns a binary adjacency matrix from a weighted adjacency matrix. If the
-    values in the adjacency matrix are greater than the threshold (default 0.0) then
-    that value is tarnsformed into 1.0.
+    values in the adjacency matrix are greater than the threshold (default 0.0) 
+    then that value is transformed into 1.0.
 
     Arguments:
         - G (Graph or DiGraph): Graph or Digraph
         - threshold (float): Min value of weight to be valued as 1 in the binary
             matrix.
-        - absolute (bool): Whether performing the comparison of weights against the
-            threshold using absolute value. Default is false.
+        - absolute (bool): Whether performing the comparison of weights against 
+            the threshold using absolute value. Default is false.
 
     Returns:
         np.ndarray with the binary version of the weights.
     """
-    m = adjacency_matrix(G, nodelist=order).todense()
+    if order is None:
+        order = sorted(list(G.nodes()))
+    m = np.zeros((len(order), len(order)))
+    for u, v in G.edges():
+        w = G.get_edge_data(u, v)['weight']
+        if w is not None:
+            if absolute:
+                w = np.abs(w)
+            if w >= threshold:
+                m[order.index(u), order.index(v)] = 1
 
-    def f(m, threshold, absolute):
-        if absolute:
-            return (np.abs(m) > threshold).astype(np.int16)
-        return (m > threshold).astype(np.int16)
-
-    return f(m, threshold, absolute)
+    return m.astype(np.int16)
 
 
 def _adjacency(
         G: AnyGraph, 
         order: Optional[List] = None, 
         threshold=0.0, 
-        absolute=False):
+        absolute=False) -> np.ndarray:
     """
     Retrieves the adjacency matrix from the graph using NetworkX method if the
     graph is not weighted. This method produces a matrix with 1/0 values only
@@ -373,7 +377,7 @@ def _weighted_adjacency(
         G: AnyGraph, 
         order: Optional[List] = None, 
         threshold=0.0, 
-        absolute=False):
+        absolute=False) -> np.ndarray:
     """
     Retrieves the adjacency matrix from the graph using NetworkX method if the
     graph is not weighted. This method produces a matrix with 1/0 values only
@@ -395,15 +399,20 @@ def _weighted_adjacency(
     if order is None:
         order = sorted(list(G.nodes()))
     F = G.copy()
-    def value(x): return abs(x) if absolute else x
-    for p, q, w in F.edges(data="weight"):
-        if w is None:
-            continue
-        if value(w) < threshold:
-            F.remove_edge(p, q)
 
-    adj_matrix = nx.to_numpy_array(F, nodelist=order)
-    adj_matrix[np.isnan(adj_matrix)] = 0
+    def value(x): return abs(x) if absolute else x
+
+    adj_matrix = np.zeros((len(order), len(order)))
+    for u, v in F.edges():
+        # check if F.get_edge_data(u, v) is not None and contains a key 'weight'
+        if 'weight' not in F.get_edge_data(u, v):
+            w = 1
+        else:
+            w = value(F.get_edge_data(u, v)['weight'])
+        if w >= threshold:
+            adj_matrix[order.index(u), order.index(v)] = w
+            if not G.is_directed():
+                adj_matrix[order.index(v), order.index(u)] = w
 
     return adj_matrix
 
@@ -431,7 +440,7 @@ def _positive(matrix: np.ndarray) -> np.ndarray:
     Returns a matrix where negative values are converted to zero,
     and positive values remain the same
     """
-    return (matrix > 0).astype(int)
+    return (matrix > 0).astype(int) * matrix
 
 
 def _negative(matrix: np.ndarray) -> np.ndarray:
@@ -439,7 +448,8 @@ def _negative(matrix: np.ndarray) -> np.ndarray:
     Returns a matrix where positive values are converted to zero,
     and negative values remain the same.
     """
-    return (matrix < 0).astype(int)
+    return (matrix < 0).astype(int) * matrix
+
 
 
 def _conf_mat(truth, est, feature_names):
@@ -451,8 +461,22 @@ def _conf_mat(truth, est, feature_names):
 
 def _conf_mat_directed(truth, est, feature_names):
     """
-    Computes the confusion matrix for two directed graphs.
+    Computes the confusion matrix for two directed graphs. This method is
+    currently only used for directed graphs.
+
+    Arguments:
+        truth: (nx.DiGraph) the ground truth graph
+        est: (nx.DiGraph) the estimated graph
+
+    Returns:
+        Tp: (int) number of true positives
+        Tn: (int) number of true negatives
+        Fp: (int) number of false positives
+        Fn: (int) number of false negatives
     """
+    assert truth.is_directed(), "true graph must be directed"
+    assert est.is_directed(), "estimated graph must be directed"
+
     def is_arrow(G, u, v):
         if u not in G.nodes() or v not in G.nodes():
             return False
@@ -484,11 +508,27 @@ def _conf_mat_directed(truth, est, feature_names):
 
 
 def _conf_mat_undirected(truth, est, feature_names):
+    """
+    Computes the confusion matrix for two undirected graphs. This method is
+    currently only used for undirected graphs.
+
+    Arguments:
+        truth: (nx.Graph) the ground truth graph
+        est: (nx.Graph) the estimated graph
+
+    Returns:
+        Tp: (int) number of true positives
+        Tn: (int) number of true negatives
+        Fp: (int) number of false positives
+        Fn: (int) number of false negatives
+    """
+    assert not truth.is_directed(), "true graph must be undirected"
+    assert not est.is_directed(), "estimated graph must be undirected"
 
     def is_edge(G, u, v):
         if u not in G.nodes() or v not in G.nodes():
             return False
-        return G.has_edge(u, v) or G.has_edge(v, u)
+        return G.has_edge(u, v)
 
     truePositives = np.zeros(
         (len(feature_names), len(feature_names))).astype(int)
@@ -498,15 +538,21 @@ def _conf_mat_undirected(truth, est, feature_names):
         for j, v in enumerate(feature_names):
             if is_edge(truth, u, v):
                 truePositives[i, j] = 1
+                truePositives[j, i] = 1
             if is_edge(est, u, v):
                 estPositives[i, j] = 1
+                estPositives[j, i] = 1
 
     zeros = np.zeros((len(feature_names), len(feature_names)))
 
-    Tp = int((np.minimum(truePositives == estPositives, truePositives)).sum() / 2)
+    # Excluir las diagonales del conteo
+    eq = (truePositives == estPositives)
+    np.fill_diagonal(eq, False)
+
+    Tp = int((np.minimum(eq, truePositives).sum() / 2))
+    Tn = int(eq.sum() / 2) - Tp
     Fp = int((np.maximum(estPositives - truePositives, zeros)).sum() / 2)
     Fn = int((np.maximum(truePositives - estPositives, zeros)).sum() / 2)
-    Tn = int(((truePositives == estPositives).sum() - Tp) / 2)
 
     return Tp, Tn, Fp, Fn
 
@@ -539,6 +585,17 @@ def _confusion_matrix(G, metrics):
 
 
 def _precision(metrics):
+    """
+    Precision = True Positives / (True Positives + False Positives)
+
+    Arguments:
+        metrics (dict): A dictionary containing the following keys:
+            - Tp (int): The number of true positives.
+            - Fp (int): The number of false positives.
+
+    Returns:
+        float: The precision score.
+    """
     if (metrics["Tp"] + metrics["Fp"]) == 0:
         return 0
     else:
@@ -546,6 +603,17 @@ def _precision(metrics):
 
 
 def _recall(metrics):
+    """
+    Recall = True Positives / (True Positives + False Negatives)
+
+    Arguments:
+        metrics (dict): A dictionary containing the following keys:
+            - Tp (int): The number of true positives.
+            - Fn (int): The number of false negatives.
+
+    Returns:
+        float: The recall score.
+    """
     if (metrics["Tp"] + metrics["Fn"]) == 0.:
         return 0
     else:
@@ -553,6 +621,17 @@ def _recall(metrics):
 
 
 def _aupr(metrics):
+    """
+    Area Under the Precision-Recall Curve (AUPR)
+
+    Arguments:
+        metrics (dict): A dictionary containing the following keys:
+            - _Gm (numpy.ndarray): The ground truth adjacency matrix.
+            - _preds (numpy.ndarray): The predicted adjacency matrix.
+
+    Returns:
+        float: The AUPR score.
+    """
     true_labels = np.squeeze(np.asarray(metrics["_Gm"].ravel()))
     predicted = np.squeeze(np.asarray(metrics["_preds"].ravel()))
     try:
@@ -564,6 +643,17 @@ def _aupr(metrics):
 
 
 def _f1(metrics):
+    """
+    F1 = 2 * (Precision * Recall) / (Precision + Recall)
+
+    Arguments:
+        metrics (dict): A dictionary containing the following keys:
+            - precision (float): The precision score.
+            - recall (float): The recall score.
+
+    Returns:
+        float: The F1 score.
+    """
     if metrics["recall"] + metrics["precision"] == 0.0:
         return 0.0
     else:
