@@ -197,6 +197,158 @@ def graph_from_dictionary(d: Dict[str, List[Union[str, Tuple[str, float]]]]) -> 
     return g
 
 
+def graph_from_adjacency(
+        adjacency: np.ndarray,
+        node_labels=None,
+        th=0.0,
+        inverse: bool = False,
+        absolute_values: bool = False
+) -> nx.DiGraph:
+    """
+    Manually parse the adj matrix to shape a dot graph
+
+    Args:
+        adjacency: a numpy adjacency matrix
+        node_labels: an array of same length as nr of columns in the adjacency
+            matrix containing the labels to use with every node.
+        th: (float) weight threshold to be considered a valid edge.
+        inverse (bool): Set to true if rows in adjacency reflects where edges 
+            are comming from, instead of where are they going to.
+        absolute_values: Take absolute value of weight label to check if 
+            its greater than the threshold.
+
+    Returns:
+         The Graph (DiGraph)
+    """
+    G = nx.DiGraph()
+    G.add_nodes_from(range(adjacency.shape[1]))
+
+    # What to do with absolute values?
+    def not_abs(x):
+        return x
+
+    w_val = np.abs if absolute_values else not_abs
+
+    def weight_gt(w, thresh):
+        return w != 0.0 if thresh is None else w_val(w) > thresh
+
+    # Do I have a threshold to consider?
+    for i, row in enumerate(adjacency):
+        for j, value in enumerate(row):
+            if inverse:
+                if weight_gt(adjacency[j][i], th):
+                    G.add_edge(i, j, weight=w_val(adjacency[j][i]))
+            else:
+                if weight_gt(value, th):
+                    # , arrowhead="normal")
+                    G.add_edge(i, j, weight=w_val(value))
+    # Map the current column numbers to the letters used in toy dataset
+    if node_labels is not None and len(node_labels) == adjacency.shape[1]:
+        mapping = dict(zip(sorted(G), node_labels))
+        G = nx.relabel_nodes(G, mapping)
+
+    return G
+
+
+def graph_from_adjacency_file(
+        file: Union[Path, str],
+        labels=None,
+        th=0.0,
+        sep=",",
+        header:bool=True
+) -> Tuple[nx.DiGraph, pd.DataFrame]:
+    """
+    Read Adjacency matrix from a file and return a Graph
+
+    Args:
+        file: (str) the full path of the file to read
+        labels: (List[str]) the list of node names to be used. If None, the
+            node names are extracted from the adj file. The names must be 
+            already sorted in the same order as the adjacency matrix.
+        th: (float) weight threshold to be considered a valid edge.
+        sep: (str) the separator used in the file
+        header: (bool) whether the file has a header. If True, then 'infer' 
+        is used to read the header.
+    Returns:
+        DiGraph, DataFrame
+    """
+    header_infer = "infer" if header else None
+    df = pd.read_csv(file, dtype="str", delimiter=sep, header=header_infer)
+    df = df.astype("float64")
+    if labels is None:
+        labels = list(df.columns)
+    G = graph_from_adjacency(df.values, node_labels=labels, th=th)
+
+    return G, df
+
+
+def graph_to_adjacency(
+        graph: AnyGraph,
+        labels: List[str],
+        weight_label: str = "weight") -> np.ndarray:
+    """
+    A method to generate the adjacency matrix of the graph. Labels are
+    sorted for better readability.
+
+    Args:
+        graph: (Union[Graph, DiGraph]) the graph to be converted.
+        node_names: (List[str]) the list of node names to be used. If None, the
+            node names are extracted from the graph. The names must be already
+            sorted in the same order as the adjacency matrix.
+        weight_label: the label used to identify the weights.
+
+    Return:
+        graph: (numpy.ndarray) A 2d array containing the adjacency matrix of
+            the graph.
+    """
+    symbol_map = {"o": 1, ">": 2, "-": 3}
+
+    # Fix for the case where an empty node is parsed from the .dot file
+    if '\\n' in labels:
+        labels.remove('\\n')
+
+    mat = np.zeros((len(labels), (len(labels))))
+    for x in labels:
+        for y in labels:
+            if graph.has_edge(x, y):
+                if bool(graph.get_edge_data(x, y)):
+                    if y in graph.get_edge_data(x, y).keys():
+                        mat[labels.index(x)][labels.index(y)] = symbol_map[
+                            graph.get_edge_data(x, y)[y]
+                        ]
+                    else:
+                        weight = graph.get_edge_data(x, y)[weight_label]
+                        if weight is None:
+                            weight = 1
+                        mat[labels.index(x)][labels.index(y)] = weight
+                else:
+                    mat[labels.index(x)][labels.index(y)] = 1
+    mat[np.isnan(mat)] = 0
+    return mat
+
+
+def graph_to_adjacency_file(graph: AnyGraph, output_file: Union[Path, str], labels):
+    """
+    A method to write the adjacency matrix of the graph to a file. If graph has
+    weights, these are the values stored in the adjacency matrix.
+
+    Args:
+        graph: (Union[Graph, DiGraph] the graph to be saved
+        output_file: (str) The full path where graph is to be saved
+    """
+    mat = graph_to_adjacency(graph, labels)
+    with open(output_file, "w", encoding="utf-8") as f:
+        f.write(",".join([f"{label}" for label in labels]))
+        f.write("\n")
+        for i, label in enumerate(labels):
+            f.write(f"{label}")
+            f.write(",")
+            f.write(",".join([str(point) for point in mat[i]]))
+            f.write("\n")
+
+    return
+
+
 def select_device(force: Optional[str] = None) -> str:
     """
     Selects the device to be used for training. If force is not None, then
@@ -485,16 +637,17 @@ def correct_edge_from_prior(dag, u, v, prior, verbose):
     if both_in_top_list:
         print(
             f"Edge {u} -x- {v} removed: both top list") if verbose else None
+        dag.remove_edge(u, v) if dag.has_edge(u, v) else None # Experimental XXX Beware of this line!
         return +1
     elif u_is_before_v:
         print(
             f"Edge {u} -> {v} added: {u} before {v}") if verbose else None
-        dag.add_edge(u, v)
+        dag.add_edge(u, v) if not dag.has_edge(v, u) else None
         return +1
     elif v_is_before_u:
         print(
             f"Edge {v} -> {u} added: {v} before {u}") if verbose else None
-        dag.add_edge(v, u)
+        dag.add_edge(v, u) if not dag.has_edge(u, v) else None
         return -1
     else:
         return 0
@@ -520,7 +673,7 @@ def valid_candidates_from_prior(feature_names, effect, prior):
     List[str]
         The valid candidates for the given effect.
     """
-    if prior is None:
+    if prior is None or prior == []:
         return [c for c in feature_names if c != effect]
 
     # identify in what list is the effect, from the list of lists defined in prior
@@ -562,6 +715,9 @@ def break_cycles_using_prior(
     nx.DiGraph: The directed acyclic graph with the edges removed according to
         the prior knowledge.
     """
+    if prior is None or prior == []:
+        return original_dag
+
     new_dag = original_dag.copy()
 
     if verbose:
@@ -598,14 +754,20 @@ def break_cycles_using_prior(
 def potential_misoriented_edges(
         loop: List[str],
         discrepancies: Dict,
-        verbose: bool = False):
+        verbose: bool = False) -> List[Tuple[str, str, float]]:
     """
-    Find potential misoriented edges in a loop based on discrepancies.
+    Find potential misoriented edges in a loop based on discrepancies. The loop
+    is a list of nodes that form a loop in a DAG. The discrepancies is a dictionary
+    containing the discrepancies between nodes. The function returns a list of
+    potential misoriented edges, sorted by the difference in goodness-of-fit
+    scores.
 
     Args:
         loop (List[str]): The list of nodes in the loop.
-        discrepancies (Dict): A dictionary containing discrepancies between nodes.
-        verbose (bool, optional): Whether to print verbose output. Defaults to False.
+        discrepancies (Dict): A dictionary containing discrepancies between 
+            nodes. It is typically a positive float number between 0 and 1.
+        verbose (bool, optional): Whether to print verbose output. 
+            Defaults to False.
 
     Returns:
         List[Tuple[str, str, float]]: A list of potential misoriented edges,
@@ -618,6 +780,10 @@ def potential_misoriented_edges(
             neighbor = loop[0]
         else:
             neighbor = loop[i + 1]
+        if neighbor not in discrepancies or node not in discrepancies:
+            continue
+        if node not in discrepancies[neighbor] or neighbor not in discrepancies[node]:
+            continue
         fwd_gof = 1. - discrepancies[neighbor][node].shap_gof
         bwd_gof = 1. - discrepancies[node][neighbor].shap_gof
         orientation = +1 if fwd_gof < bwd_gof else -1
@@ -641,7 +807,8 @@ def break_cycles_if_present(
     """
     Breaks cycles in a directed acyclic graph (DAG) by removing the edge with
     the lowest goodness of fit (R2). If there are multiple cycles, they are
-    all traversed and fixed.
+    all traversed and fixed. If prior is set, then the cycles are broken
+    using the prior knowledge.
 
     Parameters:
     - dag (nx.DiGraph): the DAG to break cycles in.
@@ -737,166 +904,6 @@ def break_cycles_if_present(
         cycles.sort(key=len)
 
     return new_dag
-
-
-def graph_from_adjacency(
-        adjacency: np.ndarray,
-        node_labels=None,
-        th=0.0,
-        inverse: bool = False,
-        absolute_values: bool = False
-) -> nx.DiGraph:
-    """
-    Manually parse the adj matrix to shape a dot graph
-
-    Args:
-        adjacency: a numpy adjacency matrix
-        node_labels: an array of same length as nr of columns in the adjacency
-            matrix containing the labels to use with every node.
-        th: (float) weight threshold to be considered a valid edge.
-        inverse (bool): Set to true if rows in adjacency reflects where edges 
-            are comming from, instead of where are they going to.
-        absolute_values: Take absolute value of weight label to check if 
-            its greater than the threshold.
-
-    Returns:
-         The Graph (DiGraph)
-    """
-    G = nx.DiGraph()
-    G.add_nodes_from(range(adjacency.shape[1]))
-
-    # What to do with absolute values?
-    def not_abs(x):
-        return x
-
-    w_val = np.abs if absolute_values else not_abs
-
-    def weight_gt(w, thresh):
-        return w != 0.0 if thresh is None else w_val(w) > thresh
-
-    # Do I have a threshold to consider?
-    for i, row in enumerate(adjacency):
-        for j, value in enumerate(row):
-            if inverse:
-                if weight_gt(adjacency[j][i], th):
-                    G.add_edge(i, j, weight=w_val(adjacency[j][i]))
-            else:
-                if weight_gt(value, th):
-                    # , arrowhead="normal")
-                    G.add_edge(i, j, weight=w_val(value))
-    # Map the current column numbers to the letters used in toy dataset
-    if node_labels is not None and len(node_labels) == adjacency.shape[1]:
-        mapping = dict(zip(sorted(G), node_labels))
-        G = nx.relabel_nodes(G, mapping)
-
-    return G
-
-
-def graph_from_adjacency_file(
-        file: Union[Path, str],
-        labels=None,
-        th=0.0,
-        sep=",",
-        header:bool=True
-) -> Tuple[nx.DiGraph, pd.DataFrame]:
-    """
-    Read Adjacency matrix from a file and return a Graph
-
-    Args:
-        file: (str) the full path of the file to read
-        labels: (List[str]) the list of node names to be used. If None, the
-            node names are extracted from the adj file. The names must be 
-            already sorted in the same order as the adjacency matrix.
-        th: (float) weight threshold to be considered a valid edge.
-        sep: (str) the separator used in the file
-        header: (bool) whether the file has a header. If True, then 'infer' 
-        is used to read the header.
-    Returns:
-        DiGraph, DataFrame
-    """
-    header_infer = "infer" if header else None
-    df = pd.read_csv(file, dtype="str", delimiter=sep, header=header_infer)
-    df = df.astype("float64")
-    if labels is None:
-        labels = list(df.columns)
-    G = graph_from_adjacency(df.values, node_labels=labels, th=th)
-
-    return G, df
-
-
-def graph_to_adjacency(
-        graph: AnyGraph,
-        labels: List[str],
-        weight_label: str = "weight") -> np.ndarray:
-    """
-    A method to generate the adjacency matrix of the graph. Labels are
-    sorted for better readability.
-
-    Args:
-        graph: (Union[Graph, DiGraph]) the graph to be converted.
-        node_names: (List[str]) the list of node names to be used. If None, the
-            node names are extracted from the graph. The names must be already
-            sorted in the same order as the adjacency matrix.
-        weight_label: the label used to identify the weights.
-
-    Return:
-        graph: (numpy.ndarray) A 2d array containing the adjacency matrix of
-            the graph.
-    """
-    symbol_map = {"o": 1, ">": 2, "-": 3}
-    # labels = list(graph.nodes)
-
-    # # Double check if all nodes are in the graph
-    # if node_names is not None:
-    #     for n in list(node_names):
-    #         if n not in set(labels):
-    #             labels.append(n)
-    #     labels = sorted(labels)
-
-    # Fix for the case where an empty node is parsed from the .dot file
-    if '\\n' in labels:
-        labels.remove('\\n')
-
-    mat = np.zeros((len(labels), (len(labels))))
-    for x in labels:
-        for y in labels:
-            if graph.has_edge(x, y):
-                if bool(graph.get_edge_data(x, y)):
-                    if y in graph.get_edge_data(x, y).keys():
-                        mat[labels.index(x)][labels.index(y)] = symbol_map[
-                            graph.get_edge_data(x, y)[y]
-                        ]
-                    else:
-                        weight = graph.get_edge_data(x, y)[weight_label]
-                        if weight is None:
-                            weight = 1
-                        mat[labels.index(x)][labels.index(y)] = weight
-                else:
-                    mat[labels.index(x)][labels.index(y)] = 1
-    mat[np.isnan(mat)] = 0
-    return mat
-
-
-def graph_to_adjacency_file(graph: AnyGraph, output_file: Union[Path, str], labels):
-    """
-    A method to write the adjacency matrix of the graph to a file. If graph has
-    weights, these are the values stored in the adjacency matrix.
-
-    Args:
-        graph: (Union[Graph, DiGraph] the graph to be saved
-        output_file: (str) The full path where graph is to be saved
-    """
-    mat = graph_to_adjacency(graph, labels)
-    with open(output_file, "w", encoding="utf-8") as f:
-        f.write(",".join([f"{label}" for label in labels]))
-        f.write("\n")
-        for i, label in enumerate(labels):
-            f.write(f"{label}")
-            f.write(",")
-            f.write(",".join([str(point) for point in mat[i]]))
-            f.write("\n")
-
-    return
 
 
 def stringfy_object(object_: object) -> str:
