@@ -53,4 +53,4 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           slug: renero/causalgraph
           ignore:
-            - "tests/*"
+            - causalexplain/tests/*

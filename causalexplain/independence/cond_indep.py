@@ -64,9 +64,13 @@ class ConditionalIndependencies:
         conditioning_set : list of str or None
             A set of nodes in the graph.
         """
+        conditioning_set = tuple(conditioning_set) if conditioning_set is not None else None
+        if not self._cache:
+            self._cache[(var1, var2, conditioning_set)] = True
+            return
         if (var1, var2, conditioning_set) in self._cache:
             return
-        self._cache[var1, var2, conditioning_set] = True
+        self._cache[(var1, var2, conditioning_set)] = True
 
 
 class SufficientSets:
@@ -366,7 +370,10 @@ def get_sufficient_sets(dag, verbose=False):
 
     return suff_sets
 
-
+#
+# XXX: This is not used, and should be removed or replaced by the NX 
+# implementation of d-separation or DoWhy implementation.
+#
 def get_conditional_independencies(dag, verbose=False):
     """
     Computes the set of conditional independencies implied by the graph G.

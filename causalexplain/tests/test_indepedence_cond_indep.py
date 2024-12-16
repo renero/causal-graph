@@ -1,7 +1,8 @@
 import networkx as nx
-
-from causalexplain.independence.cond_indep import get_backdoor_paths, get_paths, \
-    find_colliders_in_path
+from causalexplain.independence.cond_indep import (
+    ConditionalIndependencies, get_backdoor_paths, get_paths,
+    find_colliders_in_path, get_sufficient_sets_for_pair
+)
 
 # Returns an empty list if x and y are not connected
 
@@ -289,3 +290,50 @@ def test_find_colliders_in_path_returns_empty_set_when_path_is_not_in_dag():
     path = [1, 2, 3, 7]
     colliders = find_colliders_in_path(dag, path)
     assert colliders == set()
+
+
+def test_add_new_independence():
+    ci = ConditionalIndependencies()
+    ci.add('X', 'Y', ['Z'])
+    assert ci._cache[('X', 'Y', ('Z',))] is True
+
+
+def test_add_existing_independence():
+    ci = ConditionalIndependencies()
+    ci.add('X', 'Y', ['Z'])
+    ci.add('X', 'Y', ['Z'])  # Adding the same independence again
+    assert len(ci._cache) == 1  # Cache size should remain 1
+
+
+def test_add_empty_conditioning_set():
+    ci = ConditionalIndependencies()
+    ci.add('A', 'B', [])
+    assert ci._cache[('A', 'B', ())] is True
+
+
+def test_no_backdoor_paths():
+    dag = nx.DiGraph()
+    dag.add_edges_from([('A', 'B'), ('C', 'D')])
+    sufficient_sets = get_sufficient_sets_for_pair(dag, 'A', 'D')
+    assert sufficient_sets == []
+
+
+def test_single_backdoor_path():
+    dag = nx.DiGraph()
+    dag.add_edges_from([('Z', 'X'), ('Z', 'Y')])
+    sufficient_sets = get_sufficient_sets_for_pair(dag, 'X', 'Y')
+    assert sufficient_sets == [['Z']]
+
+
+def test_path_with_descendants():
+    dag = nx.DiGraph()
+    dag.add_edges_from([('X', 'Z'), ('Z', 'Y'), ('X', 'Z2')])
+    sufficient_sets = get_sufficient_sets_for_pair(dag, 'X', 'Y')
+    assert sufficient_sets == []
+
+
+def test_path_with_colliders():
+    dag = nx.DiGraph()
+    dag.add_edges_from([('X', 'Z'), ('Z', 'Y'), ('Z', 'X')])
+    sufficient_sets = get_sufficient_sets_for_pair(dag, 'X', 'Y')
+    assert sufficient_sets == []

@@ -7,8 +7,9 @@
 
 import numpy as np
 
-from causalexplain.independence.feature_selection import (find_cluster_change_point,
-                                                        select_features)
+from causalexplain.independence.feature_selection import (
+    find_cluster_change_point, select_features
+)
 
 
 class TestClusterChange:
