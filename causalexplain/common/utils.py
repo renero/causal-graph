@@ -35,8 +35,7 @@ def save_experiment(
         obj_name: str,
         folder: str,
         results: object,
-        overwrite: bool = False
-):
+        overwrite: bool = False) -> str:
     """
     Creates a folder for the experiment and saves results. Results is a
     dictionary that will be saved as an opaque pickle. When the experiment will
@@ -347,6 +346,17 @@ def graph_to_adjacency_file(graph: AnyGraph, output_file: Union[Path, str], labe
             f.write("\n")
 
     return
+
+
+def graph_to_dot_file(graph: AnyGraph, output_file: Union[Path, str]):
+    """
+    A method to write the graph in dot format to a file.
+
+    Args:
+        graph: (Union[Graph, DiGraph] the graph to be saved
+        output_file: (str) The full path where graph is to be saved
+    """
+    nx.drawing.nx_pydot.write_dot(graph, output_file)
 
 
 def select_device(force: Optional[str] = None) -> str:
