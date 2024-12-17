@@ -1,0 +1,48 @@
+name: Publish Package
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types:
+      - closed
+    branches:
+      - main
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    
+    # Run only when changes come from develop to main, either via PR or direct merge
+    if: |
+      (github.event_name == 'push' && contains(github.event.head_commit.message, 'Merge branch ''develop''')) ||
+      (github.event_name == 'pull_request' && github.event.pull_request.merged == true && 
+       github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.ref == 'develop')
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Fetch all history for tags
+
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install setuptools wheel twine
+
+    - name: Build package
+      run: |
+        python setup.py sdist bdist_wheel
+
+    - name: Publish package
+      env:
+        TWINE_USERNAME: __token__
+        TWINE_PASSWORD: ${{ secrets.PYPI_PUBLISHING_TOKEN }}
+      run: |
+        twine upload dist/*
