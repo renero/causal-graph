@@ -1,3 +1,4 @@
+from _pytest.tmpdir import tmp_path
 import networkx as nx
 import pandas as pd
 import numpy as np
@@ -886,7 +887,6 @@ class TestCorrectEdgeFromPrior:
 
 
 class TestValidCandidatesFromPrior:
-    """Test suite for valid_candidates_from_prior function"""
 
     def test_valid_candidates_with_prior(self):
         feature_names = ['A', 'B', 'C', 'D']
@@ -1058,3 +1058,26 @@ class TestBreakCyclesIfPresent:
         }
         result = utils.break_cycles_if_present(dag, discrepancies)
         assert not list(nx.simple_cycles(result)), "Cycles should be broken by changing orientation"
+
+
+class TestGraphToDotFile:
+
+    tmp_path = "/tmp"
+
+    def test_graph_to_dot_file(self):
+        # Create a simple directed graph
+        graph = nx.DiGraph()
+        graph.add_edges_from([(1, 2), (2, 3)])
+
+        # Define the output file path
+        output_file = os.path.join(self.tmp_path, "test_graph.dot")
+
+        # Use the function to write the graph to a dot file
+        utils.graph_to_dot_file(graph, output_file)
+
+        # Read the file back and verify its contents
+        with open(output_file, 'r') as f:
+            content = f.read()
+            assert 'digraph' in content
+            assert '1 -> 2' in content
+            assert '2 -> 3' in content

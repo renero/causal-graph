@@ -16,11 +16,18 @@
 
 import argparse
 import os
+import pickle
+
 import pandas as pd
 
-from causalexplain.common import (DEFAULT_BOOTSTRAP_TOLERANCE,
-                                DEFAULT_BOOTSTRAP_TRIALS, DEFAULT_HPO_TRIALS,
-                                DEFAULT_REGRESSORS, DEFAULT_SEED, utils)
+from causalexplain.common import (
+    DEFAULT_BOOTSTRAP_TOLERANCE,
+    DEFAULT_BOOTSTRAP_TRIALS,
+    DEFAULT_HPO_TRIALS,
+    DEFAULT_REGRESSORS,
+    DEFAULT_SEED,
+    utils,
+)
 from causalexplain.common.notebook import Experiment
 from causalexplain.metrics.compare_graphs import evaluate_graph
 
@@ -56,6 +63,9 @@ def parse_args():
         '-l', '--load_model', type=str, required=False,
         help='Model name (pickle) to load. If not specified, the model will be trained')
     parser.add_argument(
+        '-n', '--no-train', action='store_true', required=False,
+        help='Do not train the model. If not specified, the model will be trained')
+    parser.add_argument(
         '-T', '--threshold', type=float, required=False,
         help='Threshold to apply to the bootstrapped adjacency matrix.')
     parser.add_argument(
@@ -73,7 +83,7 @@ def parse_args():
     parser.add_argument(
         '-S', '--seed', type=int, required=False, help='Random seed')
     parser.add_argument(
-        '-s', '--save_model', type=str, required=False, nargs='?',
+        '-s', '--save_model', type=str, required=False, nargs='?', const='',
         help='Save model as specified name. If not specified the model will be saved' +
         ' with the same name as the dataset, but with pickle extension.')
     parser.add_argument(
@@ -126,18 +136,30 @@ def check_args_validity(args):
         assert os.path.isfile(args.true_dag), "True DAG file does not exist"
         run_values['true_dag'] = utils.graph_from_dot_file(args.true_dag)
 
+    if args.load_model is not None:
+        assert os.path.isfile(args.load_model), "Model file does not exist"
+        run_values['load_model'] = args.load_model
+
+    if args.no_train:
+        run_values['no_train'] = True
+    else:
+        run_values['no_train'] = False
+
     # Determine where to save the model pickle.
-    if args.save_model is None or args.save_model == '':
-        save_model = f"{args.dataset.replace('.csv', '')}.pickle"
+    if args.save_model == '':
+        save_model = f"{args.dataset.replace('.csv', '')}"
+        save_model = f"{save_model}_{args.method}.pickle"
         run_values['save_model'] = os.path.basename(save_model)
         # Output_path is the current directory
         run_values['output_path'] = os.getcwd()
         run_values['model_filename'] = utils.valid_output_name(
             filename=save_model, path=run_values['output_path'])
-    else:
+    elif args.save_model is not None:
         run_values['save_model'] = args.save_model
         run_values['output_path'] = os.path.dirname(args.save_model)
         run_values['model_filename'] = args.save_model
+    else:
+        run_values['save_model'] = None
 
     # Set default regressors in case ReX is called.
     if args.method == 'rex' and args.regressor is None:
@@ -154,12 +176,7 @@ def check_args_validity(args):
         run_values['regressors'] = [args.method]
 
     run_values['verbose'] = True if args.verbose else False
-    if args.output is None:
-        run_values['output_dag_file'] = utils.valid_output_name(
-            filename=run_values['dataset_name'], 
-            path=run_values['output_path'], 
-            extension="dot")
-    else:
+    if args.output is not None:
         run_values['output_dag_file'] = args.output
 
     # show_run_values(run_values)
@@ -237,10 +254,14 @@ def combine_and_evaluate_dags(trainer, run_values):
 
         return trainer[trainer_key]
 
+    # For ReX, we need to combine the DAGs. Hardocode for now to combine
+    # the first and second DAGs
     estimator1 = getattr(trainer[list(trainer.keys())[0]], 'rex')
     estimator2 = getattr(trainer[list(trainer.keys())[1]], 'rex')
     _, _, dag, _ = utils.combine_dags(estimator1.dag, estimator2.dag,
                                       estimator1.shaps.shap_discrepancies)
+    
+    # Create a new Experiment object for the combined DAG
     trainer[f"{run_values['dataset_name']}_rex"] = Experiment(
         experiment_name=f"{run_values['dataset_name']}",
         model_type='rex',
@@ -259,6 +280,51 @@ def combine_and_evaluate_dags(trainer, run_values):
         trainer[new_trainer].metrics = None
 
     return trainer[new_trainer]
+
+
+def save_model(trainer: dict, run_values: dict) -> None:
+    """
+    Save the model as an Experiment object. Recovers the parameters to save
+    the experiment from `run_values`: `save_model`, `output_path` and
+    `model_filename`.
+
+    Args:
+        trainer (dict): A dictionary of Experiment objects
+        run_values (dict): A dictionary of run values
+    """
+    if run_values['save_model'] is None:
+        print("Not saving model.", flush=True)
+        return
+
+    if run_values['estimator'] == 'rex':
+        # Save trainer with the name of tha last experiment_name in dictionary
+        trainer_name = list(trainer.keys())[-1]
+        saved_as = utils.save_experiment(
+            trainer_name, run_values['output_path'], trainer, overwrite=False)
+        print(f"Saved model as: {saved_as}", flush=True)
+    else:
+        trainer_name = f"{run_values['dataset_name']}_{run_values['estimator']}"
+        saved_as = utils.save_experiment(
+            trainer_name, run_values['output_path'], trainer, overwrite=False)
+        print(f"Saved model as: {saved_as}", flush=True)
+
+
+def load_models(run_values) -> Experiment:
+    """
+    Load the model from a pickle file that must be specified in
+    `run_values['load_model']`, that also is set from the command line
+    argument `-l`.
+
+    Args:
+        run_values (dict): A dictionary of run values
+
+    Returns:
+        Experiment: The loaded Experiment object
+    """
+    with open(run_values['load_model'], 'rb') as f:
+        trainer = pickle.load(f)
+
+    return trainer
 
 
 def show_run_values(run_values):
@@ -321,7 +387,6 @@ def printout_results(graph, metrics):
         print(metrics)
 
 
-
 def header_():
     """
     Done with "Ogre" font from https://patorjk.com/software/taag/
@@ -340,10 +405,26 @@ def main():
     args = parse_args()
     run_values = check_args_validity(args)
 
-    trainer = create_experiments(**run_values)
-    fit_experiments(trainer, run_values)
-    result = combine_and_evaluate_dags(trainer, run_values)
+    if args.load_model is not None:
+        run_values['load_model'] = args.load_model
+        trainer = load_models(run_values)
+        # In case of REX, trainer contains multiple entries in the dictionary
+        # and we need to retrieve the last one, but in the case of others, we
+        # only need to retrieve the only entry.
+        result = next(reversed(trainer.values()))
+    else:
+        trainer = create_experiments(**run_values)
+
+    if not args.no_train:
+        fit_experiments(trainer, run_values)
+        result = combine_and_evaluate_dags(trainer, run_values)
+        save_model(trainer, run_values)
+
     printout_results(result.dag, result.metrics)
+
+    if run_values['output_dag_file'] is not None:
+        utils.graph_to_dot_file(result.dag, run_values['output_dag_file'])
+        print(f"Saved DAG to {run_values['output_dag_file']}")
 
 
 if __name__ == "__main__":

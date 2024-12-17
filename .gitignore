@@ -72,3 +72,15 @@ db.sqlite3
 *.db
 requirements.txt.old
 requirements.txt_with_versions
+*.pickle
+
+### VisualStudioCode ###
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+### VisualStudioCode Patch ###
+# Ignore all local history of files
+**/.history
