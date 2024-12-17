@@ -27,14 +27,15 @@ class TestCorrectEdgeFromPrior:
 
     def test_both_in_top_list(self):
         assert correct_edge_from_prior(self.dag, 'a', 'b', self.prior, False) ==  1
+        assert not self.dag.has_edge('a', 'b')
 
     def test_v_is_before_u(self):
         # These edges violate the prior order.
         assert correct_edge_from_prior(self.dag, 'c', 'a', self.prior, True) == -1
         assert correct_edge_from_prior(self.dag, 'f', 'e', self.prior, True) == -1
         # Check that 'dag' is changed
-        assert self.dag.has_edge('a', 'c')
-        assert self.dag.has_edge('f', 'e')
+        assert not self.dag.has_edge('a', 'c')
+        assert not self.dag.has_edge('f', 'e')
 
     def test_u_is_before_v(self):
         # These edges are in the correct order.

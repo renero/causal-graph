@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #
-# causalexplain/causalexplain.py
+# causalexplain/__main__.py
 #
 # (C) 2024 J. Renero
 #

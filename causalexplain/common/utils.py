@@ -647,7 +647,7 @@ def correct_edge_from_prior(dag, u, v, prior, verbose):
     elif v_is_before_u:
         print(
             f"Edge {v} -> {u} added: {v} before {u}") if verbose else None
-        dag.add_edge(v, u) if not dag.has_edge(u, v) else None
+        dag.remove_edge(u, v) if dag.has_edge(u, v) else None
         return -1
     else:
         return 0
