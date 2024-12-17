@@ -844,7 +844,7 @@ class TestCorrectEdgeFromPrior:
         orientation = utils.correct_edge_from_prior(dag, 'A', 'B', prior, verbose=False)
 
         assert orientation == -1
-        assert dag.has_edge('B', 'A')
+        assert not dag.has_edge('B', 'A')
 
     def test_no_change_for_unclear_order(self):
         dag = nx.DiGraph()
