@@ -418,9 +418,9 @@ def main():
     if not args.no_train:
         fit_experiments(trainer, run_values)
         result = combine_and_evaluate_dags(trainer, run_values)
-        save_model(trainer, run_values)
 
     printout_results(result.dag, result.metrics)
+    save_model(trainer, run_values)
 
     if run_values['output_dag_file'] is not None:
         utils.graph_to_dot_file(result.dag, run_values['output_dag_file'])
