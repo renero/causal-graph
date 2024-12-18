@@ -14,7 +14,11 @@ from sklearn.preprocessing import StandardScaler
 from causalexplain.common import utils
 
 
-def estimate(digraph: nx.DiGraph, data: pd.DataFrame, in_place: bool = True, verbose=False) -> nx.DiGraph:
+def estimate(
+        digraph: nx.DiGraph, 
+        data: pd.DataFrame, 
+        in_place: bool = True, 
+        verbose=False) -> nx.DiGraph:
     """
     Takes the original digraph passed as argument, and computes the effect of
     each treatment in the outcome, given the graph. Treament and outcome are
