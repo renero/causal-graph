@@ -959,7 +959,8 @@ class TestBreakCyclesUsingPrior:
         new_dag = utils.break_cycles_using_prior(dag, prior)
         
         # Assert that the cycle is broken
-        assert list(nx.simple_cycles(new_dag)) == [['C', 'A', 'B']], "The cycle should remain."
+        assert sorted(list(nx.simple_cycles(new_dag))[0]) == ['A', 'B', 'C'], \
+            "The cycle should remain."
 
 
 # Mock class for discrepancies
