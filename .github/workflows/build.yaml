@@ -1,4 +1,4 @@
-name: Causalexplain repo
+name: Build and Publish
 
 on:
   push:
@@ -10,17 +10,16 @@ on:
     types:
       - opened
       - synchronize
+      - closed
     paths-ignore:
       - '**.md'
       - 'docs/**'
       - '.gitignore'
-      - '.github/workflows/publish.yaml'
       - '.github/workflows/docs.yaml'
       - 'LICENSE'
-      - 'README.md'
 
 jobs:
-  build:
+  build-and-publish:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -51,8 +50,29 @@ jobs:
           pip install pytest-cov
           pytest --cov .
 
-      - name: Upload coverage reports to Codecov
+      - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4.0.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           slug: renero/causalgraph
+
+      - name: Install dependencies for publishing
+        run: |
+          python -m pip install --upgrade pip
+          pip install setuptools wheel twine
+
+      - name: Build package
+        run: |
+          python setup.py sdist bdist_wheel
+
+      - name: Publish package
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_PUBLISHING_TOKEN }}
+        run: |
+          twine upload dist/* --verbose
+        if: |
+          (github.event_name == 'push') ||
+          (github.event_name == 'push' && contains(github.event.head_commit.message, 'Merge branch ''develop''')) ||
+          (github.event_name == 'pull_request' && github.event.pull_request.merged == true && 
+           github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.ref == 'develop')

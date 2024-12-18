@@ -1,4 +1,4 @@
-![logo](./docs/_static/logo-light.png)
+![logo](https://raw.githubusercontent.com/renero/causalgraph/main/docs/_static/logo-light.png)
 
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/downloads/release/python-31012/)
@@ -30,7 +30,7 @@ By combining ML and explainability techniques with causal discovery, **ReX**
 bridges the gap between predictive modeling and causal inference, offering an 
 effective tool for understanding complex causal structures.
 
-![ReX Schema](./docs/_static/REX.png)
+![ReX Schema](https://raw.githubusercontent.com/renero/causalgraph/main/docs/_static/REX.png)
 
 It is built using SKLearn estimators, so that it can be used in scikit-learn 
 pipelines and (hyper)parameter search, while facilitating testing (including 
@@ -78,7 +78,7 @@ $ python -m causalexplain
 usage: causalexplain [-h] -d DATASET [-m {rex,pc,fci,ges,lingam,cam,notears}] 
                    [-t TRUE_DAG] [-l LOAD_MODEL] [-T THRESHOLD] [-u UNION] 
                    [-i ITERATIONS] [-b BOOTSTRAP] [-r REGRESSOR] [-S SEED] 
-                   [-s [SAVE_MODEL]] [-v] [-q] [-o OUTPUT]
+                   [-s [SAVE_MODEL]] [-n] [-v] [-q] [-o OUTPUT]
 ```
 
 that will present you with a menu to choose the dataset you want to use, the 
