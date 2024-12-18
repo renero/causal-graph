@@ -3,7 +3,8 @@
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/downloads/release/python-31012/)
 [![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20macOS-lightgrey.svg)](#)
-[![Build Status](https://github.com/renero/causalgraph/actions/workflows/codecov.yaml/badge.svg)](https://github.com/renero/causalgraph/actions/workflows/codecov.yaml)
+[![PyPI version](https://badge.fury.io/py/causalexplain.svg)](https://badge.fury.io/py/causalexplain)
+[![Build Status](https://github.com/renero/causalgraph/actions/workflows/build.yaml/badge.svg)](https://github.com/renero/causalgraph/actions/workflows/build.yaml)
 [![codecov](https://codecov.io/gh/renero/causalgraph/graph/badge.svg?token=HCV0IJDFLQ)](https://codecov.io/gh/renero/causalgraph)
 [![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue.svg)](https://renero.github.io/causalgraph/)
 
@@ -23,7 +24,7 @@ generation processes, including non-linear and additive noise models. Moreover,
 **ReX** was tested on the Sachs single-cell protein-signaling dataset, achieving a 
 precision of 0.952 and recovering 
 key causal relationships with no incorrect edges. Taking together, these 
-results showcase **ReX**’s effectiveness in accurately recovering true causal 
+results showcase **ReX**'s effectiveness in accurately recovering true causal 
 structures while minimizing false positive pre- dictions, its robustness 
 across diverse datasets, and its applicability to real-world problems. 
 By combining ML and explainability techniques with causal discovery, **ReX** 
@@ -92,7 +93,6 @@ is ReX, but you can also choose between PC, FCI, GES, LiNGAM, CAM, NOTEARS.
 At the end of the execution, the edges of the plausible causal graph will be 
 displayed along with the metrics obtained, if the true dag is provided 
 (argument `-t`).
-
 
 ## Example commands
 
