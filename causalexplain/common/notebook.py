@@ -208,7 +208,8 @@ class Experiment(BaseExperiment):
             dot_filename (str, optional): The filename of the DOT file containing
                 the causal graph. Defaults to None.
             model_type (str, optional): The type of model to use. Defaults to 'nn'.
-                Other options are: 'gbt', 'pc', 'fci', 'ges' and 'lingam'.
+                Other options are: 'gbt', 'nn', 'cam', 'pc', 'fci', 'notears',
+                'ges' and 'lingam'.
             input_path (str, optional): The path to the input data.
                 Defaults to "/Users/renero/phd/data/RC4/".
             output_path (str, optional): The path to save the output.

@@ -18,6 +18,7 @@ import argparse
 import os
 import pickle
 
+import numpy as np
 import pandas as pd
 
 from causalexplain.common import (
@@ -26,12 +27,243 @@ from causalexplain.common import (
     DEFAULT_HPO_TRIALS,
     DEFAULT_REGRESSORS,
     DEFAULT_SEED,
+    SUPPORTED_METHODS,
     utils,
 )
 from causalexplain.common.notebook import Experiment
 from causalexplain.metrics.compare_graphs import evaluate_graph
 
-SUPPORTED_METHODS = ['rex', 'pc', 'fci', 'ges', 'lingam', 'cam', 'notears']
+
+class GraphDiscovery:
+    def __init__(self) -> None:
+        pass
+
+    def create_experiments(
+        self,
+        dataset_name: str,
+        regressors: list,
+        dataset_file: str,
+        true_dag_file: str,
+        dataset_path: str,
+        output_path: str,
+    ) -> dict:
+        """
+        Create an Experiment object for each regressor.
+
+        Args:
+            dataset_name (str): Name of the dataset
+            true_dag (str): Path to the true DAG DOT file
+            regressors (list): List of regressor types to create experiments for
+            dataset_path (str): Path to the input dataset
+            output_path (str): Path for output files
+
+        Returns:
+            dict: A dictionary of Experiment objects
+        """
+        self.trainer = {}
+        for model_type in regressors:
+            trainer_name = f"{dataset_name}_{model_type}"
+            self.trainer[trainer_name] = Experiment(
+                experiment_name=dataset_name,
+                csv_filename=dataset_file,
+                dot_filename=true_dag_file,
+                model_type=model_type,
+                input_path=dataset_path,
+                output_path=output_path,
+                verbose=False)
+
+        return self.trainer
+
+    def fit_experiments(
+        self,
+        estimator: str,
+        verbose: bool = False,
+        hpo_iterations: int = None,
+        bootstrap_iterations: int = None
+    ) -> None:
+        """
+        Fit the Experiment objects.
+
+        Args:
+            trainer (dict): A dictionary of Experiment objects
+            estimator (str): The estimator to use ('rex' or other)
+            verbose (bool, optional): Whether to print verbose output. 
+                Defaults to False.
+            hpo_iterations (int, optional): Number of HPO trials for REX. 
+                Defaults to None.
+            bootstrap_iterations (int, optional): Number of bootstrap trials 
+                for REX. Defaults to None.
+        """
+        if estimator == 'rex':
+            xargs = {
+                'verbose': verbose,
+                'hpo_n_trials': hpo_iterations,
+                'bootstrap_trials': bootstrap_iterations
+            }
+        else:
+            xargs = {
+                'verbose': verbose
+            }
+
+        for trainer_name, experiment in self.trainer.items():
+            experiment.fit_predict(estimator=estimator, **xargs)
+
+
+    def combine_and_evaluate_dags(
+        self,
+        dataset_name: str,
+        estimator: str,
+        dataset_path: str,
+        output_path: str,
+        ref_graph: np.ndarray = None,
+        data_columns: list = None,
+    ) -> Experiment:
+        """
+        Retrieve the DAG from the Experiment objects.
+
+        Args:
+            trainer (dict): A dictionary of Experiment objects
+            dataset_name (str): Name of the dataset
+            estimator (str): The estimator type ('rex' or other)
+            dataset_path (str): Path to the input dataset
+            output_path (str): Path for output files
+            ref_graph (np.ndarray, optional): Reference graph for evaluation. 
+                Defaults to None.
+            data_columns (list, optional): List of column names from the data. 
+                Defaults to None.
+
+        Returns:
+            Experiment: The experiment object with the final DAG
+        """
+        if estimator != 'rex':
+            trainer_key = f"{dataset_name}_{estimator}"
+            estimator_obj = getattr(self.trainer[trainer_key], estimator)
+            self.trainer[trainer_key].dag = estimator_obj.dag
+            if ref_graph is not None and data_columns is not None:
+                self.trainer[trainer_key].metrics = evaluate_graph(
+                    ref_graph, estimator_obj.dag, data_columns)
+            else:
+                self.trainer[trainer_key].metrics = None
+
+            return self.trainer[trainer_key]
+
+        # For ReX, we need to combine the DAGs. Hardcode for now to combine
+        # the first and second DAGs
+        estimator1 = getattr(self.trainer[list(self.trainer.keys())[0]], 'rex')
+        estimator2 = getattr(self.trainer[list(self.trainer.keys())[1]], 'rex')
+        _, _, dag, _ = utils.combine_dags(estimator1.dag, estimator2.dag,
+                                        estimator1.shaps.shap_discrepancies)
+        
+        # Create a new Experiment object for the combined DAG
+        new_trainer = f"{dataset_name}_rex"
+        self.trainer[new_trainer] = Experiment(
+            experiment_name=dataset_name,
+            model_type='rex',
+            input_path=dataset_path,
+            output_path=output_path,
+            verbose=False)
+
+        # Set the DAG and evaluate
+        self.trainer[new_trainer].ref_graph = ref_graph
+        self.trainer[new_trainer].dag = dag
+        if ref_graph is not None and data_columns is not None:
+            self.trainer[new_trainer].metrics = evaluate_graph(
+                ref_graph, dag, data_columns)
+        else:
+            self.trainer[new_trainer].metrics = None
+
+        return self.trainer[new_trainer]
+
+
+    def save_model(
+        self,
+        output_path: str,
+        dataset_name: str,
+        estimator: str,
+        save_model: bool = True,
+    ) -> None:
+        """
+        Save the model as an Experiment object.
+
+        Args:
+            trainer (dict): A dictionary of Experiment objects
+            output_path (str): Directory path where to save the model
+            dataset_name (str): Name of the dataset
+            estimator (str): The estimator type ('rex' or other)
+            save_model (bool, optional): Whether to save the model. 
+                Defaults to True.
+        """
+        if not save_model:
+            print("Not saving model.", flush=True)
+            return
+
+        if estimator == 'rex':
+            # Save trainer with the name of tha last experiment_name in dictionary
+            trainer_name = list(self.trainer.keys())[-1]
+        else:
+            trainer_name = f"{dataset_name}_{estimator}"
+        
+        saved_as = utils.save_experiment(
+            trainer_name, output_path, self.trainer, overwrite=False)
+        print(f"Saved model as: {saved_as}", flush=True)
+
+
+    def load_models(self, model_path: str) -> Experiment:
+        """
+        Load the model from a pickle file.
+
+        Args:
+            model_path (str): Path to the pickle file containing the model
+
+        Returns:
+            Experiment: The loaded Experiment object
+        """
+        with open(model_path, 'rb') as f:
+            self.trainer = pickle.load(f)
+
+        return self.trainer
+
+
+    def printout_results(self, graph, metrics):
+        """
+        This method prints the DAG to stdout in hierarchical order.
+
+        Parameters:
+        -----------
+        dag : nx.DiGraph
+            The DAG to be printed.
+        """
+        if len(graph.edges()) == 0:
+            print("Empty graph")
+            return
+
+        print("Resulting Graph:\n---------------")
+
+        def dfs(node, visited, indent=""):
+            if node in visited:
+                return  # Avoid revisiting nodes
+            visited.add(node)
+            
+            # Print edges for this node
+            for neighbor in graph.successors(node):
+                print(f"{indent}{node} -> {neighbor}")
+                dfs(neighbor, visited, indent + "  ")
+            
+        visited = set()
+        
+        # Start traversal from all nodes without predecessors (roots)
+        for node in graph.nodes:
+            if graph.in_degree(node) == 0:
+                dfs(node, visited)
+
+        # Handle disconnected components (not reachable from any "root")
+        for node in graph.nodes:
+            if node not in visited:
+                dfs(node, visited)
+
+        if metrics is not None:
+            print("\nGraph Metrics:\n-------------")
+            print(metrics)
 
 
 def parse_args():
@@ -134,11 +366,11 @@ def check_args_validity(args):
     if args.true_dag is not None:
         assert '.dot' in args.true_dag, "True DAG must be in .dot format"
         assert os.path.isfile(args.true_dag), "True DAG file does not exist"
-        run_values['true_dag'] = utils.graph_from_dot_file(args.true_dag)
+        run_values['ref_graph'] = utils.graph_from_dot_file(args.true_dag)
 
-    if args.load_model is not None:
-        assert os.path.isfile(args.load_model), "Model file does not exist"
-        run_values['load_model'] = args.load_model
+    if args.load_model and not os.path.isfile(args.load_model):
+        raise FileNotFoundError("Model file does not exist")
+    run_values['load_model'] = args.load_model
 
     if args.no_train:
         run_values['no_train'] = True
@@ -160,6 +392,7 @@ def check_args_validity(args):
         run_values['model_filename'] = args.save_model
     else:
         run_values['save_model'] = None
+        run_values['output_path'] = None
 
     # Set default regressors in case ReX is called.
     if args.method == 'rex' and args.regressor is None:
@@ -176,8 +409,7 @@ def check_args_validity(args):
         run_values['regressors'] = [args.method]
 
     run_values['verbose'] = True if args.verbose else False
-    if args.output is not None:
-        run_values['output_dag_file'] = args.output
+    run_values['output_dag_file'] = args.output
 
     # show_run_values(run_values)
 
@@ -185,146 +417,17 @@ def check_args_validity(args):
     return run_values
 
 
-def create_experiments(**args):
+def header_():
     """
-    Create an Experiment object for each regressor.
-
-    Returns:
-        dict: A dictionary of Experiment objects
+    Done with "Ogre" font from https://patorjk.com/software/taag/
     """
-    trainer = {}
-    for model_type in args['regressors']:
-        trainer_name = f"{args['dataset_name']}_{model_type}"
-        trainer[trainer_name] = Experiment(
-            experiment_name=f"{args['dataset_name']}",
-            model_type=model_type,
-            input_path=args['dataset_path'],
-            output_path=args['output_path'],
-            verbose=False)
-        trainer[trainer_name].ref_graph = args['true_dag']
-        # print(f"Created experiment named '{trainer_name}'", flush=True)
-
-    return trainer
-
-
-def fit_experiments(trainer, run_values):
-    """
-    Fit the Experiment objects.
-
-    Args:
-        trainer (dict): A dictionary of Experiment objects
-        run_values (dict): A dictionary of run values
-    """
-    if run_values['estimator'] == 'rex':
-        xargs = {
-            'verbose': run_values['verbose'],
-            'hpo_n_trials': run_values['hpo_iterations'],
-            'bootstrap_trials': run_values['bootstrap_iterations']
-        }
-    else:
-        xargs = {
-            'verbose': run_values['verbose']
-        }
-
-    for trainer_name, experiment in trainer.items():
-        experiment.fit_predict(estimator=run_values['estimator'], **xargs)
-
-
-def combine_and_evaluate_dags(trainer, run_values):
-    """
-    Retrieve the DAG from the Experiment objects.
-
-    Args:
-        trainer (dict): A dictionary of Experiment objects
-        run_values (dict): A dictionary of run values
-
-    Returns:
-        nx.DiGraph: The combined DAG
-    """
-    if run_values['estimator'] != 'rex':
-        trainer_key = f"{run_values['dataset_name']}_{run_values['estimator']}"
-        estimator = getattr(trainer[trainer_key], run_values['estimator'])
-        trainer[trainer_key].dag = estimator.dag
-        if run_values['true_dag'] is not None:
-            trainer[trainer_key].metrics = evaluate_graph(
-                run_values['true_dag'], estimator.dag, 
-                list(run_values['data'].columns))
-        else:
-            trainer[trainer_key].metrics = None
-
-        return trainer[trainer_key]
-
-    # For ReX, we need to combine the DAGs. Hardocode for now to combine
-    # the first and second DAGs
-    estimator1 = getattr(trainer[list(trainer.keys())[0]], 'rex')
-    estimator2 = getattr(trainer[list(trainer.keys())[1]], 'rex')
-    _, _, dag, _ = utils.combine_dags(estimator1.dag, estimator2.dag,
-                                      estimator1.shaps.shap_discrepancies)
-    
-    # Create a new Experiment object for the combined DAG
-    trainer[f"{run_values['dataset_name']}_rex"] = Experiment(
-        experiment_name=f"{run_values['dataset_name']}",
-        model_type='rex',
-        input_path=run_values['dataset_path'],
-        output_path=run_values['output_path'],
-        verbose=False)
-
-    # Create a new trainer with the combined DAG.
-    new_trainer = f"{run_values['dataset_name']}_rex"
-    trainer[new_trainer].ref_graph = run_values['true_dag']
-    trainer[new_trainer].dag = dag
-    if run_values['true_dag'] is not None:
-        trainer[new_trainer].metrics = evaluate_graph(
-            run_values['true_dag'], dag, list(run_values['data'].columns))
-    else:
-        trainer[new_trainer].metrics = None
-
-    return trainer[new_trainer]
-
-
-def save_model(trainer: dict, run_values: dict) -> None:
-    """
-    Save the model as an Experiment object. Recovers the parameters to save
-    the experiment from `run_values`: `save_model`, `output_path` and
-    `model_filename`.
-
-    Args:
-        trainer (dict): A dictionary of Experiment objects
-        run_values (dict): A dictionary of run values
-    """
-    if run_values['save_model'] is None:
-        print("Not saving model.", flush=True)
-        return
-
-    if run_values['estimator'] == 'rex':
-        # Save trainer with the name of tha last experiment_name in dictionary
-        trainer_name = list(trainer.keys())[-1]
-        saved_as = utils.save_experiment(
-            trainer_name, run_values['output_path'], trainer, overwrite=False)
-        print(f"Saved model as: {saved_as}", flush=True)
-    else:
-        trainer_name = f"{run_values['dataset_name']}_{run_values['estimator']}"
-        saved_as = utils.save_experiment(
-            trainer_name, run_values['output_path'], trainer, overwrite=False)
-        print(f"Saved model as: {saved_as}", flush=True)
-
-
-def load_models(run_values) -> Experiment:
-    """
-    Load the model from a pickle file that must be specified in
-    `run_values['load_model']`, that also is set from the command line
-    argument `-l`.
-
-    Args:
-        run_values (dict): A dictionary of run values
-
-    Returns:
-        Experiment: The loaded Experiment object
-    """
-    with open(run_values['load_model'], 'rb') as f:
-        trainer = pickle.load(f)
-
-    return trainer
+    print(
+"""   ___                      _                 _       _       
+  / __\\__ _ _   _ ___  __ _| | _____  ___ __ | | __ _(_)_ __  
+ / /  / _` | | | / __|/ _` | |/ _ \\ \\/ / '_ \\| |/ _` | | '_ \\ 
+/ /__| (_| | |_| \\__ \\ (_| | |  __/>  <| |_) | | (_| | | | | |
+\\____/\\__,_|\\__,_|___/\\__,_|_|\\___/_/\\_\\ .__/|_|\\__,_|_|_| |_|
+                                       |_|""")
 
 
 def show_run_values(run_values):
@@ -345,82 +448,51 @@ def show_run_values(run_values):
     print("-----")
 
 
-def printout_results(graph, metrics):
-    """
-    This method prints the DAG to stdout in hierarchical order.
-
-    Parameters:
-    -----------
-    dag : nx.DiGraph
-        The DAG to be printed.
-    """
-    if len(graph.edges()) == 0:
-        print("Empty graph")
-        return
-
-    print("Resulting Graph:\n---------------")
-
-    def dfs(node, visited, indent=""):
-        if node in visited:
-            return  # Avoid revisiting nodes
-        visited.add(node)
-        
-        # Print edges for this node
-        for neighbor in graph.successors(node):
-            print(f"{indent}{node} -> {neighbor}")
-            dfs(neighbor, visited, indent + "  ")
-        
-    visited = set()
-    
-    # Start traversal from all nodes without predecessors (roots)
-    for node in graph.nodes:
-        if graph.in_degree(node) == 0:
-            dfs(node, visited)
-
-    # Handle disconnected components (not reachable from any "root")
-    for node in graph.nodes:
-        if node not in visited:
-            dfs(node, visited)
-
-    if metrics is not None:
-        print("\nGraph Metrics:\n-------------")
-        print(metrics)
-
-
-def header_():
-    """
-    Done with "Ogre" font from https://patorjk.com/software/taag/
-    """
-    print(
-"""   ___                      _                 _       _       
-  / __\\__ _ _   _ ___  __ _| | _____  ___ __ | | __ _(_)_ __  
- / /  / _` | | | / __|/ _` | |/ _ \\ \\/ / '_ \\| |/ _` | | '_ \\ 
-/ /__| (_| | |_| \\__ \\ (_| | |  __/>  <| |_) | | (_| | | | | |
-\\____/\\__,_|\\__,_|___/\\__,_|_|\\___/_/\\_\\ .__/|_|\\__,_|_|_| |_|
-                                       |_|""")
-
-
 def main():
     header_()
     args = parse_args()
     run_values = check_args_validity(args)
+    discoverer = GraphDiscovery()
 
-    if args.load_model is not None:
-        run_values['load_model'] = args.load_model
-        trainer = load_models(run_values)
+    if run_values['load_model'] is not None:
+        discoverer.load_models(run_values['load_model'])
         # In case of REX, trainer contains multiple entries in the dictionary
         # and we need to retrieve the last one, but in the case of others, we
         # only need to retrieve the only entry.
-        result = next(reversed(trainer.values()))
+        result = next(reversed(discoverer.trainer.values()))
     else:
-        trainer = create_experiments(**run_values)
+        discoverer.create_experiments(
+            run_values['dataset_name'],
+            run_values['regressors'],
+            run_values['dataset_filepath'],
+            run_values['true_dag'],
+            run_values['dataset_path'],
+            run_values['output_path']
+        )
 
-    if not args.no_train:
-        fit_experiments(trainer, run_values)
-        result = combine_and_evaluate_dags(trainer, run_values)
+    if not run_values['no_train']:
+        discoverer.fit_experiments(
+            run_values['estimator'], 
+            run_values['verbose'], 
+            run_values['hpo_iterations'], 
+            run_values['bootstrap_iterations']
+        )
+        result = discoverer.combine_and_evaluate_dags(
+            run_values['dataset_name'],
+            run_values['estimator'],
+            run_values['dataset_path'],
+            run_values['output_path'],
+            run_values.get('ref_graph'),
+            list(run_values['data'].columns) if 'data' in run_values else None
+        )
 
-    printout_results(result.dag, result.metrics)
-    save_model(trainer, run_values)
+    discoverer.printout_results(result.dag, result.metrics)
+    discoverer.save_model(
+        run_values['output_path'],
+        run_values['dataset_name'],
+        run_values['estimator'],
+        run_values.get('save_model', True)
+    )
 
     if run_values['output_dag_file'] is not None:
         utils.graph_to_dot_file(result.dag, run_values['output_dag_file'])

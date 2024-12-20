@@ -4,5 +4,5 @@ DEFAULT_BOOTSTRAP_TRIALS: int = 20
 DEFAULT_BOOTSTRAP_TOLERANCE: float = 0.3
 DEFAULT_BOOTSTRAP_SAMPLING_SPLIT: float = 0.2
 DEFAULT_SEED: int = 42
-
+SUPPORTED_METHODS = ['rex', 'pc', 'fci', 'ges', 'lingam', 'cam', 'notears']
 DEFAULT_REGRESSORS = ['nn', 'gbt']
