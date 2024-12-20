@@ -220,9 +220,12 @@ def main():
 
     # Create a new instance of GraphDiscovery
     discoverer = GraphDiscovery(
-        run_values['dataset_name'], run_values['estimator'],
-        run_values['dataset_filepath'], run_values['true_dag'],
-        run_values['verbose'], run_values['seed']
+        experiment_name=run_values['dataset_name'], 
+        model_type=run_values['estimator'],
+        csv_filename=run_values['dataset_filepath'], 
+        true_dag_filename=run_values['true_dag'],
+        verbose=run_values['verbose'], 
+        seed=run_values['seed']
     )
 
     if run_values['load_model'] is not None:

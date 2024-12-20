@@ -122,9 +122,6 @@ experiment = GraphDiscovery(
 # Run the experiments
 experiment.run()
 
-# Evaluate results
-metrics = experiment.evaluate()
-
 # Plot the resulting DAG
 experiment.plot()
 ```

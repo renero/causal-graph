@@ -14,17 +14,17 @@ from causalexplain.metrics.compare_graphs import evaluate_graph
 class GraphDiscovery:
     def __init__(
         self,
-        dataset_name: str,
-        estimator: str,
+        experiment_name: str,
+        model_type: str,
         csv_filename: str,
-        dot_filename: str,
+        true_dag_filename: str,
         verbose: bool = False,
         seed: int = 42
     ) -> None:
-        self.dataset_name = dataset_name
-        self.estimator = estimator
+        self.dataset_name = experiment_name
+        self.estimator = model_type
         self.csv_filename = csv_filename
-        self.dot_filename = dot_filename
+        self.dot_filename = true_dag_filename
         self.verbose = verbose
         self.seed = seed
 
