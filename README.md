@@ -124,6 +124,30 @@ experiment.run()
 
 # Plot the resulting DAG
 experiment.plot()
+
+# Save the trained model to a file
+experiment.save("/path/to/model.pkl")
+```
+
+To load a model from a file, you can use the `load` method of the 
+`GraphDiscovery` class:
+
+```python
+from causalexplain import GraphDiscovery
+
+experiment = GraphDiscovery()
+experiment.load("/path/to/model.pkl")
+```
+
+This can be useful if you want to train a model on a dataset and then use it 
+to predict causal graphs on other datasets, or train a model on different 
+batches.
+
+To export the predicted causal graph to a DOT file, you can use the `export` 
+method of the `GraphDiscovery` class:
+
+```python
+experiment.export("/path/to/my_predicted_graph.dot")
 ```
 
 ### Output

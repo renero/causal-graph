@@ -2,11 +2,18 @@
 This module contains the GraphDiscovery class which is responsible for
 creating, fitting, and evaluating causal discovery experiments.
 """
-
+import os
 import pickle
+from turtle import pd
 import numpy as np
+import matplotlib.pyplot as plt
+from typing import Tuple
 
-from causalexplain.common import utils
+from causalexplain.common import (
+    DEFAULT_REGRESSORS,
+    utils,
+)
+from causalexplain.common import plot
 from causalexplain.common.notebook import Experiment
 from causalexplain.metrics.compare_graphs import evaluate_graph
 
@@ -27,13 +34,29 @@ class GraphDiscovery:
         self.dot_filename = true_dag_filename
         self.verbose = verbose
         self.seed = seed
+        self.dataset_path = os.path.dirname(csv_filename)
+        self.output_path = os.getcwd()
+        self.trainer = {}
 
-    def create_experiments(
-        self,
-        regressors: list,
-        dataset_path: str,
-        output_path: str,
-    ) -> dict:
+        # Read the reference graph
+        self.ref_graph = utils.graph_from_dot_file(true_dag_filename)
+
+        # assert that the data file exists
+        if not os.path.exists(csv_filename):
+            raise FileNotFoundError(f"Data file {csv_filename} not found")
+
+        # Read the column names of the data.
+        data = pd.read_csv(csv_filename)
+        self.data_columns = list(data.columns)
+        del data
+
+        if self.model_type == 'rex':
+            self.regressors = DEFAULT_REGRESSORS
+        else:
+            self.regressors = [self.model_type]
+
+
+    def create_experiments(self) -> dict:
         """
         Create an Experiment object for each regressor.
 
@@ -48,15 +71,15 @@ class GraphDiscovery:
             dict: A dictionary of Experiment objects
         """
         self.trainer = {}
-        for model_type in regressors:
+        for model_type in self.regressors:
             trainer_name = f"{self.dataset_name}_{model_type}"
             self.trainer[trainer_name] = Experiment(
                 experiment_name=self.dataset_name,
                 csv_filename=self.csv_filename,
                 dot_filename=self.dot_filename,
                 model_type=model_type,
-                input_path=dataset_path,
-                output_path=output_path,
+                input_path=self.dataset_path,
+                output_path=self.output_path,
                 verbose=False)
 
         return self.trainer
@@ -94,26 +117,9 @@ class GraphDiscovery:
             if not trainer_name.endswith("_rex"):
                 experiment.fit_predict(estimator=self.estimator, **xargs)
 
-    def combine_and_evaluate_dags(
-        self,
-        dataset_path: str,
-        output_path: str,
-        ref_graph: np.ndarray = None,
-        data_columns: list = None,
-    ) -> Experiment:
+    def combine_and_evaluate_dags(self) -> Experiment:
         """
         Retrieve the DAG from the Experiment objects.
-
-        Args:
-            trainer (dict): A dictionary of Experiment objects
-            dataset_name (str): Name of the dataset
-            estimator (str): The estimator type ('rex' or other)
-            dataset_path (str): Path to the input dataset
-            output_path (str): Path for output files
-            ref_graph (np.ndarray, optional): Reference graph for evaluation. 
-                Defaults to None.
-            data_columns (list, optional): List of column names from the data. 
-                Defaults to None.
 
         Returns:
             Experiment: The experiment object with the final DAG
@@ -122,9 +128,9 @@ class GraphDiscovery:
             trainer_key = f"{self.dataset_name}_{self.estimator}"
             estimator_obj = getattr(self.trainer[trainer_key], self.estimator)
             self.trainer[trainer_key].dag = estimator_obj.dag
-            if ref_graph is not None and data_columns is not None:
+            if self.ref_graph is not None and self.data_columns is not None:
                 self.trainer[trainer_key].metrics = evaluate_graph(
-                    ref_graph, estimator_obj.dag, data_columns)
+                    self.ref_graph, estimator_obj.dag, self.data_columns)
             else:
                 self.trainer[trainer_key].metrics = None
 
@@ -144,20 +150,42 @@ class GraphDiscovery:
         self.trainer[new_trainer] = Experiment(
             experiment_name=self.dataset_name,
             model_type='rex',
-            input_path=dataset_path,
-            output_path=output_path,
+            input_path=self.dataset_path,
+            output_path=self.output_path,
             verbose=False)
 
         # Set the DAG and evaluate
-        self.trainer[new_trainer].ref_graph = ref_graph
+        self.trainer[new_trainer].ref_graph = self.ref_graph
         self.trainer[new_trainer].dag = dag
-        if ref_graph is not None and data_columns is not None:
+        if self.ref_graph is not None and self.data_columns is not None:
             self.trainer[new_trainer].metrics = evaluate_graph(
-                ref_graph, dag, data_columns)
+                self.ref_graph, dag, self.data_columns)
         else:
             self.trainer[new_trainer].metrics = None
 
         return self.trainer[new_trainer]
+
+    def run(
+            self, 
+            hpo_iterations: int = None, 
+            bootstrap_iterations: int = None, 
+            **kwargs):
+        """
+        Run the experiment.
+
+        Args:
+            hpo_iterations (int, optional): Number of HPO trials for REX. 
+                Defaults to None.
+            bootstrap_iterations (int, optional): Number of bootstrap trials 
+                for REX. Defaults to None.
+        """
+        self.create_experiments(
+            self.regressors, self.dataset_path, self.output_path)
+        self.fit_experiments(hpo_iterations, bootstrap_iterations)
+        self.combine_and_evaluate_dags(
+            self.dataset_path, self.output_path, self.ref_graph, 
+            self.data_columns)
+
 
     def save_model(
         self,
@@ -169,8 +197,6 @@ class GraphDiscovery:
         Args:
             trainer (dict): A dictionary of Experiment objects
             output_path (str): Directory path where to save the model
-            dataset_name (str): Name of the dataset
-            estimator (str): The estimator type ('rex' or other)
         """
         if self.estimator == 'rex':
             # Save trainer with the name of tha last experiment_name in dictionary
@@ -238,3 +264,52 @@ class GraphDiscovery:
         if metrics is not None:
             print("\nGraph Metrics:\n-------------")
             print(metrics)
+
+    def export(self, output_file:str) -> str:
+        """
+        This method exports the DAG to a DOT file.
+
+        Parameters:
+        -----------
+        dag : nx.DiGraph
+            The DAG to be exported.
+        output_file : str
+            The path to the output DOT file.
+
+        Returns:
+        --------
+        str
+            The path to the output DOT file.
+        """
+        saved_as = utils.graph_to_dot_file(
+            self.trainer[list(self.trainer.keys())[0]].dag, output_file)
+
+        return saved_as
+
+    def plot(
+            self, 
+            show_metrics: bool = False, 
+            show_node_fill: bool = True,
+            title: str = None,
+            ax: plt.Axes = None,
+            figsize: Tuple[int, int] = (5, 5),
+            dpi: int = 75,
+            save_to_pdf: str = None,
+            **kwargs
+        ):
+        """
+        This method plots the DAG using networkx and matplotlib.
+
+        Parameters:
+        -----------
+        dag : nx.DiGraph
+            The DAG to be plotted.
+        """
+        model = self.trainer[list(self.trainer.keys())[0]]
+        if self.trainer.ref_graph is not None:
+            ref_graph = self.trainer.ref_graph
+        else:
+            ref_graph = None
+        plot.dag(
+            model.dag, ref_graph, show_metrics, show_node_fill, title, ax, 
+            figsize, dpi, save_to_pdf, **kwargs)
