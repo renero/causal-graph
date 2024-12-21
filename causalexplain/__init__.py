@@ -12,6 +12,7 @@ from . import generators
 from . import independence
 from . import metrics
 from . import models
+from .causalexplainer import GraphDiscovery
 
 __all__ = [
     'common',
@@ -21,6 +22,8 @@ __all__ = [
     'independence',
     'metrics',
     'models',
+    'GraphDiscovery',
+    '__version__',
 ]
 
 from ._version import __version__

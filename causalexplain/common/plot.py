@@ -31,7 +31,7 @@ from sklearn.base import BaseEstimator
 from sklearn.preprocessing import StandardScaler
 
 from causalexplain.metrics.compare_graphs import evaluate_graph
-from .notebook import global_nc_metric_types, global_metric_types
+from .metrics_config import global_nc_metric_types, global_metric_types
 
 metric_labels = {
     'mlp': 'DFN',

@@ -20,7 +20,6 @@ import pandas as pd
 from sklearn.preprocessing import StandardScaler
 
 from . import utils
-from . import *
 from ..estimators.cam.cam import CAM
 from ..estimators.fci.fci import FCI
 from ..estimators.ges.ges import GES
@@ -40,14 +39,6 @@ warnings.filterwarnings('ignore')
 # pylint: disable=W0106:expression-not-assigned, R1702:too-many-branches
 
 
-global_metric_types = [
-    'mlp', 'gbt', 'intersection', 'union',
-    'mlp_adj', 'gbt_adj', 'intersection_adj', 'union_adj',
-    'union_all', 'int_indep', 'int_final', 'union_indep', 'union_final']
-global_nc_metric_types = [
-    'mlp_nc', 'gbt_nc', 'intersection_nc', 'union_nc',
-    'mlp_adjnc', 'gbt_adjnc', 'intersection_adjnc', 'union_adjnc',
-    'union_all_nc', 'int_indep', 'int_final', 'union_indep', 'union_final']
 estimators = {
     'rex': Rex,
     'fci': FCI,
@@ -75,11 +66,16 @@ class BaseExperiment:
     Args:
     input_path (str): The path to the input data.
     output_path (str): The path to save the experiment output.
-    train_anyway (bool, optional): Whether to train the model even if the experiment exists. Defaults to False.
-    save_anyway (bool, optional): Whether to save the experiment even if it exists. Defaults to False.
-    train_size (float, optional): The proportion of data to use for training. Defaults to 0.9.
-    random_state (int, optional): The random state for reproducibility. Defaults to 42.
-    verbose (bool, optional): Whether to display verbose output. Defaults to False.
+    train_anyway (bool, optional): Whether to train the model even if the 
+        experiment exists. Defaults to False.
+    save_anyway (bool, optional): Whether to save the experiment even 
+        if it exists. Defaults to False.
+    train_size (float, optional): The proportion of data to use for training. 
+        Defaults to 0.9.
+    random_state (int, optional): The random state for reproducibility. 
+        Defaults to 42.
+    verbose (bool, optional): Whether to display verbose output. 
+        Defaults to False.
     """
 
     def __init__(

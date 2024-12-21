@@ -4,8 +4,7 @@ creating, fitting, and evaluating causal discovery experiments.
 """
 import os
 import pickle
-from turtle import pd
-import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 from typing import Tuple
 
@@ -28,7 +27,7 @@ class GraphDiscovery:
         verbose: bool = False,
         seed: int = 42
     ) -> None:
-        self.dataset_name = experiment_name
+        self.experiment_name = experiment_name
         self.estimator = model_type
         self.csv_filename = csv_filename
         self.dot_filename = true_dag_filename
@@ -44,16 +43,17 @@ class GraphDiscovery:
         # assert that the data file exists
         if not os.path.exists(csv_filename):
             raise FileNotFoundError(f"Data file {csv_filename} not found")
+        self.dataset_name = os.path.splitext(os.path.basename(csv_filename))[0]
 
         # Read the column names of the data.
         data = pd.read_csv(csv_filename)
         self.data_columns = list(data.columns)
         del data
 
-        if self.model_type == 'rex':
+        if self.estimator == 'rex':
             self.regressors = DEFAULT_REGRESSORS
         else:
-            self.regressors = [self.model_type]
+            self.regressors = [self.estimator]
 
 
     def create_experiments(self) -> dict:
@@ -179,12 +179,9 @@ class GraphDiscovery:
             bootstrap_iterations (int, optional): Number of bootstrap trials 
                 for REX. Defaults to None.
         """
-        self.create_experiments(
-            self.regressors, self.dataset_path, self.output_path)
+        self.create_experiments()
         self.fit_experiments(hpo_iterations, bootstrap_iterations)
-        self.combine_and_evaluate_dags(
-            self.dataset_path, self.output_path, self.ref_graph, 
-            self.data_columns)
+        self.combine_and_evaluate_dags()
 
 
     def save_model(
@@ -306,8 +303,8 @@ class GraphDiscovery:
             The DAG to be plotted.
         """
         model = self.trainer[list(self.trainer.keys())[0]]
-        if self.trainer.ref_graph is not None:
-            ref_graph = self.trainer.ref_graph
+        if model.ref_graph is not None:
+            ref_graph = model.ref_graph
         else:
             ref_graph = None
         plot.dag(
